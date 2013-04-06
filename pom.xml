@@ -1091,6 +1091,7 @@
         <module>modules/gplazma2-argus</module>
         <module>modules/gplazma2-grid</module>
         <module>modules/gplazma2-krb5</module>
+        <module>modules/gplazma2-homedir</module>
         <module>modules/gplazma2-jaas</module>
         <module>modules/gplazma2-nis</module>
         <module>modules/gplazma2-nsswitch</module>

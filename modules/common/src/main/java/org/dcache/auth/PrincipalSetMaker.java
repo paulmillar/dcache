@@ -1,4 +1,4 @@
-package org.dcache.gplazma.plugins;
+package org.dcache.auth;
 
 import com.google.common.collect.Sets;
 import org.globus.gsi.jaas.GlobusPrincipal;
@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.dcache.auth.FQANPrincipal;
 import org.dcache.auth.UidPrincipal;
+
 
 /**
  * The PrincipalSetMaker is a class that allows code to easily build a
@@ -78,6 +79,36 @@ public class PrincipalSetMaker
     public PrincipalSetMaker withFqan(String name)
     {
         _principals.add(new FQANPrincipal(name));
+        return this;
+    }
+
+    /**
+     * Clears the set of principals.
+     */
+    public PrincipalSetMaker thatIsEmpty()
+    {
+        _principals.clear();
+        return this;
+    }
+
+    /**
+     * Add a primary gid principal.  No checks are made whether adding this
+     * principal invalidates the set of Principals by, for example, resulting
+     * in a set of principals that has more than one primary gid.
+     */
+    public PrincipalSetMaker withPrimaryGid(long gid)
+    {
+        _principals.add(new GidPrincipal(gid, true));
+        return this;
+    }
+
+
+    /**
+     * Add a username to the set of principals.
+     */
+    public PrincipalSetMaker withUsername(String username)
+    {
+        _principals.add(new UserNamePrincipal(username));
         return this;
     }
 

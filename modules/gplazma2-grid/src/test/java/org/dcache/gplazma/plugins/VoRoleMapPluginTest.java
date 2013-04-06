@@ -14,12 +14,13 @@ import java.util.Set;
 
 import org.dcache.auth.FQANPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
+import org.dcache.auth.PrincipalSetMaker;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.gplazma.AuthenticationException;
 import org.dcache.gplazma.util.NameRolePair;
 
-import static org.dcache.gplazma.plugins.PrincipalSetMaker.aSetOfPrincipals;
+import static org.dcache.auth.PrincipalSetMaker.aSetOfPrincipals;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;

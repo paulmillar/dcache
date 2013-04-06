@@ -1,0 +1,7 @@
+<plugins>
+    <plugin>
+        <name>homedir</name>
+        <class>org.dcache.gplazma.plugins.HomedirPlugin</class>
+    </plugin>
+</plugins>
+
