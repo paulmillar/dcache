@@ -856,7 +856,22 @@ public class PoolSelectionUnitV2
     }
 
     public final static String hh_psu_set_allpoolsactive = "on|off";
-
+    public static final String fh_psu_set_allpoolsactive =
+            "NAME\n"+
+            "\tpsu set allpoolsactive\n\n"+
+            "SYNOPSIS\n"+
+            "\tpsu allpoolsactive STATE\n\n"+
+            "DESCRIPTION\n"+
+            "\tControls whether the pool-active override is enabled.  The pool-\n" +
+            "\tactive override, when enabled, will include disabled and read-\n" +
+            "\tonly pools when selecting a pool.  When the pool-active override\n" +
+            "\tis disabled then disabled or read-only pools will influence pool\n" +
+            "\tselection.\n\n" +
+            "\tIf STATE is either 'on' or 'true' then the override is enabled.\n"+
+            "\tWhen STATE is either 'off' or 'false' then the override is\n"+
+            "\tdisabled.\n\n"+
+            "OPTIONS\n"+
+            "\tnone\n";
     public String ac_psu_set_allpoolsactive_$_1(Args args) throws CommandSyntaxException {
 
         String mode = args.argv(0);
@@ -883,7 +898,17 @@ public class PoolSelectionUnitV2
     }
 
     public final static String hh_psu_netmatch = "<host address>";
-
+    public static final String fh_psu_netmatch =
+            "NAME\n"+
+            "\tpsu netmatch\n\n"+
+            "SYNOPSIS\n"+
+            "\tpsu netmatch ADDRESS\n\n"+
+            "DESCRIPTION\n"+
+            "\tVerify which net unit is selected for a given remote host.\n"+
+            "\tADDRESS is the name of the remote host, either as an IP address\n"+
+            "\tor a FQDN.\n\n"+
+            "OPTIONS\n"+
+            "\tnone\n";
     public String ac_psu_netmatch_$_1(Args args) throws UnknownHostException {
 
         NetUnit unit = null;
@@ -903,6 +928,33 @@ public class PoolSelectionUnitV2
 
     public final static String hh_psu_match = "[-linkGroup=<link group>] read|cache|write|p2p <store unit>|* <dCache unit>|* <net unit>|* <protocol unit>|* ";
 
+    public static final String fh_psu_match =
+            "NAME\n"+
+            "\tpsu match\n\n"+
+            "SYNOPSIS\n"+
+            "\tpsu match [-linkGroup=<link group>] OPERATION STORE-UNIT\n" +
+            "\t          DCACHE-UNIT NET-UNIT PROTOCOL-UNIT\n\n"+
+            "DESCRIPTION\n"+
+            "\tSimulate an incoming request of the type specified by OPERATION\n"+
+            "\tcharacterised by STORE-UNIT, DCACHE-UNIT, NET-UNIT, PROTOCOL-UNIT\n"+
+            "\tand the linkGroup option.  The list of selectable pools is presented,\n"+
+            "\tgrouped by the set of pools with the same preference level.\n\n" +
+            "\tThe OPERATION argument is either 'read', 'cache', 'write' or 'p2p'.\n"+
+            "\tThis allows simulation of attempts to read a file from disk, fetch\n"+
+            "\ta file from tape, write a new file and selecting the destination\n"+
+            "\tfor an automated pool-to-pool transfer (respectively).\n\n"+
+            "\tSTORE-UNIT is the name of store unit for the request\n\n"+
+            "\tDCACHE-UNIT is the name of dcache unit for the request\n\n"+
+            "\tNET-UNIT is the name of net unit for the request or '*' to\n" +
+            "\tmatch irrespective of network address.\n\n"+
+            "\tPROTOCOL-UNIT is the name of a protocol unit for the request or\n"+
+            "\t'*' to match irrespective of the protocol.\n\n"+
+            "OPTIONS\n"+
+            "\t-linkGroup This controls which linkgroup has been selected for\n"+
+            "\t           the transfer.  If specified, it must be the name of\n"+
+            "\t           a link-group and the transfer will be simulated as if\n"+
+            "\t           the link-group was selected.  If absent then the\n"+
+            "\t           transfer is simulated outside of any space-reservation";
     public String ac_psu_match_$_5(Args args) throws Exception {
 
         try {
