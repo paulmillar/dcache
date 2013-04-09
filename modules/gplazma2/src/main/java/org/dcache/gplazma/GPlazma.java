@@ -1,25 +1,16 @@
 package org.dcache.gplazma;
 
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
 
 import java.security.Principal;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
-
-import org.dcache.auth.LoginNamePrincipal;
-import org.dcache.auth.Origin;
-import org.dcache.auth.PasswordCredential;
 import org.dcache.commons.util.NDC;
 import org.dcache.gplazma.configuration.Configuration;
 import org.dcache.gplazma.configuration.ConfigurationItem;
@@ -32,13 +23,9 @@ import org.dcache.gplazma.loader.PluginFactory;
 import org.dcache.gplazma.loader.PluginLoader;
 import org.dcache.gplazma.loader.PluginLoadingException;
 import org.dcache.gplazma.loader.XmlResourcePluginLoader;
-import org.dcache.gplazma.monitor.CombinedLoginMonitor;
 import org.dcache.gplazma.monitor.LoggingLoginMonitor;
 import org.dcache.gplazma.monitor.LoginMonitor;
 import org.dcache.gplazma.monitor.LoginMonitor.Result;
-import org.dcache.gplazma.monitor.LoginResult;
-import org.dcache.gplazma.monitor.LoginResultPrinter;
-import org.dcache.gplazma.monitor.RecordingLoginMonitor;
 import org.dcache.gplazma.plugins.GPlazmaAccountPlugin;
 import org.dcache.gplazma.plugins.GPlazmaAuthenticationPlugin;
 import org.dcache.gplazma.plugins.GPlazmaIdentityPlugin;
@@ -56,10 +43,7 @@ import org.dcache.gplazma.validation.ValidationStrategy;
 import org.dcache.gplazma.validation.ValidationStrategyFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Predicates.instanceOf;
-import static com.google.common.base.Predicates.not;
-import static com.google.common.collect.Collections2.filter;
-import static com.google.common.collect.Iterables.getFirst;
+import org.dcache.gplazma.configuration.PluginsLifecycleAware;
 
 public class GPlazma
 {
@@ -68,8 +52,6 @@ public class GPlazma
 
     private static final LoginMonitor LOGGING_LOGIN_MONITOR =
             new LoggingLoginMonitor();
-
-    private KnownFailedLogins _failedLogins = new KnownFailedLogins();
 
     private Properties _globalProperties;
     private boolean _globalPropertiesHaveUpdated;
@@ -91,6 +73,9 @@ public class GPlazma
     private List<GPlazmaPluginElement<GPlazmaIdentityPlugin>>
             identityPluginElements;
 
+    private final Set<PluginsLifecycleAware> _pluginsLifecycleAware
+            = new HashSet<>();
+
     private final ConfigurationLoadingStrategy configurationLoadingStrategy;
     private AuthenticationStrategy _authStrategy;
     private MappingStrategy _mapStrategy;
@@ -99,129 +84,6 @@ public class GPlazma
     private ValidationStrategy validationStrategy;
     private IdentityStrategy identityStrategy;
 
-    /**
-     * Storage class for failed login attempts.  This allows gPlazma to
-     * refrain from filling up log files should a client attempt multiple
-     * login attempts that all fail.  We must be careful about how we store
-     * the incoming Subjects.
-     *
-     * This class is thread-safe.
-     */
-    private static class KnownFailedLogins
-    {
-        private final Set<Subject> _failedLogins =
-                new CopyOnWriteArraySet<>();
-
-        /**
-         * In general, this class does not store any private credential since
-         * doing this would be against the general security advise of
-         * only storing sensitive material (e.g., passwords) for as long as
-         * is necessary.
-         *
-         * However, the class may wish to distinguish between different login
-         * attempts based information contained in private credentials.  To
-         * support this, principals may be added that contain
-         * non-sensitive information contained in a private credential.
-         */
-        private static void addPrincipalsForPrivateCredentials(
-                Set<Principal> principals, Set<Object> privateCredentials)
-        {
-            PasswordCredential password =
-                    getFirst(Iterables.filter(privateCredentials,
-                    PasswordCredential.class), null);
-
-            if(password != null) {
-                Principal loginName =
-                        new LoginNamePrincipal(password.getUsername());
-                principals.add(loginName);
-            }
-        }
-
-        /**
-         * Some public credentials, when compared, will always be different.
-         * An example of this is the X509Certificate chain.  This is provided
-         * to gPlazma as an array of X509Certificate objects; however, an
-         * array, as an Object, will always be different to any other array.
-         *
-         * To work around this issue, this method normalises the credential;
-         * that is, it converts a credential to one in which two distinct
-         * Objects that represent the same information are equal.
-         * @param storageCredentials the Set into which normalised credentials
-         * are stored.
-         * @param credentials the Set of credentials that are to be normalised
-         */
-        private static void addNormalisedPublicCredentials(
-                Set<Object> storageCredentials, Set<Object> credentials)
-        {
-            for(Object credential : credentials) {
-                Object normalised;
-                if(credential instanceof X509Certificate[]) {
-                    normalised = normalise((X509Certificate[])credential);
-                } else {
-                    normalised = credential;
-                }
-                storageCredentials.add(normalised);
-            }
-        }
-
-        private static Object normalise(X509Certificate[] credential)
-        {
-            return Lists.newArrayList(credential);
-        }
-
-
-        /**
-         * Calculate the storage Subject, given an incoming subject.  The
-         * storage subject is similar to the supplied Subject but has sensitive
-         * material (like passwords) removed and is location agnostic
-         * (e.g., any Origin principals are removed).
-         */
-        private static Subject storageSubjectFor(Subject subject)
-        {
-            Subject storage = new Subject();
-
-            addNormalisedPublicCredentials(storage.getPublicCredentials(),
-                    subject.getPublicCredentials());
-
-            /*
-             * Do not store any private credentials as doing so would be a
-             * security risk.
-             */
-
-            Collection<Principal> allExceptOrigin =
-                    filter(subject.getPrincipals(), not(instanceOf(Origin.class)));
-
-            storage.getPrincipals().addAll(allExceptOrigin);
-
-            addPrincipalsForPrivateCredentials(storage.getPrincipals(),
-                    subject.getPrivateCredentials());
-
-            return storage;
-        }
-
-        private boolean has(Subject subject)
-        {
-            Subject storage = storageSubjectFor(subject);
-            return _failedLogins.contains(storage);
-        }
-
-        private void add(Subject subject)
-        {
-            Subject storage = storageSubjectFor(subject);
-            _failedLogins.add(storage);
-        }
-
-        private void remove(Subject subject)
-        {
-            Subject storage = storageSubjectFor(subject);
-            _failedLogins.remove(storage);
-        }
-
-        private void clear()
-        {
-            _failedLogins.clear();
-        }
-    }
 
 
 
@@ -256,33 +118,14 @@ public class GPlazma
         }
     }
 
+    public void addConfigurationLifecycleAware(PluginsLifecycleAware aware)
+    {
+        _pluginsLifecycleAware.add(aware);
+    }
+
     public LoginReply login(Subject subject) throws AuthenticationException
     {
-        RecordingLoginMonitor record = new RecordingLoginMonitor();
-        LoginMonitor combined = CombinedLoginMonitor.of(record,
-                LOGGING_LOGIN_MONITOR);
-
-        try {
-            LoginReply reply = login(subject, combined);
-            _failedLogins.remove(subject);
-            return reply;
-        } catch(AuthenticationException e) {
-            if(!_failedLogins.has(subject)) {
-                _failedLogins.add(subject);
-
-                LoginResult result = record.getResult();
-
-                if(result.hasStarted()) {
-                    LoginResultPrinter printer = new LoginResultPrinter(result);
-                    LOGGER.warn("Login attempt failed; " +
-                            "detailed explanation follows:\n{}",
-                            printer.print());
-                } else {
-                    LOGGER.warn("Login attempt failed: {}", e.getMessage());
-                }
-            }
-            throw e;
-        }
+        return login(subject, LOGGING_LOGIN_MONITOR);
     }
 
     public LoginReply login(Subject subject, LoginMonitor monitor)
@@ -561,8 +404,10 @@ public class GPlazma
     {
         if (_globalPropertiesHaveUpdated || configurationLoadingStrategy.hasUpdated()) {
             _globalPropertiesHaveUpdated = false;
-            _failedLogins.clear();
             loadPlugins();
+            for(PluginsLifecycleAware aware : _pluginsLifecycleAware) {
+                aware.pluginsReloaded();
+            }
         }
 
         if(isPreviousLoadPluginsProblematic()) {

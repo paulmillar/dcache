@@ -419,6 +419,7 @@ public class CellNucleus implements ThreadFactory
             if (answer == null) {
                 return null;
             }
+            CDC.updateDiagnostic(answer);
             answer = answer.decode();
 
             Object obj = answer.getMessageObject();

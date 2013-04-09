@@ -216,6 +216,9 @@ public class CDC
         Object session = envelope.getSession();
         NDC.push(getMessageContext(envelope));
         setMdc(MDC_SESSION, (session == null) ? null : session.toString());
+        if (envelope.isDiagnostic()) {
+            NDC.enableDiagnostic();
+        }
     }
 
     /**
@@ -241,5 +244,19 @@ public class CDC
         MDC.remove(MDC_CELL);
         MDC.remove(MDC_SESSION);
         NDC.clear();
+    }
+
+    public static void updateDiagnostic(CellMessage envelope)
+    {
+        if(envelope.isDiagnostic()) {
+            NDC.enableDiagnostic();
+        }
+    }
+
+    public void updateStoredDiagnostic(CellMessage envelope)
+    {
+        if(envelope.isDiagnostic()) {
+            _ndc.enableStoredDiagnostic();
+        }
     }
 }

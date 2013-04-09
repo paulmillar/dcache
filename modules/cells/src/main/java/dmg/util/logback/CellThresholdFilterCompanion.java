@@ -10,6 +10,8 @@ import java.util.Map;
 import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellNucleus;
 
+import org.dcache.commons.util.NDC;
+
 /**
  * Logback Filter that filters according to the FilterThresholds of
  * the source cell.
@@ -28,6 +30,10 @@ public class CellThresholdFilterCompanion extends Filter<ILoggingEvent>
     {
         if (!isStarted()) {
             return FilterReply.NEUTRAL;
+        }
+
+        if (NDC.isDiagnostic() && event.getLevel().isGreaterOrEqual(Level.DEBUG)) {
+            return FilterReply.ACCEPT;
         }
 
         Map<String,String> mdc = event.getMDCPropertyMap();

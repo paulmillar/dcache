@@ -25,6 +25,9 @@ public class CellLock {
 
     public void setObject(Object o) {
         _object = o;
+        if (o instanceof CellMessage) {
+            _cdc.updateStoredDiagnostic((CellMessage)o);
+        }
     }
 
     public Object getObject() {

@@ -10,6 +10,10 @@ import org.dcache.gplazma.configuration.ConfigurationItemControl;
 import org.dcache.gplazma.monitor.LoginMonitor.Result;
 
 import static com.google.common.base.Preconditions.checkState;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Sets;
+import java.util.Iterator;
 
 /**
  * This class holds a detailed report of the activity when gPlazma processes
@@ -97,6 +101,18 @@ public class LoginResult
     public boolean hasCompleted()
     {
         return getSessionPhase().hasHappened();
+    }
+
+    public Set<Principal> allObservedPrincipals()
+    {
+        Set<Principal> principals = new HashSet<>();
+
+        Iterables.addAll(principals, _authPhase.getPrincipals());
+        Iterables.addAll(principals, _mapPhase.getPrincipals());
+        Iterables.addAll(principals, _accountPhase.getPrincipals());
+        Iterables.addAll(principals, _sessionPhase.getPrincipals());
+
+        return principals;
     }
 
     /**
@@ -255,7 +271,7 @@ public class LoginResult
      * Store two sets (with same Generics interface) and allow discovery of
      * how the objects has changed.
      */
-    public static class SetDiff<T>
+    public static class SetDiff<T> implements Iterable<T>
     {
         private final Set<T> _before;
         private final Set<T> _after;
@@ -288,6 +304,12 @@ public class LoginResult
             Set<T> removed = new HashSet<>(_before);
             removed.removeAll(_after);
             return removed;
+        }
+
+        @Override
+        public Iterator<T> iterator()
+        {
+            return Sets.newHashSet(Iterables.concat(_before, _after)).iterator();
         }
     }
 

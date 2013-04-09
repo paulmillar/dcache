@@ -19,6 +19,7 @@ import java.util.Set;
 import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellNucleus;
 
+import org.dcache.commons.util.NDC;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
@@ -120,6 +121,10 @@ public class CellThresholdFilter extends TurboFilter
     {
         if (!isStarted()) {
             return FilterReply.NEUTRAL;
+        }
+
+        if (NDC.isDiagnostic() && level.isGreaterOrEqual(Level.DEBUG)) {
+            return FilterReply.ACCEPT;
         }
 
         String cell = MDC.get(CDC.MDC_CELL);

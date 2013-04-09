@@ -17,14 +17,17 @@ public class NDC
      */
     static public final String KEY_NDC = "org.dcache.ndc";
     static public final String KEY_POSITIONS = "org.dcache.ndc.positions";
+    static public final String KEY_DIAGNOSE_OFFSET = "org.dcache.ndc.diagnostic.offset";
 
     private final String _ndc;
     private final String _positions;
+    private String _diagnose;
 
-    public NDC(String ndc, String positions)
+    public NDC(String ndc, String positions, String diagnose)
     {
         _ndc = ndc;
         _positions = positions;
+        _diagnose = diagnose;
     }
 
     public String getNdc()
@@ -35,6 +38,18 @@ public class NDC
     public String getPositions()
     {
         return _positions;
+    }
+
+    public String getDiagnose()
+    {
+        return _diagnose;
+    }
+
+    public void enableStoredDiagnostic()
+    {
+        if(_diagnose == null) {
+            _diagnose = offsetFrom(_positions);
+        }
     }
 
     /**
@@ -58,6 +73,7 @@ public class NDC
     {
         MDC.remove(KEY_NDC);
         MDC.remove(KEY_POSITIONS);
+        MDC.remove(KEY_DIAGNOSE_OFFSET);
     }
 
     /**
@@ -65,7 +81,8 @@ public class NDC
      */
     static public NDC cloneNdc()
     {
-        return new NDC(MDC.get(KEY_NDC), MDC.get(KEY_POSITIONS));
+        return new NDC(MDC.get(KEY_NDC), MDC.get(KEY_POSITIONS),
+                MDC.get(KEY_DIAGNOSE_OFFSET));
     }
 
     /**
@@ -75,6 +92,7 @@ public class NDC
     {
         setMdc(KEY_NDC, ndc.getNdc());
         setMdc(KEY_POSITIONS, ndc.getPositions());
+        setMdc(KEY_DIAGNOSE_OFFSET, ndc.getDiagnose());
     }
 
     /**
@@ -107,11 +125,37 @@ public class NDC
             if (pos == -1) {
                 MDC.remove(KEY_NDC);
                 MDC.remove(KEY_POSITIONS);
+                MDC.remove(KEY_DIAGNOSE_OFFSET);
             } else {
                 int offset = Integer.parseInt(positions.substring(pos + 1));
                 MDC.put(KEY_NDC, ndc.substring(0, offset));
-                MDC.put(KEY_POSITIONS, positions.substring(0, pos));
+                String newPositions = positions.substring(0, pos);
+                MDC.put(KEY_POSITIONS, newPositions);
+                String diagnose = MDC.get(KEY_DIAGNOSE_OFFSET);
+                if(diagnose != null) {
+                    int newPos = newPositions.lastIndexOf(',');
+                    if(newPos < Integer.valueOf(diagnose)) {
+                        MDC.remove(KEY_DIAGNOSE_OFFSET);
+                    }
+                }
             }
         }
+    }
+
+    static public boolean isDiagnostic()
+    {
+        return MDC.get(KEY_DIAGNOSE_OFFSET) != null;
+    }
+
+    static public void enableDiagnostic()
+    {
+        if(!isDiagnostic()) {
+            MDC.put(KEY_DIAGNOSE_OFFSET, offsetFrom(MDC.get(KEY_POSITIONS)));
+        }
+    }
+
+    static private String offsetFrom(String value)
+    {
+        return value == null ? "-1" : String.valueOf(value.lastIndexOf(','));
     }
 }

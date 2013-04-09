@@ -1,5 +1,7 @@
 package dmg.cells.nucleus ;
 
+import org.dcache.commons.util.NDC;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -8,6 +10,7 @@ import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -34,6 +37,7 @@ public class CellMessage implements Cloneable , Serializable {
   private static final int   STREAM_MODE    = 1 ;
   private static final int   DUMMY_MODE     = 2 ;
   private transient long _receivedAt;
+  private boolean _isDiagnostic;
 
   public CellMessage( CellPath addr , Serializable msg ){
 
@@ -47,6 +51,7 @@ public class CellMessage implements Cloneable , Serializable {
      _lastUmid     = _umid ;
      _session      = CDC.getSession();
      _messageStream = null;
+     _isDiagnostic = NDC.isDiagnostic();
   }
 
   @Override
@@ -107,6 +112,7 @@ public boolean equals( Object obj ){
      _source      = new CellPath() ;
      _lastUmid    = _umid ;
      _isPersistent = true;
+     _isDiagnostic = NDC.isDiagnostic();
   }
   public boolean isFinalDestination(){ return _destination.isFinalDestination() ; }
   public boolean isFirstDestination(){ return _destination.isFirstDestination() ; }
@@ -139,6 +145,7 @@ public boolean equals( Object obj ){
         copy._isPersistent = _isPersistent;
         copy._session = _session;
         copy._ttl = _ttl;
+        copy._isDiagnostic = _isDiagnostic;
         return copy;
     }
 
@@ -206,5 +213,10 @@ public boolean equals( Object obj ){
     public long getLocalAge()
     {
         return System.currentTimeMillis() - _receivedAt;
+    }
+
+    public boolean isDiagnostic()
+    {
+        return _isDiagnostic;
     }
 }
