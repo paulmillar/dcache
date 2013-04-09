@@ -1120,5 +1120,6 @@
         <module>modules/tar</module>
         <module>modules/system-test</module>
         <module>modules/missingfiles-semsg</module>
+        <module>modules/crypto-tool</module>
     </modules>
 </project>
