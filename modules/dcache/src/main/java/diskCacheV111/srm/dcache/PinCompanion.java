@@ -87,6 +87,9 @@ import org.dcache.acl.enums.AccessMask;
 import org.dcache.cells.AbstractMessageCallback;
 import org.dcache.cells.CellStub;
 import org.dcache.cells.ThreadManagerMessageCallback;
+import org.dcache.missingfiles.Action;
+import org.dcache.missingfiles.AlwaysFailMissingFileStrategy;
+import org.dcache.missingfiles.MissingFileStrategy;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.pinmanager.PinManagerPinMessage;
@@ -102,6 +105,9 @@ public class PinCompanion
     private final static Logger _log =
         LoggerFactory.getLogger(PinCompanion.class);
 
+    private MissingFileStrategy _missingFileStrategy =
+        new AlwaysFailMissingFileStrategy();
+
     public final static String DISK_PIN_ID =
         "disk";
 
@@ -116,6 +122,7 @@ public class PinCompanion
     private final CellStub _pinManagerStub;
     private final PoolMonitor _poolMonitor;
     private final boolean _isOnlinePinningEnabled;
+    private boolean _hasBeenRetried;
 
     private Object _state;
     private FileAttributes _attributes;
@@ -303,6 +310,19 @@ public class PinCompanion
 
     private void fail(int rc, Object error)
     {
+        if(!_hasBeenRetried &&
+            (rc == FILE_NOT_FOUND || rc == FILE_NOT_IN_REPOSITORY)) {
+
+            // requestPath needed, somehow
+            if(_missingFileStrategy.recommendedAction(_subject, _path, _path)
+                      == Action.RETRY) {
+                _hasBeenRetried = true;
+                _state = new LookupState();
+            } else {
+                // fall-through.
+            }
+        }
+
         switch (rc) {
         case FILE_NOT_FOUND:
             _callbacks.FileNotFound("No such file");
