@@ -1,6 +1,6 @@
 package org.dcache.missingfiles.plugins;
 
-import org.dcache.util.ConfigurationProperties;
+import java.util.Properties;
 
 
 /**
@@ -15,7 +15,7 @@ public class SEMsgPluginFactory implements PluginFactory
     }
 
     @Override
-    public Plugin createPlugin(ConfigurationProperties properties)
+    public Plugin createPlugin(Properties properties)
     {
         return new SEMsgPlugin(properties);
     }

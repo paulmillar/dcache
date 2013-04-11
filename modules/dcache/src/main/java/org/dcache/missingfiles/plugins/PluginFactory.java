@@ -1,6 +1,6 @@
 package org.dcache.missingfiles.plugins;
 
-import org.dcache.util.ConfigurationProperties;
+import java.util.Properties;
 
 
 /**
@@ -17,10 +17,9 @@ public interface PluginFactory
 
 
     /**
-     *  Create a new instance of the plugin.  The environment parameter is a
+     *  Create a new instance of the plugin.  The properties parameter is a
      *  collection of keyword-value pairs taken from the dCache
      *  configuration.
      */
-    public Plugin createPlugin(ConfigurationProperties properties);
-
+    public Plugin createPlugin(Properties properties);
 }

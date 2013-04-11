@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.ServiceLoader;
 
 import dmg.cells.nucleus.EnvironmentAware;
@@ -36,8 +37,7 @@ public class PluginChain implements EnvironmentAware
 
     private String _pluginList;
 
-    private final ConfigurationProperties _properties =
-            new ConfigurationProperties();
+    private final Properties _properties = new Properties();
 
 
     private final static Function<PluginFactory,String> getName =

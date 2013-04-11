@@ -3,6 +3,8 @@ package org.dcache.missingfiles.plugins;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Properties;
+
 import javax.security.auth.Subject;
 
 import java.io.IOException;
@@ -13,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.dcache.auth.Subjects;
-import org.dcache.util.ConfigurationProperties;
 import org.dcache.util.FireAndForgetTask;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -44,7 +45,7 @@ public class SEMsgPlugin implements Plugin
     private String _certificatePath;
     private String _privateKeyPath;
 
-    public SEMsgPlugin(ConfigurationProperties properties)
+    public SEMsgPlugin(Properties properties)
     {
         _topic = getRequiredProperty(properties, PROPERTY_TOPIC);
         _endpoint = getRequiredProperty(properties, PROPERTY_ENDPOINT);
@@ -53,9 +54,9 @@ public class SEMsgPlugin implements Plugin
         _privateKeyPath = getRequiredProperty(properties, PROPERTY_PRIVATE_KEY);
     }
 
-    private static String getRequiredProperty(ConfigurationProperties properties, String key)
+    private static String getRequiredProperty(Properties properties, String key)
     {
-        String value = properties.getValue(key);
+        String value = properties.getProperty(key);
 
         if(value == null) {
             throw new IllegalArgumentException("missing property: " + key);
