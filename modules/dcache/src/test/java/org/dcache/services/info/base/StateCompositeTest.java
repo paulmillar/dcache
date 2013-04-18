@@ -8,8 +8,10 @@ import org.junit.Test;
 
 import java.util.Date;
 import java.util.Set;
+import org.dcache.junit.AgainstTheClock;
 
 import org.dcache.services.info.base.guides.SubtreeStateGuide;
+import org.junit.experimental.categories.Category;
 
 import static org.junit.Assert.*;
 
@@ -203,6 +205,7 @@ public class StateCompositeTest extends InfoBaseTestHelper {
     /**
      * Test method for {@link StateComposite#hasExpired()}.
      */
+    @Category(AgainstTheClock.class)
     @Test
     public void testHasExpired() {
         StateComposite sc = new StateComposite( 60);
@@ -876,6 +879,7 @@ public class StateCompositeTest extends InfoBaseTestHelper {
         assertEquals( "_immortalComposite equal to _ephemeralComposite", _immortalComposite, _ephemeralComposite);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testNewMortalComposite() throws InterruptedException, MetricStatePathException {
         /**

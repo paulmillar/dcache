@@ -17,12 +17,14 @@
 
 package org.dcache.utils;
 
+import org.dcache.junit.AgainstTheClock;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
+import org.junit.experimental.categories.Category;
 
 public class CacheTest {
 
@@ -34,6 +36,7 @@ public class CacheTest {
                 TimeUnit.SECONDS.toMillis(5));
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testPutGet() {
 
@@ -43,6 +46,7 @@ public class CacheTest {
         assertEquals("received object not equal", "value1", value);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testGetAfterTimeout() throws Exception {
 
@@ -53,6 +57,7 @@ public class CacheTest {
         assertNull("Object not expired", value);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testGetAfterRemove() throws Exception {
 
@@ -63,6 +68,7 @@ public class CacheTest {
         assertNull("Object not removed", value);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testRemoveValid() throws Exception {
         _cache.put("key1", "value1");
@@ -90,6 +96,7 @@ public class CacheTest {
         assertNull("Object not expired", value);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testBigLifeTime() {
          _cache.put("key1", "value1", Long.MAX_VALUE, TimeUnit.SECONDS.toMillis(180));

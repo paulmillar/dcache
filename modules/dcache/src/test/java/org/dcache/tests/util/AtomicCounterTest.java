@@ -12,6 +12,10 @@ import org.dcache.commons.util.AtomicCounter;
 
 import static org.junit.Assert.*;
 
+import org.dcache.commons.util.AtomicCounter;
+import org.dcache.junit.AgainstTheClock;
+import org.junit.experimental.categories.Category;
+
 public class AtomicCounterTest
 {
     private AtomicCounter counter;
@@ -81,6 +85,7 @@ public class AtomicCounterTest
         assertFalse(counter.awaitChangeUntil(0, new Date(System.currentTimeMillis() - 100)));
     }
 
+    @Category(AgainstTheClock.class)
     @Test(expected=InterruptedException.class)
     public void awaitIsInterruptible()
         throws InterruptedException

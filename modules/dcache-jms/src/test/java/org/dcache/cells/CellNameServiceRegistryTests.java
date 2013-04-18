@@ -23,6 +23,14 @@ import java.util.Set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import org.junit.Before;
+import org.junit.Test;
+
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Sets;
+import org.dcache.junit.AgainstTheClock;
+import org.junit.experimental.categories.Category;
+
 /**
  * Set of tests to verify the CellNameServiceRegistry
  */
@@ -71,6 +79,7 @@ public class CellNameServiceRegistryTests {
         assertNull(domain);
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testExpiredDomain() throws InterruptedException {
         String expiringDomain = "new-domain";

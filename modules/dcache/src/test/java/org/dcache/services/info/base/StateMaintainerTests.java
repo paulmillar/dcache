@@ -11,8 +11,16 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
+import org.dcache.junit.AgainstTheClock;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import org.junit.experimental.categories.Category;
 
 /**
  * A set of tests to check that the StateMaintainer works as expected.
@@ -222,6 +230,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
                       _maintainer.countPendingUpdates());
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testUpdateState() throws InterruptedException {
         _maintainer.setStateCaretaker( new SlowCaretaker( 1));
@@ -232,6 +241,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
                       _maintainer.countPendingUpdates());
     }
 
+    @Category(AgainstTheClock.class)
     @Test(timeout = 1000)
     public void testCountPendingUpdates() throws InterruptedException {
         // Create a caretaker that will take 10s to process each request.
@@ -254,6 +264,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
                       _maintainer.countPendingUpdates());
     }
 
+    @Category(AgainstTheClock.class)
     @Test(timeout = 1000)
     public void testUpdateProcessed() throws InterruptedException {
         _caretaker.setProcessUpdateCount( 1);
@@ -273,6 +284,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
                       _maintainer.countPendingUpdates());
     }
 
+    @Category(AgainstTheClock.class)
     @Test(timeout = 1000)
     public void testTwoUpdateProcessed() throws InterruptedException {
         _caretaker.setProcessUpdateCount( 2);
@@ -301,6 +313,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
      *
      */
 
+    @Category(AgainstTheClock.class)
     @Test(timeout = 1000)
     public void testExpiring() throws InterruptedException {
 
@@ -318,8 +331,7 @@ public class StateMaintainerTests extends InfoBaseTestHelper {
         _caretaker.waitForMetricExpiry();
     }
 
-    // See http://rt.dcache.org/Ticket/Display.html?id=7330
-    @Ignore("Broken test: depends on timing on machine")
+    @Category(AgainstTheClock.class)
     @Test(timeout = 1000)
     public void testExpiringDelayChanging() throws InterruptedException {
 

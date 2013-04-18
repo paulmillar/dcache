@@ -7,6 +7,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -32,6 +33,7 @@ import diskCacheV111.vehicles.StorageInfo;
 
 import dmg.cells.nucleus.CellPath;
 
+import org.dcache.junit.AgainstTheClock;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.classic.FairQueueAllocation;
 import org.dcache.pool.classic.SpaceSweeper2;
@@ -919,8 +921,7 @@ public class RepositorySubsystemTest
     }
 
 
-    // See http://rt.dcache.org/Ticket/Display.html?id=7337
-    @Ignore("Time-critical test; may fail under extreme load")
+    @Category(AgainstTheClock.class)
     @Test
     public void testStickyExpiration()
         throws IOException, CacheException, InterruptedException

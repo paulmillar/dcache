@@ -1,7 +1,9 @@
 package dmg.util;
 
+import org.dcache.junit.AgainstTheClock;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import static org.junit.Assert.fail;
 
@@ -26,6 +28,7 @@ public class GateTest {
         closedGate = false;
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testGatePassing() {
         int timesWaited = 0;

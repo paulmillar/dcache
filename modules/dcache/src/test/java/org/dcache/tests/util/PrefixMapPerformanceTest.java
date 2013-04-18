@@ -3,8 +3,10 @@ package org.dcache.tests.util;
 import org.junit.Test;
 
 import diskCacheV111.util.FsPath;
+import org.dcache.junit.Benchmark;
 
 import org.dcache.util.PrefixMap;
+import org.junit.experimental.categories.Category;
 
 public class PrefixMapPerformanceTest
 {
@@ -138,6 +140,7 @@ public class PrefixMapPerformanceTest
         }
     }
 
+    @Category(Benchmark.class)
     @Test
     public void compareSmall()
     {
@@ -153,6 +156,7 @@ public class PrefixMapPerformanceTest
                            + " entries: " + (t2 - t1) + "ms");
     }
 
+    @Category(Benchmark.class)
     @Test
     public void compareMedium()
     {
@@ -168,6 +172,7 @@ public class PrefixMapPerformanceTest
                            + " entries: " + (t2 - t1) + "ms");
     }
 
+    @Category(Benchmark.class)
     @Test
     public void compareLarge()
     {
@@ -183,6 +188,7 @@ public class PrefixMapPerformanceTest
                            + " entries: " + (t2 - t1) + "ms");
     }
 
+    @Category(Benchmark.class)
     @Test
     public void compareHuge()
     {

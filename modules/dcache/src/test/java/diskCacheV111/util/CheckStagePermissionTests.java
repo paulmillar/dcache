@@ -13,6 +13,10 @@ import java.util.regex.PatternSyntaxException;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import diskCacheV111.util.CheckStagePermission;
+import org.dcache.junit.AgainstTheClock;
+import org.junit.experimental.categories.Category;
+
 public class CheckStagePermissionTests {
 
     public static final String TEST_PREFIX = "stagePermissionFile";
@@ -74,6 +78,7 @@ public class CheckStagePermissionTests {
         assertFalse( "read still required after initial read", _check.fileNeedsRereading());
     }
 
+    @Category(AgainstTheClock.class)
     @Test
     public void testRereadNeededAfterTouch() throws PatternSyntaxException, IOException, InterruptedException {
         _check.rereadConfig();
