@@ -22,11 +22,13 @@ import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Required;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.security.cert.X509Certificate;
@@ -69,6 +71,8 @@ public class JettyGSIConnector
     private TrustedCertificates _trustedCerts;
     private GSSManager _manager;
 
+    private DiagnosticTriggers<InetAddress> _diagnosticAddresses;
+
     // public static final String GSI_CONTEXT="org.gglobus.gsi.context";
     // public static final String GSI_USER_DN="org.globus.gsi.authorized.user.name";
     // public static final String GSI_CREDENTIALS="org.globus.gsi.credentials";
@@ -100,6 +104,12 @@ public class JettyGSIConnector
     {
         _hostCertRefreshInterval = DEFAULT_HOST_CERT_REFRESH_INTERVAL;
         _trustAnchorRefreshInterval = DEFAULT_TRUST_ANCHOR_REFRESH_INTERVAL;
+    }
+
+    @Required
+    public void setDiagnosticTriggers(DiagnosticTriggers<InetAddress> triggers)
+    {
+        _diagnosticAddresses = triggers;
     }
 
     /**
@@ -388,25 +398,32 @@ public class JettyGSIConnector
     {
         Socket socket = _serverSocket.accept();
 
-        try {
-            loadServerCredentials();
-            loadTrustAnchors();
+        try (CDC ignored = new CDC()) {
+            NDC.push(socket.getInetAddress().getHostAddress() + ":" +
+                    socket.getPort());
 
-            configure(socket);
+            _diagnosticAddresses.accept(socket.getInetAddress());
 
-            GsiSocket gsiSocket = new GsiSocket(socket, createGSSContext());
-            gsiSocket.setUseClientMode(false);
-            gsiSocket.setAuthorization(null);
-            gsiSocket.setAutoFlush(_autoFlush);
+            try {
+                loadServerCredentials();
+                loadTrustAnchors();
 
-            ConnectorEndPoint connection = new GsiConnection(gsiSocket);
-            connection.dispatch();
-        } catch (GSSException e) {
-            _log.error("Failed to initialize GSS Context: " , e);
-            throw new IOException("Failed to initialize GSS context", e);
-        } catch (IOException e) {
-            _log.warn("Failed to accept connection: " + e);
-            throw e;
+                configure(socket);
+
+                GsiSocket gsiSocket = new GsiSocket(socket, createGSSContext());
+                gsiSocket.setUseClientMode(false);
+                gsiSocket.setAuthorization(null);
+                gsiSocket.setAutoFlush(_autoFlush);
+
+                ConnectorEndPoint connection = new GsiConnection(gsiSocket);
+                connection.dispatch();
+            } catch (GSSException e) {
+                _log.error("Failed to initialize GSS Context: " , e);
+                throw new IOException("Failed to initialize GSS context", e);
+            } catch (IOException e) {
+                _log.warn("Failed to accept connection: " + e);
+                throw e;
+            }
         }
     }
 
@@ -537,18 +554,21 @@ public class JettyGSIConnector
 
     public class GsiConnection extends ConnectorEndPoint
     {
+        private final CDC _constructorsCDC;
+
         public GsiConnection(Socket socket) throws IOException
         {
             super(socket);
+            _constructorsCDC = new CDC();
         }
 
         @Override
         public void run()
         {
             try (CDC ignored = new CDC()) {
+                _constructorsCDC.restore();
+
                 try {
-                    NDC.push(_socket.getInetAddress().getHostAddress() + ":" +
-                            _socket.getPort());
                     int handshakeTimeout = getHandshakeTimeout();
                     int oldTimeout = _socket.getSoTimeout();
                     if (handshakeTimeout > 0) {

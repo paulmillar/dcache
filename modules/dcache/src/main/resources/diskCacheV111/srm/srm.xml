@@ -128,6 +128,18 @@
     </property>
   </bean>
 
+  <bean id="diagnostic-triggers"
+	class="org.dcache.util.DiagnosticTriggers">
+      <description>The set of addresses that trigger diagnostic logging</description>
+  </bean>
+
+  <bean id="diagnostic-triggers-cli"
+	class="org.dcache.util.DiagnosticAddressTriggerCLI">
+      <description>CLI for managing diagnostic triggers</description>
+
+      <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
+  </bean>
+
   <bean id="auth-persistence-manager"
         class="org.dcache.auth.persistence.AuthRecordPersistenceManager">
     <description>Persistence manager for authentication</description>
@@ -461,6 +473,7 @@
         <property name="handshakeTimeout" value="10000" />
         <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
         <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
+	<property name="diagnosticTriggers" ref="diagnostic-triggers"/>
     </bean>
 
     <bean id="ssl-connector"
@@ -486,6 +499,7 @@
         <property name="handshakeTimeout" value="10000" />
         <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
         <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
+	<property name="diagnosticTriggers" ref="diagnostic-triggers"/>
     </bean>
 
 </beans>

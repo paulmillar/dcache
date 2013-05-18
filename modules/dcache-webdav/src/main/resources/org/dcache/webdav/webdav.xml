@@ -66,6 +66,20 @@
       <constructor-arg value="2"/>
   </bean>
 
+  
+  <bean id="diagnostic-triggers"
+       class="org.dcache.util.DiagnosticTriggers">
+      <description>The set of addresses that trigger diagnostic logging</description>
+  </bean>
+
+
+  <bean id="diagnostic-triggers-cli"
+       class="org.dcache.util.DiagnosticAddressTriggerCLI">
+      <description>CLI for managing diagnostic triggers</description>
+
+      <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
+  </bean>
+
 
   <bean id="login-strategy" class="org.dcache.auth.UnionLoginStrategy">
       <description>Processes login requests</description>
@@ -287,6 +301,7 @@
 		    value="#{ ${hostCertificateRefreshPeriod} * 1000 }"/>
 	  <property name="millisecBetweenTrustAnchorRefresh"
 		    value="#{ ${trustAnchorRefreshPeriod} * 1000 }"/>
+	  <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
       </bean>
   </beans>
 
