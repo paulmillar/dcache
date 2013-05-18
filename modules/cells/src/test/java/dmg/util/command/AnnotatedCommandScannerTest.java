@@ -4,6 +4,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
+import java.net.InetAddress;
 import java.sql.Time;
 import java.util.List;
 import java.util.Map;
@@ -650,5 +651,31 @@ public class AnnotatedCommandScannerTest
         }
 
         _scanner.scan(new SUT());
+    }
+
+    @Test
+    public void shouldAcceptCustomFactory() throws Exception
+    {
+        class SUT
+        {
+            @Command(name = "test")
+            class TestCommand implements Callable<String>
+            {
+                @Argument(factory="getByName")
+                InetAddress address;
+
+                @Override
+                public String call() throws Exception
+                {
+                    assertThat(address, is(InetAddress.getByName("127.0.0.1")));
+                    return null;
+                }
+            }
+        }
+
+        Map<List<String>,? extends CommandExecutor> commands =
+                _scanner.scan(new SUT());
+
+        commands.get(asList("test")).execute(new Args("127.0.0.1"), CommandInterpreter.ASCII);
     }
 }

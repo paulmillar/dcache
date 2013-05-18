@@ -41,4 +41,9 @@ public @interface Argument
      * See {@link Option#required()}.
      */
     boolean required() default true;
+
+    /**
+     * See {@link Option#staticMethod()}.
+     */
+    String factory() default "valueOf";
 }

@@ -167,7 +167,8 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         Class<?> type = field.getType();
         if (type.isArray()) {
             Function<String,Object> typeConverter =
-                    createTypeConverter(type.getComponentType());
+                    createTypeConverter(type.getComponentType(),
+                    option.factory());
             if (option.values().length > 0) {
                 typeConverter = new MultipleChoiceValidator(
                         typeConverter, asList(option.values()));
@@ -178,7 +179,8 @@ public class AnnotatedCommandExecutor implements CommandExecutor
                 return new SplittingOptionHandler(field, typeConverter, option);
             }
         } else {
-            Function<String,Object> typeConverter = createTypeConverter(type);
+            Function<String,Object> typeConverter = createTypeConverter(type,
+                    option.factory());
             if (option.values().length > 0) {
                 typeConverter = new MultipleChoiceValidator(
                         typeConverter, asList(option.values()));
@@ -192,10 +194,12 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         Class<?> type = field.getType();
         if (type.isArray()) {
             Function<String,Object> typeConverter =
-                    createTypeConverter(type.getComponentType());
+                    createTypeConverter(type.getComponentType(),
+                    argument.factory());
             return new MultiValuedArgumentHandler(field, typeConverter, argument);
         } else {
-            Function<String,Object> typeConverter = createTypeConverter(type);
+            Function<String,Object> typeConverter = createTypeConverter(type,
+                    argument.factory());
             return new ArgumentHandler(field, typeConverter, argument);
         }
     }
@@ -226,7 +230,8 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         return handlers;
     }
 
-    private static Function<String,Object> createTypeConverter(Class<?> type)
+    private static Function<String,Object> createTypeConverter(Class<?> type,
+            String factory)
     {
         if (Boolean.class.equals(type) || Boolean.TYPE.equals(type)) {
             return new BooleanTypeConverter();
@@ -250,9 +255,9 @@ public class AnnotatedCommandExecutor implements CommandExecutor
             return new EnumTypeConverter(type.asSubclass(Enum.class));
         } else if (!type.isInterface() && !type.isAnnotation() && !type.isPrimitive()) {
             try {
-                Method method = type.getMethod("valueOf", String.class);
+                Method method = type.getMethod(factory, String.class);
                 if (Modifier.isStatic(method.getModifiers())) {
-                    return new ValueOfTypeConverter(method);
+                    return new StaticMethodTypeConverter(method);
                 }
             } catch (NoSuchMethodException ignored) {
             }
@@ -725,13 +730,13 @@ public class AnnotatedCommandExecutor implements CommandExecutor
     }
 
     /**
-     * A function from String to a class with a static valueOf factory method.
+     * A function from String to a class with a static factory method.
      */
-    private static class ValueOfTypeConverter implements Function<String,Object>
+    private static class StaticMethodTypeConverter implements Function<String,Object>
     {
         private Method _method;
 
-        public ValueOfTypeConverter(Method method)
+        public StaticMethodTypeConverter(Method method)
         {
             _method = method;
         }

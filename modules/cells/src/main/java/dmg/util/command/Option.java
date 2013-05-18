@@ -57,4 +57,11 @@ public @interface Option
      * Category descriptor used to group options in help output.
      */
     String category() default "";
+
+    /**
+     * The name of the static method used to create an object of this
+     * type.  This is used if the type is not primitive, not an enum and not a
+     * String.  The method must accept a single String argument.
+     */
+    String factory() default "valueOf";
 }
