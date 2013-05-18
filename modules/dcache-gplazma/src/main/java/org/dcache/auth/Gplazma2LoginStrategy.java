@@ -3,7 +3,6 @@ package org.dcache.auth;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.springframework.beans.factory.annotation.Required;
 
 import javax.security.auth.Subject;
@@ -15,7 +14,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -51,10 +49,8 @@ import static com.google.common.collect.Iterables.getFirst;
 import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Collections2.filter;
-import dmg.cells.nucleus.CDC;
-
-import org.dcache.commons.util.NDC;
 import org.dcache.gplazma.configuration.PluginsLifecycleAware;
+import org.dcache.util.DiagnosticTriggers;
 
 /**
  * A LoginStrategy that wraps a org.dcache.gplazma.GPlazma
@@ -72,7 +68,9 @@ public class Gplazma2LoginStrategy
     private Map<String,Object> _environment = Collections.emptyMap();
     private PluginFactory _factory;
     private KnownFailedLogins _failedLogins = new KnownFailedLogins();
-    private Set<Principal> _diagnosePrincipals = new HashSet<>();
+
+    private DiagnosticTriggers<Principal> _diagnosticPrincipals =
+            new DiagnosticTriggers<>();
 
     @Required
     public void setConfigurationFile(String configurationFile)
@@ -149,13 +147,6 @@ public class Gplazma2LoginStrategy
         return new LoginReply(gPlazmaLoginReply.getSubject(), loginAttributes);
     }
 
-    private void checkDiagnostics(Set<Principal> principals)
-    {
-        if(_diagnosePrincipals.removeAll(principals)) {
-            NDC.enableDiagnostic();
-        }
-    }
-
     /**
      * List of attributes that affect how a login result is printed
      */
@@ -186,10 +177,11 @@ public class Gplazma2LoginStrategy
     {
         RecordingLoginMonitor monitor = new RecordingLoginMonitor();
 
+        LoginResult result = monitor.getResult();
+        _diagnosticPrincipals.acceptAll(result.allObservedPrincipals());
+
         try {
             LoginReply reply = convertLoginReply(_gplazma.login(subject, monitor));
-            LoginResult result = monitor.getResult();
-            checkDiagnostics(result.allObservedPrincipals());
             if(_log.isDebugEnabled()) {
                 printLoginResult(result, EnumSet.noneOf(PrintFeatures.class));
             }
@@ -197,9 +189,6 @@ public class Gplazma2LoginStrategy
 
             return reply;
         } catch (AuthenticationException e) {
-            LoginResult result = monitor.getResult();
-            checkDiagnostics(result.allObservedPrincipals());
-
             if(!_failedLogins.has(subject)) {
                 _failedLogins.add(subject);
 
@@ -270,7 +259,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_add_$_1_99(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
-        _diagnosePrincipals.addAll(principals);
+        _diagnosticPrincipals.addAll(principals);
         return "";
     }
 
@@ -278,7 +267,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_ls(Args args)
     {
         StringBuilder sb = new StringBuilder();
-        for (Principal p : _diagnosePrincipals) {
+        for (Principal p : _diagnosticPrincipals.getAll()) {
             sb.append(p).append('\n');
         }
         return sb.toString();
@@ -288,7 +277,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_rm(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
-        return _diagnosePrincipals.removeAll(principals) ? "" : "No prinicpal removed";
+        return _diagnosticPrincipals.removeAll(principals) ? "" : "No principal was removed";
     }
 
     /**
