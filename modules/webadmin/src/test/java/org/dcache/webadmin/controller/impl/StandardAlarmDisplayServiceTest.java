@@ -71,7 +71,6 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.dcache.alarms.Severity;
 import org.dcache.alarms.dao.LogEntry;
 import org.dcache.webadmin.controller.util.AlarmTableProvider;
 import org.dcache.webadmin.model.dataaccess.ILogEntryDAO;
@@ -99,7 +98,14 @@ public class StandardAlarmDisplayServiceTest {
     public void setup() throws Exception {
         helper = new DAOFactoryImplHelper();
         mocked = helper.getLogEntryDAO();
-        service = new StandardAlarmDisplayService(helper);
+        service = new StandardAlarmDisplayService(helper){
+            private static final long serialVersionUID = -260651971282691608L;
+
+            @Override
+            public boolean isConnected() {
+                return true;
+            }
+        };
         provider = service.getDataProvider();
     }
 
@@ -120,7 +126,6 @@ public class StandardAlarmDisplayServiceTest {
         delete.clear();
         inOrder.verify(mocked).update(update);
         inOrder.verify(mocked).remove(delete);
-        inOrder.verify(mocked).get(null, null, Severity.MODERATE, null, true);
     }
 
     @Test

@@ -15,6 +15,7 @@ import java.util.NoSuchElementException;
 
 import diskCacheV111.vehicles.JobInfo;
 
+import org.dcache.pool.movers.Mover;
 import org.dcache.util.IoPriority;
 
 import static com.google.common.collect.Iterables.concat;
@@ -28,8 +29,7 @@ public class IoQueueManager {
     private final ImmutableList<IoScheduler> _queues;
     private final ImmutableMap<String, IoScheduler> _queuesByName;
 
-    public IoQueueManager(JobTimeoutManager jobTimeoutManager, String[] names,
-            MoverExecutorServices executorServices) {
+    public IoQueueManager(JobTimeoutManager jobTimeoutManager, String[] names) {
         Map<String,IoScheduler> queuesByName = new HashMap<>();
         List<IoScheduler> queues = new ArrayList<>();
         for (String name : concat(asList(DEFAULT_QUEUE), asList(names))) {
@@ -41,7 +41,7 @@ public class IoQueueManager {
                 }
                 if (!queuesByName.containsKey(name)) {
                     _log.debug("Creating queue: {}", name);
-                    IoScheduler job = new SimpleIoScheduler(name, executorServices, queues.size(), fifo);
+                    IoScheduler job = new SimpleIoScheduler(name, queues.size(), fifo);
                     queues.add(job);
                     queuesByName.put(name, job);
                     jobTimeoutManager.addScheduler(name, job);
@@ -75,15 +75,15 @@ public class IoQueueManager {
         return _queues.get(pos);
     }
 
-    public int add(String queueName, PoolIORequest request, IoPriority priority)
+    public int add(String queueName, Mover<?> transfer, IoPriority priority)
     {
         IoScheduler js = (queueName == null) ? null : _queuesByName.get(queueName);
-        return (js == null) ? add(request, priority) : js.add(request, priority);
+        return (js == null) ? add(transfer, priority) : js.add(transfer, priority);
     }
 
-    public int add(PoolIORequest request, IoPriority priority)
+    public int add(Mover<?> transfer, IoPriority priority)
     {
-        return getDefaultQueue().add(request, priority);
+        return getDefaultQueue().add(transfer, priority);
     }
 
     public void cancel(int jobId) throws NoSuchElementException {

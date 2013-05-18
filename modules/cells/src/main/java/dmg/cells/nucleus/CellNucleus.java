@@ -654,11 +654,8 @@ public class CellNucleus implements ThreadFactory
         return new Runnable() {
             @Override
             public void run() {
-                CDC cdc = CDC.reset(CellNucleus.this);
-                try {
+                try (CDC ignored = CDC.reset(CellNucleus.this)) {
                     runnable.run();
-                } finally {
-                    cdc.restore();
                 }
             }
         };
@@ -786,8 +783,7 @@ public class CellNucleus implements ThreadFactory
     {
         LOGGER.trace("Received {}", event);
 
-        CDC cdc = CDC.reset(CellNucleus.this);
-        try {
+        try (CDC ignored = CDC.reset(CellNucleus.this)) {
             _state = REMOVING;
             addToEventQueue(LAST_MESSAGE_EVENT);
             try {
@@ -818,8 +814,6 @@ public class CellNucleus implements ThreadFactory
             }
             __cellGlue.destroy(CellNucleus.this);
             _state = DEAD;
-        } finally {
-            cdc.restore();
         }
     }
 
@@ -932,14 +926,11 @@ public class CellNucleus implements ThreadFactory
         @Override
         public void run ()
         {
-            CDC cdc = CDC.reset(CellNucleus.this);
-            try {
+            try (CDC ignored = CDC.reset(CellNucleus.this)) {
                 innerRun();
             } catch (Throwable e) {
                 Thread t = Thread.currentThread();
                 t.getUncaughtExceptionHandler().uncaughtException(t, e);
-            } finally {
-                cdc.restore();
             }
         }
     }
@@ -958,30 +949,31 @@ public class CellNucleus implements ThreadFactory
         @Override
         public void innerRun()
         {
-            CellMessageAnswerable callback =
-                _lock.getCallback();
+            try (CDC ignored = _lock.getCdc().restore()) {
+                CellMessageAnswerable callback =
+                        _lock.getCallback();
 
-            CellMessage answer;
-            Object obj;
-            try {
-                answer = _message.decode();
-                _lock.getCdc().restore();
-                obj = answer.getMessageObject();
-            } catch (SerializationException e) {
-                LOGGER.warn(e.getMessage());
-                obj = e;
-                answer = null;
-            }
+                CellMessage answer;
+                Object obj;
+                try {
+                    answer = _message.decode();
+                    obj = answer.getMessageObject();
+                } catch (SerializationException e) {
+                    LOGGER.warn(e.getMessage());
+                    obj = e;
+                    answer = null;
+                }
 
-            EventLogger.sendEnd(_lock.getMessage());
-            if (obj instanceof Exception) {
-                callback.
-                    exceptionArrived(_lock.getMessage(), (Exception) obj);
-            } else {
-                callback.
-                    answerArrived(_lock.getMessage(), answer);
+                EventLogger.sendEnd(_lock.getMessage());
+                if (obj instanceof Exception) {
+                    callback.
+                            exceptionArrived(_lock.getMessage(), (Exception) obj);
+                } else {
+                    callback.
+                            answerArrived(_lock.getMessage(), answer);
+                }
+                LOGGER.trace("addToEventQueue : callback done for : {}", _message);
             }
-            LOGGER.trace("addToEventQueue : callback done for : {}", _message);
         }
     }
 

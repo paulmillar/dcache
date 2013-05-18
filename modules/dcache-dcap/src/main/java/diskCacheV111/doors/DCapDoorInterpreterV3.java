@@ -156,6 +156,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
     private String  _poolManagerName;
     private String  _pnfsManagerName;
 
+    private final CellStub _gPlazmaStub;
     private CellStub _pinManagerStub;
     private CellPath _poolMgrPath;
 
@@ -201,7 +202,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
 
     private final UnionLoginStrategy.AccessLevel _anonymousAccessLevel;
 
-    protected final CellPath _billingCellPath = new CellPath("billing");
+    private final CellPath _billingCellPath;
     private final InetAddress _clientAddress;
 
     /**
@@ -261,8 +262,6 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
             UnionLoginStrategy.AccessLevel.READONLY;
         _log.debug("Anonymous access level : {}", _anonymousAccessLevel);
 
-        _loginStrategy = createLoginStrategy();
-
         _pnfsManagerName = _args.getOpt("pnfsManager");
         _poolManagerName = _args.getOpt("poolManager");
         _poolProxy = _args.getOpt("poolProxy");
@@ -283,6 +282,8 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
 
         _poolMgrPath     = new CellPath( _poolManagerName ) ;
         _pinManagerStub = new CellStub(cell, new CellPath(_args.getOpt("pinManager")));
+        _gPlazmaStub = new CellStub(_cell, new CellPath(_args.getOpt("gplazma")), 30000);
+        _billingCellPath = new CellPath(_args.getOpt("billing"));
 
         _checkStrict     = _args.hasOption("check") &&
         ( _args.getOpt("check").equals("strict") ) ;
@@ -342,6 +343,8 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
         _stageConfigurationFilePath = _args.getOpt("stageConfigurationFilePath");
         _checkStagePermission = new CheckStagePermission(_stageConfigurationFilePath);
         _log.debug("Check : {}", _checkStrict ? "Strict" : "Fuzzy");
+
+        _loginStrategy = createLoginStrategy();
     }
 
     private LoginStrategy createLoginStrategy()
@@ -349,9 +352,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
         UnionLoginStrategy union = new UnionLoginStrategy();
 
         if (_authorizationStrong || _authorizationRequired) {
-            LoginStrategy gplazma =
-                    new RemoteLoginStrategy(new CellStub(_cell, new CellPath("gPlazma"), 30000));
-            union.setLoginStrategies(Collections.singletonList(gplazma));
+            union.setLoginStrategies(Collections.<LoginStrategy>singletonList(new RemoteLoginStrategy(_gPlazmaStub)));
         }
 
         if (!_authorizationStrong ) {

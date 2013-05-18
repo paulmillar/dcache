@@ -22,6 +22,7 @@ import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.dcache.xrootd.protocol.XrootdProtocol;
+import org.dcache.xrootd.stream.ChunkedResponseWriteHandler;
 
 import static org.jboss.netty.channel.Channels.pipeline;
 
@@ -101,7 +102,7 @@ public class XrootdPoolNettyServer
      * Only shutdown the server if no client connection left.
      */
     @Override
-    protected synchronized void conditionallyStopServer() throws IOException {
+    protected synchronized void conditionallyStopServer() {
         if (_numberClientConnections == 0) {
             super.conditionallyStopServer();
         }
@@ -112,7 +113,7 @@ public class XrootdPoolNettyServer
         _numberClientConnections++;
     }
 
-    public synchronized void clientDisconnected() throws IOException {
+    public synchronized void clientDisconnected() {
         _numberClientConnections--;
         conditionallyStopServer();
     }
@@ -140,6 +141,7 @@ public class XrootdPoolNettyServer
                                                              0,
                                                              _clientIdleTimeout,
                                                              TimeUnit.MILLISECONDS));
+            pipeline.addLast("chunkedWriter", new ChunkedResponseWriteHandler());
             pipeline.addLast("transfer",
                              new XrootdPoolRequestHandler(XrootdPoolNettyServer.this));
             return pipeline;

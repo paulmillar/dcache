@@ -333,10 +333,16 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
     }
 
     @Override
+    public void channelConnected(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception
+    {
+        _logger.debug("HTTP connection from {} established", ctx.getChannel().getRemoteAddress());
+    }
+
+    @Override
     public void channelClosed(ChannelHandlerContext ctx,
                               ChannelStateEvent event)
     {
-        _logger.debug("Called channelClosed.");
+        _logger.debug("HTTP connection from {} closed", ctx.getChannel().getRemoteAddress());
         for (MoverChannel<HttpProtocolInfo> file: _files) {
             _server.close(file);
         }
@@ -351,8 +357,8 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             if (_logger.isInfoEnabled()) {
                 long idleTime = System.currentTimeMillis() -
                     event.getLastActivityTimeMillis();
-                _logger.info("Closing idling connection without opened files." +
-                          " Connection has been idle for {} ms.", idleTime);
+                _logger.info("Connection from {} has been idle for {} ms; disconnecting.",
+                        ctx.getChannel().getRemoteAddress(), idleTime);
             }
 
             ctx.getChannel().close();
@@ -523,36 +529,34 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
     protected void doOnChunk(ChannelHandlerContext context, MessageEvent event,
                              HttpChunk chunk)
     {
-        Exception exception = null;
-        ChannelFuture future = null;
-        try {
-            if (_writeChannel == null) {
-                throw new HttpException(NOT_IMPLEMENTED.getCode(),
-                        "Chunked encoding is not supported for this HTTP method");
-            }
-            write(_writeChannel, chunk.getContent());
-            if (chunk.isLast()) {
-                if (chunk instanceof HttpChunkTrailer) {
-                    checkContentHeader(((HttpChunkTrailer) chunk).getHeaderNames(),
-                            asList(CONTENT_LENGTH));
+        if (_writeChannel != null) {
+            Exception exception = null;
+            ChannelFuture future = null;
+            try {
+                write(_writeChannel, chunk.getContent());
+                if (chunk.isLast()) {
+                    if (chunk instanceof HttpChunkTrailer) {
+                        checkContentHeader(((HttpChunkTrailer) chunk).getHeaderNames(),
+                                asList(CONTENT_LENGTH));
+                    }
+                    future = sendPutResponse(context, _writeChannel);
                 }
-                future = sendPutResponse(context, _writeChannel);
-            }
-        } catch (IOException e) {
-            exception = e;
-            future = conditionalSendError(context, HttpMethod.PUT,
-                    future, INTERNAL_SERVER_ERROR, e.getMessage());
-        } catch (HttpException e) {
-            exception = e;
-            future = conditionalSendError(context, HttpMethod.PUT,
-                    future, HttpResponseStatus.valueOf(e.getErrorCode()), e.getMessage());
-        } finally {
-            if (chunk.isLast() || exception != null) {
-                close(_writeChannel, exception);
-                _writeChannel = null;
-            }
-            if (future != null && (!isKeepAlive() || !chunk.isLast())) {
-                future.addListener(ChannelFutureListener.CLOSE);
+            } catch (IOException e) {
+                exception = e;
+                future = conditionalSendError(context, HttpMethod.PUT,
+                        future, INTERNAL_SERVER_ERROR, e.getMessage());
+            } catch (HttpException e) {
+                exception = e;
+                future = conditionalSendError(context, HttpMethod.PUT,
+                        future, HttpResponseStatus.valueOf(e.getErrorCode()), e.getMessage());
+            } finally {
+                if (chunk.isLast() || exception != null) {
+                    close(_writeChannel, exception);
+                    _writeChannel = null;
+                }
+                if (future != null && (!isKeepAlive() || !chunk.isLast())) {
+                    future.addListener(ChannelFutureListener.CLOSE);
+                }
             }
         }
     }
@@ -577,7 +581,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             new QueryStringDecoder(request.getUri());
 
         Map<String, List<String>> params = queryStringDecoder.getParameters();
-        if (!params.containsKey(HttpProtocol_2.UUID_QUERY_PARAM)) {
+        if (!params.containsKey(HttpTransferService.UUID_QUERY_PARAM)) {
             if(!request.getUri().equals("/favicon.ico")) {
                 _logger.error("Received request without UUID in the query " +
                         "string. Request-URI was {}", request.getUri());
@@ -586,7 +590,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             throw new IllegalArgumentException("Query string does not include any UUID.");
         }
 
-        List<String> uuidList = params.get(HttpProtocol_2.UUID_QUERY_PARAM);
+        List<String> uuidList = params.get(HttpTransferService.UUID_QUERY_PARAM);
         if (uuidList.isEmpty()) {
             throw new IllegalArgumentException("UUID parameter does not include any value.");
         }

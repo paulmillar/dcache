@@ -59,11 +59,11 @@ documents or software obtained from this server.
  */
 package org.dcache.webadmin.controller.impl;
 
+import com.google.common.base.Strings;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,8 +81,11 @@ import org.dcache.webadmin.controller.IAlarmDisplayService;
 import org.dcache.webadmin.controller.util.AlarmTableProvider;
 import org.dcache.webadmin.model.dataaccess.DAOFactory;
 import org.dcache.webadmin.model.dataaccess.ILogEntryDAO;
-import org.dcache.webadmin.model.dataaccess.impl.DAOFactoryImpl.NOPLogEntryDAO;
 import org.dcache.webadmin.model.exceptions.DAOException;
+import org.dcache.webadmin.model.util.AlarmJDOUtils;
+import org.dcache.webadmin.model.util.AlarmJDOUtils.AlarmDAOFilter;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Provider does in-memory filtering and sorts on sortable fields; service
@@ -102,7 +105,7 @@ public class StandardAlarmDisplayService implements IAlarmDisplayService {
     private String definitions;
 
     public StandardAlarmDisplayService(DAOFactory factory) {
-        access = factory.getLogEntryDAO();
+        access = checkNotNull(factory.getLogEntryDAO());
     }
 
     @Override
@@ -114,7 +117,7 @@ public class StandardAlarmDisplayService implements IAlarmDisplayService {
     public List<String> getPredefinedAlarmTypes() {
         List<String> types = new ArrayList<>();
         types.add(AlarmDefinition.getMarker(null).toString());
-        if (definitions != null && definitions.length() > 0) {
+        if (!Strings.isNullOrEmpty(definitions)) {
             File xmlFile = new File(definitions);
             if (xmlFile.exists()) {
                 loadDefinitions(xmlFile, types);
@@ -124,7 +127,7 @@ public class StandardAlarmDisplayService implements IAlarmDisplayService {
     }
 
     public boolean isConnected() {
-        return !(access instanceof NOPLogEntryDAO);
+        return access.isConnected();
     }
 
     /**
@@ -135,20 +138,25 @@ public class StandardAlarmDisplayService implements IAlarmDisplayService {
         if (!isConnected()) {
             return;
         }
+
         update();
         delete();
+
         Date after = alarmTableProvider.getAfter();
         Date before = alarmTableProvider.getBefore();
-        String severity = alarmTableProvider.getSeverity();
+        String severityStr = alarmTableProvider.getSeverity();
+        Severity severity = severityStr == null ? null :
+            Severity.valueOf(severityStr);
         String type = alarmTableProvider.getType();
         Boolean alarm = alarmTableProvider.isAlarm();
+        Integer rangeStart = alarmTableProvider.getFrom();
+        Integer rangeEnd = alarmTableProvider.getTo();
+
         try {
-            Collection<LogEntry> refreshed
-                = access.get(after,
-                             before,
-                             severity == null ? null
-                                              : Severity.valueOf(severity), type,
-                             alarm);
+            AlarmDAOFilter filter
+                = AlarmJDOUtils.getFilter(after, before, severity, type,
+                                          alarm, rangeStart, rangeEnd);
+            Collection<LogEntry> refreshed = access.get(filter);
             alarmTableProvider.setEntries(refreshed);
         } catch (DAOException e) {
             logger.error(e.getMessage(), e);
@@ -157,6 +165,10 @@ public class StandardAlarmDisplayService implements IAlarmDisplayService {
 
     public void setDefinitions(String definitions) {
         this.definitions = definitions;
+    }
+
+    public void shutDown() {
+        access.shutDown();
     }
 
     private void delete() {
