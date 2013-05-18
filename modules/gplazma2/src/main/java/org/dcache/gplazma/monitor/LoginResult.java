@@ -1,8 +1,13 @@
 package org.dcache.gplazma.monitor;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
+
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -10,10 +15,6 @@ import org.dcache.gplazma.configuration.ConfigurationItemControl;
 import org.dcache.gplazma.monitor.LoginMonitor.Result;
 
 import static com.google.common.base.Preconditions.checkState;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
-import com.google.common.collect.Sets;
-import java.util.Iterator;
 
 /**
  * This class holds a detailed report of the activity when gPlazma processes
@@ -121,6 +122,8 @@ public class LoginResult
      */
     public static class PhaseResult<T extends PAMPluginResult>
     {
+        private static final SetDiff<Principal> EMPTY_SETDIFF = new SetDiff<>();
+
         private final List<T> _plugins = new ArrayList<>();
         private final String _name;
         private SetDiff<Principal> _principals;
@@ -164,7 +167,7 @@ public class LoginResult
 
         public SetDiff<Principal> getPrincipals()
         {
-            return _principals;
+            return _principals == null ? EMPTY_SETDIFF : _principals;
         }
 
         public void setResult(Result result)
@@ -275,6 +278,12 @@ public class LoginResult
     {
         private final Set<T> _before;
         private final Set<T> _after;
+
+        SetDiff()
+        {
+            _before = Collections.emptySet();
+            _after = Collections.emptySet();
+        }
 
         SetDiff(Set<T> before, Set<T> after)
         {
