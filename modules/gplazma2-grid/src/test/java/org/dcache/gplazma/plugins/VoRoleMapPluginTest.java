@@ -123,10 +123,10 @@ public class VoRoleMapPluginTest
         assertThat(_principals, hasDn("/O=ACME/CN=Wile E Coyote"));
         assertThat(_principals, hasPrimaryFqan("/acme/Role=genius"));
         assertThat(_principals, hasFqan("/acme"));
-        assertThat(_principals, hasGroupName("acme01")); // FIXME should be primaryGroupName?
+        assertThat(_principals, hasPrimaryGroupName("acme01"));
 
         assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
-        assertThat(_authorizedPrincipals, hasFqan("/acme"));
+        assertThat(_authorizedPrincipals, hasPrimaryFqan("/acme"));
     }
 
 
@@ -314,11 +314,13 @@ public class VoRoleMapPluginTest
         assertThat(_principals, hasDn("/O=ACME/CN=Wile E Coyote"));
         assertThat(_principals, hasPrimaryFqan("/acme/Role=genius"));
         assertThat(_principals, hasFqan("/acme"));
-        assertThat(_principals, hasGroupName("acme01")); // FIXME should be primaryGroupName
+        assertThat(_principals, hasPrimaryGroupName("acme01"));
 
         assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
-        assertThat(_authorizedPrincipals, hasFqan("/acme"));
         assertThat(_authorizedPrincipals, not(hasPrimaryFqan("/acme/Role=genius")));
+        assertThat(_authorizedPrincipals, not(hasFqan("/acme/Role=genius")));
+        assertThat(_authorizedPrincipals, hasPrimaryFqan("/acme"));
+        assertThat(_authorizedPrincipals, not(hasFqan("/acme")));
     }
 
 
@@ -349,10 +351,10 @@ public class VoRoleMapPluginTest
     }
 
     @Test
-    public void shouldMatchLongestPrefixForPrimaryFqan() throws AuthenticationException
+    public void shouldMatchLongestPrefixForPrimaryFqan()
+            throws AuthenticationException
     {
-        givenVoRoleMapFile().withLines(
-                "\"*\" \"/cms\" cms001");
+        givenVoRoleMapFile().withSingleLine("\"*\" \"/cms\" cms001");
 
         whenMapPluginCalledWith(aSetOfPrincipals()
                 .withDn("/DC=es/DC=irisgrid/O=ciemat/CN=antonio-delgado-peris")
@@ -362,6 +364,136 @@ public class VoRoleMapPluginTest
         assertThat(_principals, hasPrimaryGroupName("cms001"));
         assertThat(_authorizedPrincipals, hasDn("/DC=es/DC=irisgrid/O=ciemat/CN=antonio-delgado-peris"));
         assertThat(_authorizedPrincipals, hasPrimaryFqan("/cms"));
+    }
+
+
+    @Test
+    public void shouldMatchDnOnlyEntryWithDn() throws AuthenticationException
+    {
+        givenVoRoleMapFile()
+                .withSingleLine("\"/O=ACME/CN=Wile E Coyote\"  genius");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius"));
+        assertThat(_principals, not(hasGroupName("genius")));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+    }
+
+
+    @Test
+    public void shouldMatchDnOnlyEntryWithDnFqan()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile()
+                .withSingleLine("\"/O=ACME/CN=Wile E Coyote\"  genius");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote")
+                .withPrimaryFqan("/acme"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius"));
+        assertThat(_principals, not(hasGroupName("genius")));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+        assertThat(_authorizedPrincipals, not(hasPrimaryFqan("/acme")));
+    }
+
+
+    @Test
+    public void shouldOnlyMatchDnFqanEntryWithDnFqanWhenFirst()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile().withLines(
+                "\"/O=ACME/CN=Wile E Coyote\"  /acme  genius1",
+                "\"/O=ACME/CN=Wile E Coyote\"         genius2");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote")
+                .withPrimaryFqan("/acme"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius1"));
+        assertThat(_principals, not(hasGroupName("genius1")));
+        assertThat(_principals, not(hasPrimaryGroupName("genius2")));
+        assertThat(_principals, hasGroupName("genius2"));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+        assertThat(_authorizedPrincipals, hasPrimaryFqan("/acme"));
+    }
+
+
+    @Test
+    public void shouldOnlyMatchDnFqanEntryWithDnFqanWhenSecond()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile().withLines(
+                "\"/O=ACME/CN=Wile E Coyote\"         genius2",
+                "\"/O=ACME/CN=Wile E Coyote\"  /acme  genius1");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote")
+                .withPrimaryFqan("/acme"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius1"));
+        assertThat(_principals, not(hasGroupName("genius1")));
+        assertThat(_principals, not(hasPrimaryGroupName("genius2")));
+        assertThat(_principals, hasGroupName("genius2"));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+        assertThat(_authorizedPrincipals, hasPrimaryFqan("/acme"));
+    }
+
+
+    @Test
+    public void shouldMatchDnOnlyEntryWithDnAndDifferentFqan()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile().withLines(
+                "\"/O=ACME/CN=Wile E Coyote\"                    genius1",
+                "\"/O=ACME/CN=Wile E Coyote\"  /acme/Role=genius genius2");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote")
+                .withPrimaryFqan("/acme"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius1"));
+        assertThat(_principals, not(hasGroupName("genius1")));
+        assertThat(_principals, not(hasPrimaryGroupName("genius2")));
+        assertThat(_principals, not(hasGroupName("genius2")));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+        assertThat(_authorizedPrincipals, not(hasPrimaryFqan("/acme")));
+    }
+
+    @Test
+    public void shouldMatchDnFqanEntryWithWildFqan()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile().withLines(
+                "\"/O=ACME/CN=Wile E Coyote\"  \"\"  genius1");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote")
+                .withPrimaryFqan("/acme"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius1"));
+        assertThat(_principals, not(hasGroupName("genius1")));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
+        assertThat(_authorizedPrincipals, not(hasPrimaryFqan("/acme")));
+        assertThat(_authorizedPrincipals, not(hasFqan("/acme")));
+    }
+
+
+    @Test
+    public void shouldMatchDnWithWildFqan()
+            throws AuthenticationException
+    {
+        givenVoRoleMapFile().withLines(
+                "\"/O=ACME/CN=Wile E Coyote\"  \"\"  genius1");
+
+        whenMapPluginCalledWith(aSetOfPrincipals()
+                .withDn("/O=ACME/CN=Wile E Coyote"));
+
+        assertThat(_principals, hasPrimaryGroupName("genius1"));
+        assertThat(_principals, not(hasGroupName("genius1")));
+        assertThat(_authorizedPrincipals, hasDn("/O=ACME/CN=Wile E Coyote"));
     }
 
 

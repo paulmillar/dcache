@@ -13,6 +13,7 @@ import org.dcache.gplazma.util.NameRolePair;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.assertFalse;
 
 public class CachedVOMapTest
 {
@@ -55,7 +56,7 @@ public class CachedVOMapTest
         Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITH_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair(VALID_DN, VALID_FQAN_LONG_ROLE));
         assertTrue(mappedNames.contains(VALID_USERNAME_RESPONSE));
         assertTrue(mappedNames.contains(VALID_ROLE_WC_USERNAME_RESPONSE));
-        assertTrue(mappedNames.contains(VALID_WC_USERNAME_RESPONSE));
+        assertFalse(mappedNames.contains(VALID_WC_USERNAME_RESPONSE));
     }
 
     @Test
@@ -73,14 +74,14 @@ public class CachedVOMapTest
         Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITH_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair(VALID_DN, VALID_FQAN_SHORT_ROLE));
         assertTrue(mappedNames.contains(VALID_USERNAME_RESPONSE));
         assertTrue(mappedNames.contains(VALID_ROLE_WC_USERNAME_RESPONSE));
-        assertTrue(mappedNames.contains(VALID_WC_USERNAME_RESPONSE));
+        assertFalse(mappedNames.contains(VALID_WC_USERNAME_RESPONSE));
     }
 
     @Test
     public void testDoesContainsWildcardResponseForInvalidUsernameWithWildcards()
         throws IOException
     {
-        Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITH_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair( INVALID_USERNAME, ""));
+        Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITH_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair(INVALID_USERNAME, null));
         assertTrue(mappedNames.contains(VALID_WC_USERNAME_RESPONSE));
     }
 
@@ -88,7 +89,7 @@ public class CachedVOMapTest
     public void testIsEmptyForInvalidUsernameWithoutWildcards()
         throws IOException
     {
-        Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITHOUT_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair(INVALID_USERNAME, ""));
+        Collection<String> mappedNames = loadFixture(TEST_FIXTURE_WITHOUT_WILDCARDS).getValuesForPredicatesMatching(new NameRolePair(INVALID_USERNAME, null));
         assertTrue(mappedNames.isEmpty());
     }
 

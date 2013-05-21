@@ -23,8 +23,59 @@ import static com.google.common.collect.Iterables.filter;
 import static org.dcache.gplazma.util.Preconditions.checkAuthentication;
 
 /**
- * Plugin that uses a vorolemap file for mapping FQANPrincipal and
- * GlobusPrincipal to GroupNamePrincipal.
+ * If this plugin succeeds then it adds one or more GroupNamePrincipal objects
+ * to the Principals set and zero or more FQAN and one or more GlobusPrincipal
+ * object to the AuthorizedPrincipals set.  Therefore, to succeed, the plugin
+ * must be provided with at least one GlobusPrincipal.
+ *
+ * The behavior of the plugin is driven by the vorolemap file.  Aside from
+ * comments and empty lines, this file contains zero or more mapping lines.
+ * Each mapping line describes a predicate and the name of a group.  The
+ * predicate has one required part and one optional part: the required part is
+ * a DN glob, the optional part is an FQAN literal.
+ *
+ * The plugin makes use of a logical "map" operation.  In this operation, each
+ * line of the file is compared against the supplied criteria: either a DN or a
+ * DN,FQAN pair.  A map operation succeeds iff there is at least one mapping
+ * line in the vorolemap file that has a predicate that matches the supplied DN
+ * or DN,FQAN pair.  If the map operation succeeds then the group from the
+ * first mapping line (in document order) with a predicate that matches the
+ * supplied DN or DN,FQAN pair is the mapped group.
+ *
+ * Another concept the plugin uses is the parent FQAN.  The parent FQAN of
+ * a FQAN is one with the final element removed.  Some FQANs have no parent.
+ * Here is an example that shows a sequence of FQANs where each FQAN (except
+ * the first) is the parent of the immediately preceeding one, terminating with
+ * an FQAN that has no parent: /cms/higgs/Role=production, /cms/higgs, /cms.
+ *
+ * The plugin provides the logic:
+ *
+ *   The primary FQAN, if present, is paired with each supplied DN in turn and
+ *   mapped to a group; the DN order is not specific.  If none of these
+ *   mappings succeed then the same procedure is attempted with the parent of
+ *   the primary FQAN.  This continues with each iteration taking the parent
+ *   FQAN of the previous iteration until there is at least one successful
+ *   mapping or the previous iteration attempted to map an FQAN that has no
+ *   parent FQAN.
+ *
+ *   Then the Cartesian product of DNs and non-primary FQANs is taken.  Each
+ *   DN,FQAN pair is mapped.  The order of processing these pairs is not
+ *   specified.  If there is no non-primary FQANs then this step is skipped.
+ *
+ *   Then each of the DNs is mapped individually.
+ *
+ *   If the subject does not already have a primary group then the first
+ *   successful mapping defines the primary group and all subsequently mapped
+ *   groups are non-primary.  If the subject already has a primary group then
+ *   all mapped groups are non-primary.
+ *
+ *   The GroupNamePrincipal objects for all successful mappings are added to
+ *   the principals set.  All DNs involved with successful mappings are added
+ *   to the AuthorizedPrincipals set.  All FQANs involved with successful
+ *   mappings are added to the AuthorizedPrincipals set.  The FQAN that
+ *   mapped the primary group is made primary and all others are non-primary.
+ *   If the same FQAN mapped the primary group and a non-primary group then it
+ *   is primary in AuthorizedPrincipals.
  */
 public class VoRoleMapPlugin implements GPlazmaMappingPlugin
 {
@@ -45,7 +96,8 @@ public class VoRoleMapPlugin implements GPlazmaMappingPlugin
 
         checkArgument(path != null, "Undefined property: " + VOROLEMAP);
 
-        _map = new SourceBackedPredicateMap<>(new FileLineSource(path, REFRESH_PERIOD), new VOMapLineParser());
+        LineSource source = new FileLineSource(path, REFRESH_PERIOD);
+        _map = new SourceBackedPredicateMap<>(source, new VOMapLineParser());
     }
 
     /**
@@ -57,9 +109,11 @@ public class VoRoleMapPlugin implements GPlazmaMappingPlugin
         _map = map;
     }
 
-    private boolean containsPrimaryGroupName(Set<Principal> principals)
+
+    private static boolean hasPrimaryGroupName(Set<Principal> principals)
     {
-        for (GroupNamePrincipal p: filter(principals, GroupNamePrincipal.class)) {
+        for (GroupNamePrincipal p:
+                filter(principals, GroupNamePrincipal.class)) {
             if (p.isPrimaryGroup()) {
                 return true;
             }
@@ -67,57 +121,173 @@ public class VoRoleMapPlugin implements GPlazmaMappingPlugin
         return false;
     }
 
-    private boolean addMappingFor(FQAN fqan,
-                                  GlobusPrincipal globusPrincipal,
-                                  boolean isPrimary,
-                                  Set<Principal> principals,
-                                  Set<Principal> authorizedPrincipals)
+    private String groupNameMatching(GlobusPrincipal globusPrincipal, FQAN fqan)
     {
-        String dn = globusPrincipal.getName();
-        List<String> names =
-            _map.getValuesForPredicatesMatching(new NameRolePair(dn, fqan.toString()));
-        if (names.isEmpty()) {
-            return false;
-        }
+        String dn = globusPrincipal == null ? null : globusPrincipal.getName();
+        String fqanString = fqan == null ? null : fqan.toString();
 
-        String name = names.get(0);
-        principals.add(new GroupNamePrincipal(name, isPrimary));
-        authorizedPrincipals.add(new FQANPrincipal(fqan, isPrimary));
-        authorizedPrincipals.add(globusPrincipal);
-        _log.info("VOMS authorization successful for user with DN: {} and FQAN: {} for user name: {}.", dn, fqan, name);
-        return true;
+        NameRolePair dnAndFqan = new NameRolePair(dn, fqanString);
+
+        List<String> names = _map.getValuesForPredicatesMatching(dnAndFqan);
+
+        return names.isEmpty() ? null : names.get(0);
     }
 
     @Override
     public void map(Set<Principal> principals,
-                    Set<Principal> authorizedPrincipals)
-        throws AuthenticationException
+            Set<Principal> authorizedPrincipals) throws AuthenticationException
     {
-        List<FQANPrincipal> fqanPrincipals =
-            Lists.newArrayList(filter(principals, FQANPrincipal.class));
-        List<GlobusPrincipal> globusPrincipals =
-            Lists.newArrayList(filter(principals, GlobusPrincipal.class));
+        VoRoleMapRequest request = new VoRoleMapRequest(principals,
+                authorizedPrincipals);
+        request.process();
+    }
 
-        boolean hasPrimary = containsPrimaryGroupName(authorizedPrincipals);
-        boolean authorized = false;
+    /**
+     * Encapsulates a request to this plugin.
+     */
+    private class VoRoleMapRequest
+    {
+        private final Set<Principal> _principals;
+        private final Set<Principal> _authorizedPrincipals;
+        private final List<FQANPrincipal> _fqans;
+        private final List<GlobusPrincipal> _dns;
+        private boolean _hasPrimaryGroup;
+        private boolean _authorized;
 
-        for (FQANPrincipal fqanPrincipal: fqanPrincipals) {
-            boolean found = false;
-            boolean isPrimary = fqanPrincipal.isPrimaryGroup() && !hasPrimary;
-            FQAN fqan = fqanPrincipal.getFqan();
-            do {
-                for (GlobusPrincipal globusPrincipal: globusPrincipals) {
-                    if (addMappingFor(fqan, globusPrincipal, isPrimary,
-                                      principals, authorizedPrincipals)) {
-                        authorized = true;
-                        found = true;
-                        hasPrimary |= isPrimary;
-                    }
-                }
-                fqan = fqan.getParent();
-            } while (isPrimary && !found && fqan != null);
+        private VoRoleMapRequest(Set<Principal> principals,
+                Set<Principal> authorizedPrincipals)
+                throws AuthenticationException
+        {
+            _principals = principals;
+            _authorizedPrincipals = authorizedPrincipals;
+
+            _fqans = Lists.newArrayList(filter(_principals, FQANPrincipal.class));
+            _dns = Lists.newArrayList(filter(_principals, GlobusPrincipal.class));
+
+            _hasPrimaryGroup = hasPrimaryGroupName(_authorizedPrincipals);
         }
 
-        checkAuthentication(authorized, "no record");
+
+        public void process() throws AuthenticationException
+        {
+            for (FQANPrincipal fqan: _fqans) {
+                addAllGroupNamesFor(fqan);
+            }
+
+            addDnOnlyGroupNames();
+
+            checkAuthentication(_authorized, "no record");
+        }
+
+
+        private void addAllGroupNamesFor(FQANPrincipal fqan)
+        {
+            boolean addAsPrimaryGroup =
+                    fqan.isPrimaryGroup() && !_hasPrimaryGroup;
+
+            if (addAsPrimaryGroup) {
+                /*
+                 * For the primary group, try very hard to find a match.
+                 * This is because the primary group (usually) determines the
+                 * primary gid and, without a primary gid, the login will fail.
+                 *
+                 * Note that FQANs form a hierarchy and the VOMS server always
+                 * adds parent FQANs.  Therefore the parent FQANs of this FQAN
+                 * are also present in the request, but will be non-primary.
+                 * Also, since the order of processing FQANs isn't guaranteed,
+                 * zero or more parent FQAN may have already been processed.
+                 *
+                 * Here, the FQAN parent hierarchy is walked from the primary
+                 * FQAN in the direction of increasing generalisation.  The
+                 * primary group is the first FQAN successfully mapped.  In the
+                 * absense of a direct match, this probably provides the
+                 * expected behaviour.
+                 */
+                for (FQAN f = fqan.getFqan(); f != null; f = f.getParent()) {
+                    if (addGroupNamesFor(f, addAsPrimaryGroup)) {
+                        break;
+                     }
+                 }
+            } else {
+                addGroupNamesFor(fqan.getFqan(), addAsPrimaryGroup);
+            }
+         }
+
+
+        private void addDnOnlyGroupNames()
+        {
+            addGroupNamesFor((FQAN)null, !_hasPrimaryGroup);
+        }
+
+
+        private boolean addGroupNamesFor(FQAN fqan, boolean addAsPrimaryGroup)
+        {
+            boolean hasAddedPrincipals = false;
+
+            for (GlobusPrincipal dn : _dns) {
+                String name = groupNameMatching(dn, fqan);
+
+                if (name != null) {
+                    GroupNamePrincipal group =
+                            new GroupNamePrincipal(name, addAsPrimaryGroup);
+
+                    if (addMappingFor(dn, fqan, group)) {
+                        addAsPrimaryGroup = false;
+                        hasAddedPrincipals = true;
+                    }
+                }
+            }
+
+            return hasAddedPrincipals;
+        }
+        /**
+         * Add Principals for FQAN, DN and GroupName.  Care must be taken
+         * since the order that FQANs are processed is not guaranteed.
+         * Therefore, adding a primary group may remove an existing
+         * non-primary group principals with the same name and adding a
+         * non-primary group will fail to add principals if a primary group is
+         * already present.
+         */
+        private boolean addMappingFor(GlobusPrincipal dn, FQAN fqan,
+                GroupNamePrincipal group)
+        {
+            boolean isPrimary = group.isPrimaryGroup();
+            boolean shouldAddFQAN = fqan != null;
+
+            if (isPrimary) {
+                Principal nonprimaryGroup =
+                        new GroupNamePrincipal(group.getName(), false);
+                Principal nonprimaryFQAN =
+                        fqan == null ? null : new FQANPrincipal(fqan, false);
+
+                _principals.remove(nonprimaryGroup);
+                _authorizedPrincipals.remove(nonprimaryFQAN);
+            } else {
+                Principal primaryGroup =
+                        new GroupNamePrincipal(group.getName(), true);
+                Principal primaryFQAN =
+                        fqan == null ? null : new FQANPrincipal(fqan, true);
+
+                if (_principals.contains(primaryGroup)) {
+                    return false;
+                }
+
+                shouldAddFQAN &= !_authorizedPrincipals.contains(primaryFQAN);
+            }
+
+            _principals.add(group);
+            _authorizedPrincipals.add(dn);
+            if (shouldAddFQAN) {
+                _authorizedPrincipals.add(new FQANPrincipal(fqan, isPrimary));
+            }
+
+            _authorized = true;
+            _hasPrimaryGroup |= isPrimary;
+
+            _log.debug("added group {} for DN: {} and FQAN: {}",
+                    new Object[] {group, dn, fqan});
+
+            return true;
+        }
     }
 }
