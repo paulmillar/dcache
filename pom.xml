@@ -33,7 +33,7 @@
         <version.jetty>7.6.10.v20130312</version.jetty>
         <version.wicket>1.5.10</version.wicket>
         <version.xrootd4j>1.2.0</version.xrootd4j>
-        <version.jglobus>2.0.5-dcache-rc4</version.jglobus>
+        <version.jglobus>2.0.6-rc2</version.jglobus>
         <version.openmq>4.5.2</version.openmq>
 
         <!-- BouncyCastle seems to change the naming convention of
@@ -111,6 +111,8 @@
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
+                <!-- Remember to update modules/logback-test-config/pom.xml
+                     when upgrading logback. -->
                 <version>1.0.12</version>
             </dependency>
             <dependency>
@@ -766,7 +768,7 @@
         </dependency>
         <dependency>
             <groupId>junit</groupId>
-            <artifactId>junit-dep</artifactId>
+            <artifactId>junit</artifactId>
             <version>4.11</version>
             <scope>test</scope>
         </dependency>
@@ -795,7 +797,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.0</version>
+                    <version>3.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -835,7 +837,17 @@
                     <artifactId>buildnumber-maven-plugin</artifactId>
                     <version>1.2</version>
                 </plugin>
-                <plugin>
+		<plugin>
+		  <groupId>org.codehaus.mojo</groupId>
+		  <artifactId>build-helper-maven-plugin</artifactId>
+		  <version>1.8</version>
+		</plugin>
+		<plugin>
+		  <groupId>org.codehaus.mojo</groupId>
+		  <artifactId>exec-maven-plugin</artifactId>
+		  <version>1.2.1</version>
+		</plugin>
+		<plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>2.13</version>
@@ -1083,6 +1095,7 @@
         <module>modules/gplazma2-kpwd</module>
         <module>modules/gplazma2-xacml</module>
         <module>modules/gplazma2-ldap</module>
+        <module>modules/gplazma2-gsi</module>
         <module>modules/javatunnel</module>
         <module>modules/srm</module>
         <module>modules/dcache</module>
@@ -1092,17 +1105,13 @@
         <module>modules/dcache-xrootd</module>
         <module>modules/dcache-dcap</module>
         <module>modules/dcache-gplazma</module>
-        <module>modules/dcache-gsi</module>
         <module>modules/dcache-jms</module>
-        <module>modules/webadmin</module>
+        <module>modules/dcache-webadmin</module>
         <module>modules/srmclient</module>
         <module>modules/acl</module>
         <module>modules/chimera</module>
-        <module>plugins</module>
-        <module>modules/packaging</module>
-        <module>modules/fhs</module>
-        <module>modules/tar</module>
-        <module>modules/system-test</module>
         <module>modules/missingfiles-semsg</module>
+        <module>plugins</module>
+        <module>packages</module>
     </modules>
 </project>

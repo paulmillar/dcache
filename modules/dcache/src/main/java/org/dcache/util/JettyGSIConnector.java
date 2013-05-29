@@ -319,6 +319,7 @@ public class JettyGSIConnector
         //                       _trustedCerts);
         // }
 
+        context.setBannedCiphers(Crypto.BANNED_CIPHERS);
         context.requestConf(_encrypt);
         return context;
     }
