@@ -37,7 +37,7 @@ public class CellMessage implements Cloneable , Serializable {
   private static final int   STREAM_MODE    = 1 ;
   private static final int   DUMMY_MODE     = 2 ;
   private transient long _receivedAt;
-  private boolean _isDiagnostic;
+  private boolean _isDiagnoseEnabled;
 
   public CellMessage( CellPath addr , Serializable msg ){
 
@@ -51,7 +51,7 @@ public class CellMessage implements Cloneable , Serializable {
      _lastUmid     = _umid ;
      _session      = CDC.getSession();
      _messageStream = null;
-     _isDiagnostic = NDC.isDiagnostic();
+     _isDiagnoseEnabled = NDC.isDiagnoseEnabled();
   }
 
   @Override
@@ -111,7 +111,7 @@ public boolean equals( Object obj ){
      _source      = new CellPath() ;
      _lastUmid    = _umid ;
      _isPersistent = true;
-     _isDiagnostic = NDC.isDiagnostic();
+     _isDiagnoseEnabled = NDC.isDiagnoseEnabled();
   }
   public boolean isFinalDestination(){ return _destination.isFinalDestination() ; }
   public boolean isFirstDestination(){ return _destination.isFirstDestination() ; }
@@ -144,7 +144,7 @@ public boolean equals( Object obj ){
         copy._isPersistent = _isPersistent;
         copy._session = _session;
         copy._ttl = _ttl;
-        copy._isDiagnostic = _isDiagnostic;
+        copy._isDiagnoseEnabled = _isDiagnoseEnabled;
         return copy;
     }
 
@@ -214,8 +214,8 @@ public boolean equals( Object obj ){
         return System.currentTimeMillis() - _receivedAt;
     }
 
-    public boolean isDiagnostic()
+    public boolean isDiagnoseEnabled()
     {
-        return _isDiagnostic;
+        return _isDiagnoseEnabled;
     }
 }

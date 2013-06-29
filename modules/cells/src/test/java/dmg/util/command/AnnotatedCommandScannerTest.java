@@ -661,7 +661,7 @@ public class AnnotatedCommandScannerTest
             @Command(name = "test")
             class TestCommand implements Callable<String>
             {
-                @Argument(factory="getByName")
+                @Argument(factoryMethod="getByName")
                 InetAddress address;
 
                 @Override

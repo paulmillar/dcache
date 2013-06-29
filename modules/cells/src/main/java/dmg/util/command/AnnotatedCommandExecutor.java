@@ -182,7 +182,7 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         if (type.isArray()) {
             Function<String,Object> typeConverter =
                     createTypeConverter(type.getComponentType(),
-                    option.factory());
+                    option.factoryMethod());
             if (option.values().length > 0) {
                 typeConverter = new MultipleChoiceValidator(
                         typeConverter, asList(option.values()));
@@ -194,7 +194,7 @@ public class AnnotatedCommandExecutor implements CommandExecutor
             }
         } else {
             Function<String,Object> typeConverter = createTypeConverter(type,
-                    option.factory());
+                    option.factoryMethod());
             if (option.values().length > 0) {
                 typeConverter = new MultipleChoiceValidator(
                         typeConverter, asList(option.values()));
@@ -209,11 +209,11 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         if (type.isArray()) {
             Function<String,Object> typeConverter =
                     createTypeConverter(type.getComponentType(),
-                    argument.factory());
+                    argument.factoryMethod());
             return new MultiValuedArgumentHandler(field, typeConverter, argument);
         } else {
             Function<String,Object> typeConverter = createTypeConverter(type,
-                    argument.factory());
+                    argument.factoryMethod());
             return new ArgumentHandler(field, typeConverter, argument);
         }
     }

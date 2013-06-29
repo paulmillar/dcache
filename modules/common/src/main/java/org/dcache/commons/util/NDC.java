@@ -40,15 +40,15 @@ public class NDC
         return _positions;
     }
 
-    public String getDiagnose()
+    private String getDiagnose()
     {
         return _diagnose;
     }
 
-    public void enableStoredDiagnostic()
+    public void enableStoredDiagnose()
     {
-        if(_diagnose == null) {
-            _diagnose = offsetFrom(_positions);
+        if (_diagnose == null) {
+            _diagnose = lastCommaOffset(_positions);
         }
     }
 
@@ -142,19 +142,19 @@ public class NDC
         }
     }
 
-    static public boolean isDiagnostic()
+    static public boolean isDiagnoseEnabled()
     {
         return MDC.get(KEY_DIAGNOSE_OFFSET) != null;
     }
 
-    static public void enableDiagnostic()
+    static public void enableDiagnose()
     {
-        if(!isDiagnostic()) {
-            MDC.put(KEY_DIAGNOSE_OFFSET, offsetFrom(MDC.get(KEY_POSITIONS)));
+        if (!isDiagnoseEnabled()) {
+            MDC.put(KEY_DIAGNOSE_OFFSET, lastCommaOffset(MDC.get(KEY_POSITIONS)));
         }
     }
 
-    static private String offsetFrom(String value)
+    static private String lastCommaOffset(String value)
     {
         return value == null ? "-1" : String.valueOf(value.lastIndexOf(','));
     }

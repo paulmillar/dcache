@@ -43,7 +43,7 @@ public @interface Argument
     boolean required() default true;
 
     /**
-     * See {@link Option#staticMethod()}.
+     * See {@link Option#factoryMethod()}.
      */
-    String factory() default "valueOf";
+    String factoryMethod() default "valueOf";
 }

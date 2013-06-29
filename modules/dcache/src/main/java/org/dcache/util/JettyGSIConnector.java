@@ -72,7 +72,7 @@ public class JettyGSIConnector
     private TrustedCertificates _trustedCerts;
     private GSSManager _manager;
 
-    private DiagnosticTriggers<InetAddress> _diagnosticAddresses;
+    private DiagnoseTriggers<InetAddress> _diagnosticAddresses;
 
     // public static final String GSI_CONTEXT="org.gglobus.gsi.context";
     // public static final String GSI_USER_DN="org.globus.gsi.authorized.user.name";
@@ -109,7 +109,7 @@ public class JettyGSIConnector
     }
 
     @Required
-    public void setDiagnosticTriggers(DiagnosticTriggers<InetAddress> triggers)
+    public void setDiagnosticTriggers(DiagnoseTriggers<InetAddress> triggers)
     {
         _diagnosticAddresses = triggers;
     }

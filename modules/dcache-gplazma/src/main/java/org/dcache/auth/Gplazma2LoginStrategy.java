@@ -50,7 +50,7 @@ import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Collections2.filter;
 import org.dcache.gplazma.configuration.PluginsLifecycleAware;
-import org.dcache.util.DiagnosticTriggers;
+import org.dcache.util.DiagnoseTriggers;
 
 /**
  * A LoginStrategy that wraps a org.dcache.gplazma.GPlazma
@@ -69,8 +69,8 @@ public class Gplazma2LoginStrategy
     private PluginFactory _factory;
     private KnownFailedLogins _failedLogins = new KnownFailedLogins();
 
-    private DiagnosticTriggers<Principal> _diagnosticPrincipals =
-            new DiagnosticTriggers<>();
+    private DiagnoseTriggers<Principal> _diagnosePrincipals =
+            new DiagnoseTriggers<>();
 
     @Required
     public void setConfigurationFile(String configurationFile)
@@ -178,7 +178,7 @@ public class Gplazma2LoginStrategy
         RecordingLoginMonitor monitor = new RecordingLoginMonitor();
 
         LoginResult result = monitor.getResult();
-        _diagnosticPrincipals.acceptAll(result.allObservedPrincipals());
+        _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
 
         try {
             LoginReply reply = convertLoginReply(_gplazma.login(subject, monitor));
@@ -259,7 +259,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_add_$_1_99(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
-        _diagnosticPrincipals.addAll(principals);
+        _diagnosePrincipals.addAll(principals);
         return "";
     }
 
@@ -267,7 +267,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_ls(Args args)
     {
         StringBuilder sb = new StringBuilder();
-        for (Principal p : _diagnosticPrincipals.getAll()) {
+        for (Principal p : _diagnosePrincipals.getAll()) {
             sb.append(p).append('\n');
         }
         return sb.toString();
@@ -277,7 +277,7 @@ public class Gplazma2LoginStrategy
     public String ac_diagnose_rm(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
-        return _diagnosticPrincipals.removeAll(principals) ? "" : "No principal was removed";
+        return _diagnosePrincipals.removeAll(principals) ? "" : "No principal was removed";
     }
 
     /**

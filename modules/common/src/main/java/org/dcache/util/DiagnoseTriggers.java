@@ -1,33 +1,39 @@
 package org.dcache.util;
 
 import java.util.Collection;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.dcache.commons.util.NDC;
 
+import static java.util.Collections.newSetFromMap;
+
 /**
- * This class holds a set of triggers for the NDC enableDiagnostic method.
- * One may add or remove a trigger, and the combined set of triggers may be
- * viewed or cleared.
+ * This class holds a set of triggers for the NDC enableDiagnose method.
+ * One may add or remove one or multiple triggers, and the combined set of
+ * triggers may be viewed or cleared.
  *
- * Either a single item or a combination of items may be processed.  If
- * the item or at least one item of the supplied collection matches one or more
- * of the triggers then NDC#enableDiagnostics is called and the matching items
- * are removed from the set of triggers.
+ * Either a single item or multiple items may be processed in one go, via the
+ * #accept and #acceptAll method respectively.  Processing involves checking
+ * whether the supplied item or any member of the multiple items matches a
+ * trigger (via the equals method).  If any match then the NDC#enableDiagnose
+ * method is called.  All triggers that match the supplied item or items are
+ * removed, so that a subsequent call to the #accept or #acceptAll method with
+ * the same input will not call NDC#enableDiagnose, unless #add or #addAll has
+ * been called.
  *
- * This class is generic and requires the specific type be immutable.
+ * This class is generic and requires the specified type be immutable.
  */
-public class DiagnosticTriggers<T>
+public class DiagnoseTriggers<T>
 {
-    private final Set<T> _triggers = Collections.newSetFromMap(
-        new ConcurrentHashMap<T, Boolean>());
+    private final Set<T> _triggers =
+            newSetFromMap(new ConcurrentHashMap<T, Boolean>());
 
     /**
-     * Add an additional triggers to the existing set of triggers.
-     * If an equal item is already registered then this method has no effect.
+     * Add an additional trigger to the existing set of triggers.
+     * If an equal trigger is already registered then this method will have no
+     * effect.
      */
     public void add(T item)
     {
@@ -36,8 +42,8 @@ public class DiagnosticTriggers<T>
 
     /**
      * Add zero or more additional triggers to the existing set of triggers.
-     * If any item of the supplied collection is equal to an already registered
-     * trigger then that item has no effect.
+     * If any trigger of the supplied collection is equal to an already
+     * registered trigger then adding that trigger will have no effect.
      */
     public void addAll(Collection<T> items)
     {
@@ -77,25 +83,26 @@ public class DiagnosticTriggers<T>
     }
 
     /**
-     * Returns an unmodifiable view of the set of triggers.
+     * Returns the set of triggers.
      */
     public Set<T> getAll()
     {
-        return Collections.unmodifiableSet(_triggers);
+        return new HashSet(_triggers);
     }
 
     /**
-     * Process a potential trigger for NDC enableDiagnostic.  If the supplied
-     * item equals a previously added trigger then NDC#enableDiagnostic is
-     * called.  Subsequent calls with the same argument will not trigger
-     * NDC#enableDiagnostic unless #add has called with this argument.
+     * Process a potential trigger for NDC enableDiagnose.  If the supplied
+     * item equals a previously added trigger then NDC#enableDiagnose is
+     * called.  The trigger is removed so that subsequent calls with the same
+     * argument will not trigger NDC#enableDiagnostic unless #add has called
+     * with this argument.
      * @return true if item triggered enabling diagnostic.
      */
     public boolean accept(T item)
     {
         boolean isTriggered = _triggers.remove(item);
         if (isTriggered) {
-            NDC.enableDiagnostic();
+            NDC.enableDiagnose();
         }
         return isTriggered;
     }
@@ -104,15 +111,15 @@ public class DiagnosticTriggers<T>
      * Process several potential triggers for NDC enableDiagnostic.  If any of
      * the supplied items equal any item previously added then
      * NDC#enableDiagnostic is called.  Subsequent calls with any subset of the
-     * supplied argument will not trigger NDC#enableDiagnostic unless #add
-     * has been called with an element from this subset.
-     * @return true if any of the supplied items are triggers.
+     * supplied argument will not trigger NDC#enableDiagnostic unless #add or
+     * #addAll  has been called with elements from this subset.
+     * @return true if any of the supplied items match a trigger.
      */
     public boolean acceptAll(Collection<T> items)
     {
         boolean isTriggered = _triggers.removeAll(items);
         if (isTriggered) {
-            NDC.enableDiagnostic();
+            NDC.enableDiagnose();
         }
         return isTriggered;
     }

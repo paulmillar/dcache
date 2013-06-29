@@ -32,7 +32,7 @@ public class CellThresholdFilterCompanion extends Filter<ILoggingEvent>
             return FilterReply.NEUTRAL;
         }
 
-        if (NDC.isDiagnostic() && event.getLevel().isGreaterOrEqual(Level.DEBUG)) {
+        if (NDC.isDiagnoseEnabled() && event.getLevel().isGreaterOrEqual(Level.DEBUG)) {
             return FilterReply.ACCEPT;
         }
 

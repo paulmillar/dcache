@@ -242,8 +242,8 @@ public class CDC implements AutoCloseable
         Object session = envelope.getSession();
         NDC.push(getMessageContext(envelope));
         setMdc(MDC_SESSION, (session == null) ? null : session.toString());
-        if (envelope.isDiagnostic()) {
-            NDC.enableDiagnostic();
+        if (envelope.isDiagnoseEnabled()) {
+            NDC.enableDiagnose();
         }
     }
 
@@ -272,17 +272,17 @@ public class CDC implements AutoCloseable
         NDC.clear();
     }
 
-    public static void updateDiagnostic(CellMessage envelope)
+    public static void updateDiagnose(CellMessage envelope)
     {
-        if(envelope.isDiagnostic()) {
-            NDC.enableDiagnostic();
+        if (envelope.isDiagnoseEnabled()) {
+            NDC.enableDiagnose();
         }
     }
 
-    public void updateStoredDiagnostic(CellMessage envelope)
+    public void updateStoredDiagnose(CellMessage envelope)
     {
-        if(envelope.isDiagnostic()) {
-            _ndc.enableStoredDiagnostic();
+        if (envelope.isDiagnoseEnabled()) {
+            _ndc.enableStoredDiagnose();
         }
     }
 }
