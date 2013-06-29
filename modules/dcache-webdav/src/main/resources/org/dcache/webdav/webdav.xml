@@ -1,50 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-                           http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+                           http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+                           http://www.springframework.org/schema/util
+                           http://www.springframework.org/schema/util/spring-util-3.1.xsd">
 
   <bean id="properties"
 	class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
       <description>Imported configuration data</description>
-
       <property name="location" value="arguments:"/>
   </bean>
 
 
   <bean id="pnfs-stub" class="org.dcache.cells.CellStub">
       <description>PnfsManager communication stub</description>
-
-      <property name="destination" value="${pnfsmanager}"/>
+      <property name="destination" value="${dcache.service.pnfsmanager}"/>
       <property name="timeout" value="${webdavPnfsTimeout}"/>
   </bean>
 
 
   <bean id="pool-manager-stub" class="org.dcache.cells.CellStub">
       <description>PoolManager communication stub</description>
-
-      <property name="destination" value="${poolmanager}"/>
+      <property name="destination" value="${dcache.service.poolmanager}"/>
       <property name="timeout" value="${webdavPoolManagerTimeout}"/>
   </bean>
 
 
   <bean id="pool-stub" class="org.dcache.cells.CellStub">
       <description>Pool communication stub</description>
-
       <property name="timeout" value="${webdavPoolTimeout}"/>
   </bean>
 
 
   <bean id="login-stub" class="org.dcache.cells.CellStub">
-      <description>Login cell communication stub</description>
-      <property name="destination" value="${gplazma}"/>
-      <property name="timeout" value="${webdavLoginTimeout}"/>
+      <description>Login serviceunication stub</description>
+      <property name="destination" value="${dcache.service.gplazma}"/>
+      <property name="timeout" value="${webdavGplazmaTimeout}"/>
   </bean>
 
 
   <bean id="billing-stub" class="org.dcache.cells.CellStub">
       <description>Billing communication stub</description>
-      <property name="destination" value="${billing}"/>
+      <property name="destination" value="${dcache.service.billing}"/>
   </bean>
 
 
@@ -101,6 +100,7 @@
       <property name="readOnly" value="${webdavReadOnly}"/>
       <property name="loginStrategy" ref="login-strategy"/>
       <property name="enableBasicAuthentication" value="${webdavBasicAuthentication}"/>
+      <property name="rootPath" value="${webdavRootPath}"/>
   </bean>
 
 
@@ -123,7 +123,6 @@
       <property name="missingFileStrategy" ref="missing-file-strategy"/>
       <property name="listHandler" ref="list-handler"/>
       <property name="rootPath" value="${webdavRootPath}"/>
-      <property name="chrootToUserRoot" value="${webdavChrootToUserRoot}"/>
       <property name="allowedPaths" value="${webdavAllowedPaths}"/>
       <property name="ioQueue" value="${webdavIoQueue}"/>
       <property name="executor" ref="scheduled-thread-pool"/>
@@ -197,22 +196,28 @@
       <description>Registers the door with a LoginBroker</description>
 
       <property name="executor" ref="scheduled-thread-pool"/>
-      <property name="updateTime" value="${loginBrokerUpdateTime}"/>
-      <property name="updateThreshold" value="${loginBrokerUpdateThreshold}"/>
+      <property name="updateTime" value="${webdav.service.loginbroker.update-period}"/>
+      <property name="updateTimeUnit" value="${webdav.service.loginbroker.update-period.unit}"/>
+      <property name="updateThreshold" value="${webdav.service.loginbroker.update-threshold}"/>
       <property name="protocolEngine"
 		value="org.dcache.webdav.DcacheResourceFactory"/>
       <property name="protocolVersion" value="1.1"/>
       <property name="protocolFamily" ref="protocol-family"/>
-      <property name="address" value="${webdavAddress}"/>
-      <property name="port" value="${webdavPort}"/>
+      <property name="address" value="${webdav.net.listen}"/>
+      <property name="port" value="${port}"/>
       <property name="loginBroker">
 	  <bean class="dmg.cells.nucleus.CellPath">
-	      <constructor-arg value="${loginBroker}"/>
+	      <constructor-arg value="${webdav.service.loginbroker}"/>
 	  </bean>
       </property>
   </bean>
 
-  <beans profile="connector-http">
+    <bean id="banned-ciphers" class="org.dcache.util.Crypto"
+          factory-method="getBannedCipherSuitesFromConfigurationValue">
+        <constructor-arg value="${webdav.security.ciphers}"/>
+    </bean>
+
+    <beans profile="connector-http">
       <bean id="protocol-family" class="java.lang.String">
           <description>http</description>
 	  <constructor-arg type="String" value="http"/>
@@ -225,8 +230,8 @@
 	  <property name="connectors">
 	      <list>
 		  <bean class="org.eclipse.jetty.server.nio.SelectChannelConnector">
-		      <property name="port" value="${webdavPort}"/>
-		      <property name="host" value="${webdavAddress}"/>
+		      <property name="port" value="${port}"/>
+		      <property name="host" value="${webdav.net.listen}"/>
 		  </bean>
 	      </list>
 	  </property>
@@ -259,14 +264,13 @@
   </beans>
 
 
-
   <beans profile="connector-https">
       <bean id="https-connector"
 	    class="org.eclipse.jetty.server.ssl.SslSelectChannelConnector">
           <description>HTTPS connector from Jetty</description>
 
-	  <property name="port" value="${webdavPort}"/>
-	  <property name="host" value="${webdavAddress}"/>
+	  <property name="port" value="${port}"/>
+	  <property name="host" value="${webdav.net.listen}"/>
 	  <property name="keystore" value="${webdavKeyStore}"/>
 	  <property name="keystoreType" value="PKCS12"/>
 	  <property name="password" value="${webdavKeyStorePassword}"/>
@@ -274,6 +278,7 @@
 	  <property name="trustPassword" value="${webdavTrustStorePassword}"/>
 	  <property name="wantClientAuth" value="${webdavWantClientAuth}"/>
 	  <property name="needClientAuth" value="${webdavNeedClientAuth}"/>
+      <property name="excludeCipherSuites" ref="banned-ciphers"/>
       </bean>
   </beans>
 
@@ -283,22 +288,23 @@
       <bean id="https-connector" class="org.dcache.util.JettyGSIConnector">
           <description>HTTPS connector using jGlobus</description>
 
-	  <property name="port" value="${webdavPort}"/>
-	  <property name="host" value="${webdavAddress}"/>
+	  <property name="port" value="${port}"/>
+	  <property name="host" value="${webdav.net.listen}"/>
 	  <property name="hostCertificatePath" value="${grid.hostcert.cert}"/>
 	  <property name="hostKeyPath" value="${grid.hostcert.key}"/>
 	  <property name="caCertificatePath" value="${grid.ca.path}"/>
 	  <property name="autoFlush" value="true"/>
 	  <property name="encrypt" value="true"/>
-	  <property name="requireClientAuth" value="${webdavWantClientAuth}"/>
-	  <property name="acceptNoClientCerts"
-		    value="#{ '${webdavNeedClientAuth}' == 'false' }"/>
+      <property name="requireClientAuth" value="${webdavNeedClientAuth}"/>
+      <property name="acceptNoClientCerts"
+                 value="#{ '${webdavWantClientAuth}' == 'false' }"/>
 	  <property name="gssMode" value="SSL"/>
 	  <property name="millisecBetweenHostCertRefresh"
 		    value="#{ ${hostCertificateRefreshPeriod} * 1000 }"/>
 	  <property name="millisecBetweenTrustAnchorRefresh"
 		    value="#{ ${trustAnchorRefreshPeriod} * 1000 }"/>
 	  <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
+      <property name="excludeCipherSuites" ref="banned-ciphers"/>
       </bean>
   </beans>
 

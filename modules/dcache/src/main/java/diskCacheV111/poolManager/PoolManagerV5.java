@@ -19,13 +19,13 @@ import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 
 import diskCacheV111.poolManager.PoolSelectionUnit.DirectionType;
+import diskCacheV111.pools.PoolCostInfo;
 import diskCacheV111.pools.PoolV2Mode;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.vehicles.GenericStorageInfo;
 import diskCacheV111.vehicles.IpProtocolInfo;
-import diskCacheV111.vehicles.PoolCostCheckable;
 import diskCacheV111.vehicles.PoolLinkGroupInfo;
 import diskCacheV111.vehicles.PoolManagerGetPoolListMessage;
 import diskCacheV111.vehicles.PoolManagerGetPoolMonitor;
@@ -324,16 +324,12 @@ public class PoolManagerV5
         return "'set timeout pool' is obsolete";
     }
 
-    public final static String hh_getpoolsbylink =
-        "<linkName> [-size=<filesize>]";
+    public static final String hh_getpoolsbylink = "<linkName>";
     public String ac_getpoolsbylink_$_1(Args args)
-        throws NumberFormatException
     {
-       String sizeString = args.getOpt("size");
-       long size = (sizeString == null) ? 50000000L : Long.parseLong(sizeString);
        String link = args.argv(0);
        StringBuilder sb = new StringBuilder();
-       for (PoolCostCheckable pool: _poolMonitor.queryPoolsByLinkName(link, size)) {
+       for (PoolCostInfo pool: _poolMonitor.queryPoolsByLinkName(link)) {
            sb.append(pool).append("\n");
        }
        return sb.toString();
@@ -430,7 +426,7 @@ public class PoolManagerV5
           PoolStatusChangedMessage msg = new PoolStatusChangedMessage( poolName , status ) ;
           msg.setPoolMode( poolMode ) ;
           msg.setDetail( statusCode , statusMessage ) ;
-          _log.info("sendPoolStatusRelay : "+msg);
+          _log.info("sendPoolStatusRelay : " + msg);
           sendMessage(
                new CellMessage( _poolStatusRelayPath , msg )
                      ) ;
@@ -477,7 +473,7 @@ public class PoolManagerV5
         PoolSelectionUnit.SelectionLink link =
             _selectionUnit.getLinkByName(linkName);
         List<PoolInfo> pools =
-            _costModule.getPoolInfo(transform(link.pools(), getName));
+            _costModule.getPoolInfo(transform(link.getPools(), getName));
         if (pools.isEmpty()) {
             throw new CacheException(57, "No appropriate pools found for link: " + linkName);
         }
@@ -494,11 +490,9 @@ public class PoolManagerV5
     {
         List<PoolManagerPoolInformation> pools = new ArrayList<>();
         for (String name: msg.getPoolNames()) {
-            try {
-                pools.add(_poolMonitor.getPoolInformation(name));
-            } catch (NoSuchElementException e) {
-                /* Don't include a pool that doesn't exist.
-                 */
+            PoolManagerPoolInformation pool = _poolMonitor.getPoolInformation(name);
+            if (pool != null) {
+                pools.add(pool);
             }
         }
         msg.setPools(pools);
@@ -719,7 +713,7 @@ public class PoolManagerV5
                 _message.setSucceeded();
 
                 _log.info("Select link group handler finished after {} ms",
-                          (System.currentTimeMillis() - started));
+                        (System.currentTimeMillis() - started));
             } catch (Exception e) {
                 _message.setFailed(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                    e.getMessage());
@@ -817,7 +811,7 @@ public class PoolManagerV5
                    .selectWritePool(_request.getPreallocated());
 
               _log.info("{} write handler selected {} after {} ms", _pnfsId, pool.getName(),
-                        System.currentTimeMillis() - started);
+                      System.currentTimeMillis() - started);
               requestSucceeded(pool);
 
            }catch(CacheException ce ){

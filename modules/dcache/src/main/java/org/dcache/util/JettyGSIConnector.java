@@ -38,6 +38,7 @@ import dmg.cells.nucleus.CDC;
 
 import org.dcache.commons.util.NDC;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.dcache.util.Files.checkDirectory;
 import static org.dcache.util.Files.checkFile;
 import static org.globus.axis.gsi.GSIConstants.*;
@@ -96,6 +97,7 @@ public class JettyGSIConnector
     private volatile boolean _rejectLimitedProxy = false;
     private volatile Integer _mode = GSIConstants.MODE_SSL;
     private volatile int _handshakeTimeout = 0; // 0 means use maxIdleTime
+    private String[] _excludedCipherSuites = {};
 
     /**
      * Assing default values to the certificate refresh intervals
@@ -299,6 +301,11 @@ public class JettyGSIConnector
         _handshakeTimeout = msec;
     }
 
+    public void setExcludeCipherSuites(String[] cipherSuites)
+    {
+        _excludedCipherSuites = checkNotNull(cipherSuites);
+    }
+
     protected ExtendedGSSContext createGSSContext()
         throws GSSException
     {
@@ -319,7 +326,7 @@ public class JettyGSIConnector
         //                       _trustedCerts);
         // }
 
-        context.setBannedCiphers(Crypto.BANNED_CIPHERS);
+        context.setBannedCiphers(_excludedCipherSuites);
         context.requestConf(_encrypt);
         return context;
     }
