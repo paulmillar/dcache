@@ -66,17 +66,17 @@
   </bean>
 
   
-  <bean id="diagnostic-triggers"
-       class="org.dcache.util.DiagnosticTriggers">
+  <bean id="diagnose-triggers"
+       class="org.dcache.util.DiagnoseTriggers">
       <description>The set of addresses that trigger diagnostic logging</description>
   </bean>
 
 
-  <bean id="diagnostic-triggers-cli"
-       class="org.dcache.util.DiagnosticAddressTriggerCLI">
+  <bean id="diagnose-triggers-cli"
+       class="org.dcache.util.AddressTriggerDiagnoseCLI">
       <description>CLI for managing diagnostic triggers</description>
 
-      <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
+      <property name="diagnoseTriggers" ref="diagnose-triggers"/>
   </bean>
 
 
@@ -303,7 +303,7 @@
 		    value="#{ ${hostCertificateRefreshPeriod} * 1000 }"/>
 	  <property name="millisecBetweenTrustAnchorRefresh"
 		    value="#{ ${trustAnchorRefreshPeriod} * 1000 }"/>
-	  <property name="diagnosticTriggers" ref="diagnostic-triggers"/>
+	  <property name="diagnoseTriggers" ref="diagnose-triggers"/>
       <property name="excludeCipherSuites" ref="banned-ciphers"/>
       </bean>
   </beans>

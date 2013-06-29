@@ -109,7 +109,7 @@ public class JettyGSIConnector
     }
 
     @Required
-    public void setDiagnosticTriggers(DiagnoseTriggers<InetAddress> triggers)
+    public void setDiagnoseTriggers(DiagnoseTriggers<InetAddress> triggers)
     {
         _diagnosticAddresses = triggers;
     }

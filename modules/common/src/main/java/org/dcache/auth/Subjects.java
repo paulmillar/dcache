@@ -467,4 +467,25 @@ public class Subjects
         }
         return principals;
     }
+
+    public static String argFromPrincipal(Principal principal)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        if(principal instanceof GlobusPrincipal) {
+            sb.append("dn");
+        } else if(principal instanceof KerberosPrincipal) {
+            sb.append("kerberos");
+        } else if (principal instanceof FQANPrincipal) {
+            sb.append("fqan");
+        } else if (principal instanceof LoginNamePrincipal) {
+            sb.append("name");
+        } else {
+            sb.append("<unknown:").append(principal.getClass().getSimpleName()).append('>');
+        }
+
+        sb.append(':').append(principal.getName());
+
+        return sb.toString();
+    }
 }

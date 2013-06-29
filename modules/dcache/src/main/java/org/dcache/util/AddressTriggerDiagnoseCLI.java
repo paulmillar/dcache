@@ -22,7 +22,7 @@ public class AddressTriggerDiagnoseCLI implements CellCommandListener
     private DiagnoseTriggers<InetAddress> _triggers;
 
     @Required
-    public void setDiagnosticTriggers(DiagnoseTriggers<InetAddress> triggers)
+    public void setDiagnoseTriggers(DiagnoseTriggers<InetAddress> triggers)
     {
         _triggers = triggers;
     }
@@ -64,7 +64,7 @@ public class AddressTriggerDiagnoseCLI implements CellCommandListener
                     "additional logging in all dCache components.\n\n" +
                     "Note that a client's address is removed automatically " +
                     "if it triggers additiona logging; therefore, in most " +
-                    "cases, this command is not be needed.")
+                    "cases, this command is not needed.")
     public class DiagnoseRmCommand implements Callable<String>
     {
         @Argument(factoryMethod="getByName")

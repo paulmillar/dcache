@@ -45,6 +45,12 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Sets;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.concurrent.Callable;
+
+import dmg.util.command.Argument;
+import dmg.util.command.Command;
 import static com.google.common.collect.Iterables.getFirst;
 import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.base.Predicates.not;
@@ -255,7 +261,52 @@ public class Gplazma2LoginStrategy
         return printer.print();
     }
 
-    public static final String hh_diagnose_add = "Add new principals";
+    public static final String hh_diagnose_add =
+            "<principal> [<principal> ...] # add new principals";
+    public static final String fh_diagnose_add =
+            "Adds one or more principals to the list of principals that will\n" +
+            "trigger additional logging in all dCache components.\n" +
+            "\n" +
+            "All dCache components will log additional information when a \n" +
+            "user next authenticates and their identity matches one or more of\n" +
+            "the added principals.  This information may be useful when \n" +
+            "diagnosing a user-specific problem.\n" +
+            "\n" +
+            "If a login triggers additional logging then the matching principals\n" +
+            "are removed from the list so subsequent logins from the same user\n" +
+            "will not trigger the same detailed logging (i.e., this is a \n" +
+            "'one-shot' diagnostic logging).  If subsequent additional logging\n" +
+            "is needed then this command must be called again.\n" +
+            "\n" +
+            "Diagnostic logging may also be triggered through the door, which has\n" +
+            "the advantage of capturing all activity, but must be specified on\n" +
+            "the correct door(s).\n" +
+            "\n" +
+            "Principals are specified as arguments to this command---one\n" +
+            "principal per argument.  Therefore care must be taken if the\n" +
+            "principal contains a space; place the argument in double-quote\n" +
+            "marks.\n" +
+            "\n" +
+            "Arguments have the form <type>:<identifier>, where <type> is the\n" +
+            "type of principal and <identifier> is the principal value in a type-\n" +
+            "specific format; for example, to add the Kerberos principal \n" +
+            "'paul@EXAMPLE.ORG', the command is:\n" +
+            "\n" +
+            "    diagnose add kerberos:paul@EXAMPLE.ORG\n" +
+            "\n" +
+            "The following <type> values are accepted:\n"+
+            "\n" +
+            "    'dn'       X.509 Distinguished Name; for example, \n" +
+            "               \"dn:/DC=org/DC=example/CN=Paul Millar\"\n" +
+            "\n" +
+            "    'kerberos' a Kerberos principal, including realm; for example,\n" +
+            "               \"kerberos:paul@EXAMPLE.ORG\"\n" +
+            "\n" +
+            "    'fqan'     a Fully Qualified Attribute Name; for example,\n" +
+            "               \"fqan:/example.org/higgs/Role=admin\"\n" +
+            "\n" +
+            "    'name'     the name from name + password based authentication;\n" +
+            "               for example, \"name:paul\"";
     public String ac_diagnose_add_$_1_99(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
@@ -263,21 +314,53 @@ public class Gplazma2LoginStrategy
         return "";
     }
 
-    public static final String hh_diagnose_ls = "List diagnose principals";
+    public static final String hh_diagnose_ls = "# list diagnose principals";
+    public static final String fh_diagnose_ls =
+            "List all the principals that will trigger additional logging in all\n" +
+            "dCache components.";
     public String ac_diagnose_ls(Args args)
     {
         StringBuilder sb = new StringBuilder();
+
         for (Principal p : _diagnosePrincipals.getAll()) {
-            sb.append(p).append('\n');
+            sb.append(Subjects.argFromPrincipal(p)).append('\n');
         }
+
         return sb.toString();
     }
 
-    public static final String hh_diagnose_rm = "Remove a principal for diagnosis";
-    public String ac_diagnose_rm(Args args)
+    public static final String hh_diagnose_rm =
+            "<principal> [<principal> ...] # remove principals";
+    public static final String fh_diagnose_rm =
+            "Manually remove one or more principals from the list of principals\n" +
+            "that trigger additional logging.\n" +
+            "\n" +
+            "A subsequent attempt to log in by a user who's identity matches\n" +
+            "the removed principals (and none of the principals remaining on the\n" +
+            "list) will not trigger additional logging.  A login attempt from a \n" +
+            "user identified with any principals remaining on the list will\n" +
+            "trigger additional logging.\n" +
+            "\n" +
+            "Principals are specified in the same format as for the 'diagnose add'\n" +
+            "command.  See that command's help for more details.\n" +
+            "\n" +
+            "Note that when a user attempts to log in and triggers additional\n" +
+            "logging, all principals that match the user's identity are\n" +
+            "automatically removed from the list.  Therefore, in many cases,\n" +
+            "this command is not needed.";
+    public String ac_diagnose_rm_$_1_99(Args args)
     {
         Set<Principal> principals = Subjects.principalsFromArgs(args.getArguments());
         return _diagnosePrincipals.removeAll(principals) ? "" : "No principal was removed";
+    }
+
+    public static final String hh_diagnose_clear = "# remove all principals";
+    public static final String fh_diagnose_clear =
+            "Empty the list of principals that trigger additional logging.\n";
+    public String ac_diagnose_clear(Args args)
+    {
+        _diagnosePrincipals.clear();
+        return "";
     }
 
     /**
