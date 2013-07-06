@@ -42,8 +42,6 @@ import diskCacheV111.vehicles.PnfsDeleteEntryMessage;
 import diskCacheV111.vehicles.PnfsDeleteEntryNotificationMessage;
 import diskCacheV111.vehicles.PnfsFlagMessage;
 import diskCacheV111.vehicles.PnfsGetCacheLocationsMessage;
-import diskCacheV111.vehicles.PnfsGetChecksumAllMessage;
-import diskCacheV111.vehicles.PnfsGetChecksumMessage;
 import diskCacheV111.vehicles.PnfsGetFileMetaDataMessage;
 import diskCacheV111.vehicles.PnfsGetParentMessage;
 import diskCacheV111.vehicles.PnfsGetStorageInfoMessage;
@@ -54,6 +52,7 @@ import diskCacheV111.vehicles.PnfsSetChecksumMessage;
 import diskCacheV111.vehicles.PnfsSetFileMetaDataMessage;
 import diskCacheV111.vehicles.PoolFileFlushedMessage;
 import diskCacheV111.vehicles.StorageInfo;
+import diskCacheV111.vehicles.StorageInfos;
 
 import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellMessage;
@@ -120,8 +119,6 @@ public class PnfsManagerV3
         PnfsMapPathMessage.class,
         PnfsGetFileMetaDataMessage.class,
         PnfsGetParentMessage.class,
-        PnfsGetChecksumAllMessage.class,
-        PnfsGetChecksumMessage.class,
         PnfsCreateEntryMessage.class,
         PnfsCreateDirectoryMessage.class,
         PnfsGetFileAttributes.class,
@@ -182,9 +179,7 @@ public class PnfsManagerV3
         _gauges.addGauge(PnfsRenameMessage.class);
         _gauges.addGauge(PnfsFlagMessage.class);
         _gauges.addGauge(PnfsSetChecksumMessage.class);
-        _gauges.addGauge(PnfsGetChecksumMessage.class);
         _gauges.addGauge(PoolFileFlushedMessage.class);
-        _gauges.addGauge(PnfsGetChecksumAllMessage.class);
         _gauges.addGauge(PnfsGetParentMessage.class);
         _gauges.addGauge(PnfsSetFileAttributes.class);
         _gauges.addGauge(PnfsGetFileAttributes.class);
@@ -503,7 +498,7 @@ public class PnfsManagerV3
                         EnumSet.of(FileAttribute.STORAGEINFO, FileAttribute.ACCESS_LATENCY,
                                 FileAttribute.RETENTION_POLICY,  FileAttribute.SIZE));
 
-            StorageInfo info = attributes.getStorageInfo();
+            StorageInfo info = StorageInfos.extractFrom(attributes);
             if(v) {
                 sb.append(" Storage Info : ").append(info).append("\n") ;
             }else{
@@ -801,51 +796,6 @@ public class PnfsManagerV3
             _nameSpaceProvider.getFileAttributes(subject, pnfsId,
                                                  EnumSet.of(FileAttribute.CHECKSUM));
         return factory.find(attributes.getChecksums());
-    }
-
-    private void getChecksum(PnfsGetChecksumMessage msg)
-    {
-        try {
-            PnfsId pnfsId    = msg.getPnfsId();
-            if(pnfsId == null ) {
-                throw new InvalidMessageCacheException("no pnfsid defined");
-            }
-            ChecksumType type = ChecksumType.getChecksumType(msg.getType());
-            Checksum checksum = getChecksum(msg.getSubject(), pnfsId, type);
-            if (checksum != null) {
-                msg.setValue(checksum.getValue());
-            }
-        }catch( CacheException e ){
-            _log.warn(e.toString()) ;
-            msg.setFailed( e.getRc() , e.getMessage() ) ;
-        }catch ( Exception e){
-            _log.warn(e.toString()) ;
-            msg.setFailed( CacheException.UNEXPECTED_SYSTEM_EXCEPTION , e.getMessage() ) ;
-        }
-    }
-
-    private void listChecksumTypes(PnfsGetChecksumAllMessage msg){
-
-        PnfsId pnfsId    = msg.getPnfsId();
-
-        try {
-            FileAttributes attributes =
-                _nameSpaceProvider.getFileAttributes(msg.getSubject(), pnfsId,
-                                                     EnumSet.of(FileAttribute.CHECKSUM));
-            Set<Checksum> checksums = attributes.getChecksums();
-            int[] types =  new int[checksums.size()];
-            int index = 0;
-            for (Checksum checksum: checksums) {
-                types[index++] = checksum.getType().getType();
-            }
-            msg.setValue(types);
-        }catch( CacheException e ){
-            _log.warn(e.toString()) ;
-            msg.setFailed( e.getRc() , e.getMessage() ) ;
-        }catch ( Exception e){
-            _log.warn(e.toString()) ;
-            msg.setFailed( CacheException.UNEXPECTED_SYSTEM_EXCEPTION , e.getMessage() ) ;
-        }
     }
 
     private void setChecksum(PnfsSetChecksumMessage msg){
@@ -1419,8 +1369,7 @@ public class PnfsManagerV3
                 (delay == Long.MAX_VALUE)
                 ? Long.MAX_VALUE
                 : delay - envelope.getLocalAge();
-            CellPath source = (CellPath)envelope.getSourcePath().clone();
-            source.revert();
+            CellPath source = envelope.getSourcePath().revert();
             ListHandler handler =
                 new ListHandlerImpl(source, envelope.getUOID(),
                                     msg, initialDelay, delay);
@@ -1648,25 +1597,19 @@ public class PnfsManagerV3
         else if ( pnfsMessage instanceof PnfsSetChecksumMessage){
             setChecksum((PnfsSetChecksumMessage)pnfsMessage);
         }
-        else if ( pnfsMessage instanceof PnfsGetChecksumMessage){
-            getChecksum((PnfsGetChecksumMessage)pnfsMessage);
-        }
         else if( pnfsMessage instanceof PoolFileFlushedMessage ) {
-            processFlushMessage((PoolFileFlushedMessage) pnfsMessage );
-        }
-        else if ( pnfsMessage instanceof PnfsGetChecksumAllMessage ){
-            listChecksumTypes((PnfsGetChecksumAllMessage)pnfsMessage);
+            processFlushMessage((PoolFileFlushedMessage) pnfsMessage);
         }
         else if (pnfsMessage instanceof PnfsGetParentMessage){
-            getParent((PnfsGetParentMessage)pnfsMessage);
+            getParent((PnfsGetParentMessage) pnfsMessage);
         } else if (pnfsMessage instanceof PnfsListDirectoryMessage) {
             listDirectory(message, (PnfsListDirectoryMessage) pnfsMessage);
         }
         else if (pnfsMessage instanceof PnfsGetFileAttributes) {
-            getFileAttributes((PnfsGetFileAttributes)pnfsMessage);
+            getFileAttributes((PnfsGetFileAttributes) pnfsMessage);
         }
         else if (pnfsMessage instanceof PnfsSetFileAttributes) {
-            setFileAttributes((PnfsSetFileAttributes)pnfsMessage);
+            setFileAttributes((PnfsSetFileAttributes) pnfsMessage);
         }
         else if (pnfsMessage instanceof PnfsRemoveChecksumMessage) {
             removeChecksum((PnfsRemoveChecksumMessage) pnfsMessage);

@@ -162,7 +162,7 @@ public class AliasEntry {
                                 + entry.getSpecificString() + ")";
                 break;
             case WEBAPP:
-                handler = createWebAppContext(alias, specific, args, cell);
+                handler = createWebAppContext(alias, specific, new Args(args.argv(3)), cell);
                 entry = new AliasEntry(alias, aliasType, handler, args.toString());
                 entry.statusMessage = alias + " -> " + TYPE_WEBAPP + "(" + args + ")";
                 break;
@@ -230,20 +230,18 @@ public class AliasEntry {
     private String statusMessage;
     private Method getInfo;
 
-    private AliasEntry(String name, AliasType type, Handler handler, String spec) {
+    private AliasEntry(String name, AliasType type, Handler handler, String spec)
+                    throws NoSuchMethodException, SecurityException {
         this.name = name;
         this.type = type;
         this.handler = handler;
         this.spec = spec;
 
         if (handler instanceof ResponseEngineHandler) {
-            try {
-                final HttpResponseEngine engine
-                    = ((ResponseEngineHandler) handler).getEngine();
-                getInfo = engine.getClass().getMethod("getInfo",
-                                new Class[] { PrintWriter.class });
-            } catch (final Exception e) {
-            }
+            HttpResponseEngine engine
+                = ((ResponseEngineHandler) handler).getEngine();
+            getInfo = engine.getClass().getMethod("getInfo",
+                            new Class[] { PrintWriter.class });
         }
     }
 

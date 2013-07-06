@@ -3,20 +3,13 @@
 define env startLogin.exe enddefine
   onerror shutdown
   check -strong cell.name
-  check -strong gplazmaPolicy
   check -strong gPlazmaNumberOfSimultaneousRequests
   check -strong gplazma.configuration.file
-  check -strong pnfsmanager
+  check -strong dcache.service.pnfsmanager
 
   create org.dcache.cells.UniversalSpringCell "${cell.name}" \
     "classpath:org/dcache/services/login/gplazma.xml \
-     -export -monitor \
-     -num-simultaneous-requests=${gPlazmaNumberOfSimultaneousRequests} \
-     -gplazmaPolicy=${gplazmaPolicy} \
-     -gplazmaConfig=${gplazma.configuration.file} \
-     -messageExecutor=message-thread-pool \
-     -pnfsmanager=${pnfsmanager} \
-  "
+     -export -monitor -messageExecutor=message-thread-pool"
 enddefine
 
 define env killLogin.exe enddefine

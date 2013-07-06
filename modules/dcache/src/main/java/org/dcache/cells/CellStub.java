@@ -1,6 +1,7 @@
 package org.dcache.cells;
 
 import java.io.Serializable;
+import java.util.concurrent.TimeUnit;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.TimeoutCacheException;
@@ -13,6 +14,8 @@ import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.NoRouteToCellException;
 
 import org.dcache.util.CacheExceptionFactory;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * Stub class for common cell communication patterns. An instance
@@ -29,6 +32,7 @@ public class CellStub
     private CellEndpoint _endpoint;
     private CellPath _destination;
     private long _timeout = 30000;
+    private TimeUnit _timeoutUnit = MILLISECONDS;
     private boolean _retryOnNoRouteToCell;
 
     public CellStub()
@@ -48,8 +52,14 @@ public class CellStub
 
     public CellStub(CellEndpoint endpoint, CellPath destination, long timeout)
     {
+        this(endpoint, destination, timeout, MILLISECONDS);
+    }
+
+    public CellStub(CellEndpoint endpoint, CellPath destination, long timeout, TimeUnit unit)
+    {
         this(endpoint, destination);
         setTimeout(timeout);
+        setTimeoutUnit(unit);
     }
 
     @Override
@@ -88,6 +98,16 @@ public class CellStub
     public long getTimeout()
     {
         return _timeout;
+    }
+
+    public void setTimeoutUnit(TimeUnit unit)
+    {
+        _timeoutUnit = unit;
+    }
+
+    public TimeUnit getTimeoutUnit()
+    {
+        return _timeoutUnit;
     }
 
     /**

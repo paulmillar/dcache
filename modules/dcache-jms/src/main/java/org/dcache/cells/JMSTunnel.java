@@ -240,8 +240,7 @@ public class JMSTunnel
             if (!(msg instanceof CellExceptionMessage)) {
                 _log.info("Cannot deliver {}", msg);
 
-                CellPath retAddr = (CellPath)msg.getSourcePath().clone();
-                retAddr.revert();
+                CellPath retAddr = msg.getSourcePath().revert();
                 CellExceptionMessage ret = new CellExceptionMessage(retAddr, e);
                 ret.setLastUOID(msg.getUOID());
                 sendMessage(ret);
@@ -577,8 +576,7 @@ public class JMSTunnel
         @Override
         synchronized public void onMessage(Message message)
         {
-            CDC cdc = CDC.reset(_nucleus);
-            try {
+            try (CDC ignored = CDC.reset(_nucleus)) {
                 TextMessage textMessage = (TextMessage) message;
                 String cell = textMessage.getJMSCorrelationID();
                 String domain = textMessage.getText();
@@ -589,8 +587,6 @@ public class JMSTunnel
             } catch (JMSException e) {
                 _log.error("Error while resolving well known cell: {}",
                            e.getMessage());
-            } finally {
-                cdc.restore();
             }
         }
 
@@ -700,8 +696,7 @@ public class JMSTunnel
         @Override
         synchronized public void onMessage(Message message)
         {
-            CDC cdc = CDC.reset(_nucleus);
-            try {
+            try (CDC ignored = CDC.reset(_nucleus)) {
                 ObjectMessage objectMessage = (ObjectMessage) message;
                 Object object = objectMessage.getObject();
                 CellMessage envelope = (CellMessage) object;
@@ -716,8 +711,6 @@ public class JMSTunnel
             } catch (JMSException e) {
                 _log.error("Failed to retrieve object from JMS message: {}",
                            e.getMessage());
-            } finally {
-                cdc.restore();
             }
         }
 
@@ -839,11 +832,8 @@ public class JMSTunnel
         @Override
         public void onMessage(Message message)
         {
-            CDC cdc = CDC.reset(_nucleus);
-            try {
+            try (CDC ignored = CDC.reset(_nucleus)) {
                 register();
-            } finally {
-                cdc.restore();
             }
         }
 

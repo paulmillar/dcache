@@ -699,13 +699,7 @@ public class      CellShell
                         response = e;
                     }
 
-
-                    try {
-                        future.send(response);
-                    } catch (NoRouteToCellException | SerializationException e){
-                        _log.error("problem sending result of 'kill {}' " +
-                                "command: {}", cell, e.getMessage());
-                    }
+                    future.reply(response);
                 } catch (InterruptedException e) {
                     // Do nothing, dCache is shutting down.
                 }
@@ -815,7 +809,8 @@ public class      CellShell
    //
     public static final String hh_create = "<cellClass> <cellName> [<Arguments>]";
     public String ac_create_$_2_3(Args args)
-        throws Throwable
+            throws ClassNotFoundException, NoSuchMethodException, InstantiationException,
+                   IllegalAccessException, CommandThrowableException
     {
         try {
             Cell cell;
@@ -843,7 +838,7 @@ public class      CellShell
 
             return "created : " + cell;
         } catch (InvocationTargetException e) {
-            throw e.getTargetException();
+            throw new CommandThrowableException(e.getTargetException().getMessage(), e.getTargetException());
         }
     }
    ////////////////////////////////////////////////////////////

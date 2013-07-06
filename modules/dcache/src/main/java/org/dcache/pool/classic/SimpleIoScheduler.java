@@ -2,10 +2,11 @@ package org.dcache.pool.classic;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.util.concurrent.MoreExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InterruptedIOException;
+import java.nio.channels.CompletionHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,6 +24,7 @@ import diskCacheV111.vehicles.JobInfo;
 
 import dmg.cells.nucleus.CDC;
 
+import org.dcache.pool.movers.Mover;
 import org.dcache.util.AdjustableSemaphore;
 import org.dcache.util.FifoPriorityComparator;
 import org.dcache.util.IoPrioritizable;
@@ -31,6 +33,7 @@ import org.dcache.util.LifoPriorityComparator;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
+import static org.dcache.pool.classic.IoRequestState.*;
 
 /**
  *
@@ -77,22 +80,17 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
 
     private final AdjustableSemaphore _semaphore = new AdjustableSemaphore();
 
-    private final MoverExecutorServices _executorServices;
-
     public SimpleIoScheduler(String name,
-                             MoverExecutorServices executorServices,
                              int queueId)
     {
-        this(name, executorServices, queueId, true);
+        this(name, queueId, true);
     }
 
     public SimpleIoScheduler(String name,
-                             MoverExecutorServices executorServices,
                              int queueId,
                              boolean fifo)
     {
         _name = name;
-        _executorServices = executorServices;
         _queueId = queueId;
 
         Comparator<IoPrioritizable> comparator =
@@ -114,12 +112,12 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
      * and internal counter:
      *   | 31- queue id -24|23- job id -0|
      *
-     * @param request
+     * @param mover
      * @param priority
      * @return mover id
      */
     @Override
-    public synchronized int add(PoolIORequest request, IoPriority priority) {
+    public synchronized int add(Mover<?> mover, IoPriority priority) {
         checkState(!_shutdown);
 
         int id = _queueId << 24 | nextId();
@@ -128,8 +126,7 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
             _log.warn("A task was added to queue '{}', however the queue is not configured to execute any tasks.", _name);
         }
 
-        request.setState(IoRequestState.QUEUED);
-        PrioritizedRequest wrapper = new PrioritizedRequest(id, request, priority);
+        PrioritizedRequest wrapper = new PrioritizedRequest(id, mover, priority);
         _queue.add(wrapper);
         _jobs.put(id, wrapper);
 
@@ -152,25 +149,19 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
 
     @Override
     public JobInfo getJobInfo(int id) {
-        PrioritizedRequest pRequest = _jobs.get(id);
-        if(pRequest == null) {
+        PrioritizedRequest request = _jobs.get(id);
+        if(request == null) {
             throw new NoSuchElementException("Job not found : Job-" + id);
         }
-        return toJobInfo(pRequest.getRequest(), id);
+        return request.toJobInfo();
     }
 
     @Override
     public List<JobInfo> getJobInfos() {
         List<JobInfo> jobs = new ArrayList<>();
-
-        for (Map.Entry<Integer, PrioritizedRequest> job : _jobs.entrySet()) {
-            jobs.add(toJobInfo(job.getValue().getRequest(), job.getKey()));
+        for (PrioritizedRequest request : _jobs.values()) {
+            jobs.add(request.toJobInfo());
         }
-
-        /*
-         * return unmodifiable list to 'kill' every one who wants to
-         * change it (in other words, for bug tracking).
-         */
         return Collections.unmodifiableList(jobs);
     }
 
@@ -211,31 +202,46 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
         cancel(wrapper);
     }
 
-    private void cancel(PrioritizedRequest wrapper)
+    private void cancel(final PrioritizedRequest request)
     {
-        if (_queue.remove(wrapper)) {
-            /*
-             * as request is still in the queue, we can cancel it right away.
+        try (CDC ignored = request.getCdc().restore()) {
+            if (_queue.remove(request)) {
+                /* The request was still in the queue. Post processing is still applied to close
+             * the transfer and to notify billing and door.
              */
-            _jobs.remove(wrapper.getId());
-            PoolIORequest request = wrapper.getRequest();
-            request.setState(IoRequestState.DONE);
-            request.setTransferStatus(CacheException.DEFAULT_ERROR_CODE, "Transfer canceled");
+                request.kill();
+                request.getMover().postprocess(
+                        new CompletionHandler<Void,Void>()
+                        {
+                            @Override
+                            public void completed(Void result, Void attachment)
+                            {
+                                release();
+                            }
 
-            /*
-             * go through the standard procedure to update billing and notify door.
-             */
-            String protocolName = protocolNameOf(request);
-            _executorServices.getPostExecutorService(protocolName).execute(request);
-        } else {
-            wrapper.getRequest().kill();
+                            @Override
+                            public void failed(Throwable exc, Void attachment)
+                            {
+                                release();
+                            }
+
+                            private void release()
+                            {
+                                request.done();
+                                _jobs.remove(request.getId());
+                            }
+
+                        });
+            } else {
+                request.kill();
+            }
         }
     }
 
     @Override
     public StringBuffer printJobQueue(StringBuffer sb) {
         for (Map.Entry<Integer, PrioritizedRequest> job : _jobs.entrySet()) {
-            sb.append(job.getKey()).append(" : ").append(job.getValue().getRequest()).append('\n');
+            sb.append(job.getKey()).append(" : ").append(job.getValue()).append('\n');
         }
         return sb;
     }
@@ -264,7 +270,7 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
                             @Override
                             public String apply(PrioritizedRequest input)
                             {
-                                return input.getRequest().getProtocolInfo().getVersionString();
+                                return input.getMover().getProtocolInfo().getVersionString();
                             }
                         })));
             }
@@ -277,34 +283,54 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
             while (!_shutdown) {
                 _semaphore.acquire();
                 try {
-                    final PrioritizedRequest wrapp = _queue.take();
-                    wrapp.getCdc().restore();
+                    final PrioritizedRequest request = _queue.take();
+                    request.getCdc().restore();
+                    request.transfer(
+                            new CompletionHandler<Void,Void>()
+                            {
+                                @Override
+                                public void completed(Void result, Void attachment)
+                                {
+                                    postprocess();
+                                }
 
-                    final PoolIORequest request = wrapp.getRequest();
-                    final String protocolName = protocolNameOf(request);
+                                @Override
+                                public void failed(Throwable exc, Void attachment)
+                                {
+                                    if (exc instanceof InterruptedException || exc instanceof InterruptedIOException) {
+                                        request.getMover().setTransferStatus(CacheException.DEFAULT_ERROR_CODE, "Transfer was killed");
+                                    }
+                                    postprocess();
+                                }
 
-                    request.transfer(_executorServices.getExecutorService(protocolName))
-                            .addListener(
-                                    new Runnable()
-                                    {
-                                        @Override
-                                        public void run()
-                                        {
-                                            _executorServices
-                                                    .getPostExecutorService(protocolName)
-                                                    .execute(request)
-                                                    .addListener(new Runnable()
-                                                    {
-                                                        @Override
-                                                        public void run()
-                                                        {
-                                                            request.setState(IoRequestState.DONE);
-                                                            _jobs.remove(wrapp.getId());
-                                                            _semaphore.release();
-                                                        }
-                                                    }, MoreExecutors.sameThreadExecutor());
-                                        }
-                                    }, MoreExecutors.sameThreadExecutor());
+                                private void postprocess()
+                                {
+                                    request.getMover().postprocess(
+                                            new CompletionHandler<Void, Void>()
+                                            {
+                                                @Override
+                                                public void completed(Void result,
+                                                                      Void attachment)
+                                                {
+                                                    release();
+                                                }
+
+                                                @Override
+                                                public void failed(Throwable exc,
+                                                                   Void attachment)
+                                                {
+                                                    release();
+                                                }
+
+                                                private void release()
+                                                {
+                                                    request.done();
+                                                    _jobs.remove(request.getId());
+                                                    _semaphore.release();
+                                                }
+                                            });
+                                }
+                            });
                 } catch (RuntimeException | Error | InterruptedException e) {
                     _semaphore.release();
                     throw e;
@@ -317,31 +343,37 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
         }
     }
 
-    private String protocolNameOf(PoolIORequest request) {
-        return request.getProtocolInfo().getProtocol() + "-"
-                        + request.getProtocolInfo().getMajorVersion();
-    }
-    /*
-     * wrapper for priority queue
-     */
-    private static class PrioritizedRequest implements IoPrioritizable {
-
-        private final PoolIORequest _request;
+    private static class PrioritizedRequest implements IoPrioritizable  {
+        private final Mover<?> _mover;
         private final IoPriority _priority;
         private final long _ctime;
         private final int _id;
         private final CDC _cdc;
+        private IoRequestState _state;
 
-        PrioritizedRequest(int id, PoolIORequest o, IoPriority p) {
+        /**
+         * Request creation time.
+         */
+        private final long _submitTime;
+
+        /**
+         * Transfer start time.
+         */
+        private long _startTime;
+        private Cancellable _cancellable;
+
+        PrioritizedRequest(int id, Mover<?> mover, IoPriority p) {
             _id = id;
-            _request = o;
+            _mover = mover;
             _priority = p;
             _ctime = System.nanoTime();
+            _submitTime = System.currentTimeMillis();
+            _state = QUEUED;
             _cdc = new CDC();
         }
 
-        public PoolIORequest getRequest() {
-            return _request;
+        public Mover<?> getMover() {
+            return _mover;
         }
 
         public CDC getCdc() {
@@ -376,9 +408,42 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
         public int hashCode() {
             return _id;
         }
-    }
 
-    private static JobInfo toJobInfo(final PoolIORequest request, final int id) {
-        return new IoJobInfo(request, id);
+        @Override
+        public synchronized String toString() {
+            return _state + " : " + _mover.toString();
+        }
+
+        public synchronized JobInfo toJobInfo() {
+            return new IoJobInfo(_submitTime, _startTime, _state, _id, _mover);
+        }
+
+        public synchronized void transfer(CompletionHandler<Void,Void> completionHandler) {
+            try {
+                if (_state != QUEUED) {
+                    completionHandler.failed(new InterruptedException("Transfer cancelled"), null);
+                }
+                _state = RUNNING;
+                _startTime = System.currentTimeMillis();
+                _cancellable = _mover.execute(completionHandler);
+            } catch (RuntimeException e) {
+                completionHandler.failed(e, null);
+            }
+        }
+
+        public synchronized void kill()
+        {
+            if (_cancellable != null) {
+                _cancellable.cancel();
+            } else {
+                _mover.setTransferStatus(CacheException.DEFAULT_ERROR_CODE, "Transfer cancelled");
+            }
+            _state = CANCELED;
+        }
+
+        public synchronized void done()
+        {
+            _state = DONE;
+        }
     }
 }

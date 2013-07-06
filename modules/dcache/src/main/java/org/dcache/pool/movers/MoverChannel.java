@@ -10,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import diskCacheV111.vehicles.ProtocolInfo;
@@ -64,12 +63,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
         new AtomicLong(_transferStarted);
 
     /**
-     * True if the transfer any data.
-     */
-    private final AtomicBoolean _wasChanged =
-        new AtomicBoolean(false);
-
-    /**
      * The number of bytes transferred.
      */
     private final AtomicLong _bytesTransferred =
@@ -90,6 +83,11 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
      * accessed while the monitor lock is held.
      */
     private long _reserved;
+
+    public MoverChannel(Mover<T> mover, RepositoryChannel channel)
+    {
+        this(mover.getIoMode(), mover.getFileAttributes(), mover.getProtocolInfo(), channel, mover.getIoHandle());
+    }
 
     public MoverChannel(IoMode mode, FileAttributes attributes, T protocolInfo,
             RepositoryChannel channel, Allocator allocator)
@@ -131,7 +129,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
     public synchronized MoverChannel<T> truncate(long size) throws IOException
     {
         try {
-            _wasChanged.set(true);
             _channel.truncate(size);
             return this;
         } finally {
@@ -213,7 +210,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
     public int write(ByteBuffer buffer, long position) throws IOException {
         try {
             preallocate(position + buffer.remaining());
-            _wasChanged.set(true);
             int bytes = _channel.write(buffer, position);
             _bytesTransferred.getAndAdd(bytes);
             return bytes;
@@ -231,7 +227,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
             }
             preallocate(position() + remaining);
 
-            _wasChanged.set(true);
             long bytes = _channel.write(srcs, offset, length);
             _bytesTransferred.getAndAdd(bytes);
             return bytes;
@@ -249,7 +244,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
             }
             preallocate(position() + remaining);
 
-            _wasChanged.set(true);
             long bytes = _channel.write(srcs);
             _bytesTransferred.getAndAdd(bytes);
             return bytes;
@@ -273,7 +267,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
     public long transferFrom(ReadableByteChannel src, long position, long count) throws IOException {
         try {
             preallocate(position + count);
-            _wasChanged.set(true);
             long bytes = _channel.transferFrom(src, position, count);
             _bytesTransferred.getAndAdd(bytes);
             return bytes;
@@ -308,8 +301,8 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
         return _lastTransferred.get();
     }
 
-    public boolean wasChanged() {
-        return _wasChanged.get();
+    public synchronized long getAllocated() {
+        return _reserved;
     }
 
     private synchronized void preallocate(long pos)
@@ -320,7 +313,7 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
 
             if (pos > _reserved) {
                 long delta = Math.max(pos - _reserved, SPACE_INC);
-                _logSpaceAllocation.debug("ALLOC: " + delta);
+                _logSpaceAllocation.trace("preallocate: {}", delta);
                 _allocator.allocate(delta);
                 _reserved += delta;
             }

@@ -1,49 +1,32 @@
 package org.dcache.vehicles;
 
-import java.util.Collection;
+import java.net.InetSocketAddress;
 
-import diskCacheV111.movers.NetIFContainer;
 import diskCacheV111.vehicles.Message;
 
-public class XrootdDoorAdressInfoMessage extends Message {
+import static com.google.common.base.Preconditions.checkNotNull;
 
-	private static final long serialVersionUID = -5306759219838126273L;
+public class XrootdDoorAdressInfoMessage extends Message
+{
+    private static final long serialVersionUID = -5306759219838126273L;
 
-	private int xrootdFileHandle;
-	private Collection<NetIFContainer> networkInterfaces;
-	private int serverPort;
-	private final boolean uuidEnabledPool;
+    private final int xrootdFileHandle;
 
-	public XrootdDoorAdressInfoMessage(int xrootdFileHandle, int serverPort, Collection<NetIFContainer> networkInterfaces) {
+    private InetSocketAddress socketAddress;
 
-		this(xrootdFileHandle, serverPort, networkInterfaces, false);
-	}
+    public XrootdDoorAdressInfoMessage(int xrootdFileHandle, InetSocketAddress socketAddress)
+    {
+        this.xrootdFileHandle = xrootdFileHandle;
+        this.socketAddress = checkNotNull(socketAddress);
+    }
 
-	public XrootdDoorAdressInfoMessage(int xrootdFileHandle,
-	                                   int serverPort,
-	                                   Collection<NetIFContainer> networkInterfaces,
-	                                   boolean uuidEnabled) {
-		this.xrootdFileHandle = xrootdFileHandle;
-		this.serverPort = serverPort;
+    public int getXrootdFileHandle()
+    {
+        return xrootdFileHandle;
+    }
 
-		this.networkInterfaces = networkInterfaces;
-		this.uuidEnabledPool = uuidEnabled;
-	}
-
-	public Collection<NetIFContainer> getNetworkInterfaces() {
-		return networkInterfaces;
-	}
-
-	public int getXrootdFileHandle() {
-		return xrootdFileHandle;
-	}
-
-	public int getServerPort() {
-		return serverPort;
-	}
-
-	public boolean isUUIDEnabledPool() {
-		return uuidEnabledPool;
-	}
-
+    public InetSocketAddress getSocketAddress()
+    {
+        return socketAddress;
+    }
 }

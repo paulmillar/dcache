@@ -110,9 +110,6 @@ public class CacheException extends Exception
 
     private final int _rc;
 
-    @Deprecated // Drop in 2.7
-    private final String _message;
-
     private static String formatMessage(String message)
     {
         if (message == null) {
@@ -155,7 +152,7 @@ public class CacheException extends Exception
      *         permitted, and indicates that the cause is nonexistent or
      *         unknown.)
      */
-    public CacheException(String message, Exception cause)
+    public CacheException(String message, Throwable cause)
     {
         this(DEFAULT_ERROR_CODE, message, cause);
     }
@@ -183,10 +180,9 @@ public class CacheException extends Exception
      *         permitted, and indicates that the cause is nonexistent or
      *         unknown.)
      */
-    public CacheException(int rc, String message, Exception cause)
+    public CacheException(int rc, String message, Throwable cause)
     {
         super(formatMessage(message), cause);
-        _message = getMessage();
         _rc = rc;
     }
 

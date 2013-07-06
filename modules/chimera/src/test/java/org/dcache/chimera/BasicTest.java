@@ -39,7 +39,7 @@ public class BasicTest extends ChimeraTestCaseHelper {
     @Test
     public void testLs() throws Exception {
 
-        List<HimeraDirectoryEntry> list = DirectoryStreamHelper.listOf(_fs, _rootInode);
+        List<HimeraDirectoryEntry> list = DirectoryStreamHelper.listOf(_rootInode);
         assertTrue("Root Dir cant be empty", list.size() > 0);
 
     }
@@ -831,5 +831,45 @@ public class BasicTest extends ChimeraTestCaseHelper {
         tagInode.setMode(0007);
 
         assertEquals(0007 | UnixPermission.S_IFREG, tagInode.stat().getMode());
+    }
+
+    @Test
+    public void testUpdateTagMtimeOnWrite() throws Exception {
+
+        final String tagName = "myTag";
+        final byte[] data1 = "some data".getBytes();
+        final byte[] data2 = "some other data".getBytes();
+
+        FsInode base = _rootInode.mkdir("junit");
+        _fs.createTag(base, tagName);
+        FsInode tagInode = new FsInode_TAG(_fs, base.toString(), tagName);
+
+        tagInode.write(0, data1, 0, data1.length);
+        Stat statBefore = tagInode.stat();
+
+        // unshure that time in millis is changed
+        TimeUnit.MICROSECONDS.sleep(2);
+
+        tagInode.write(0, data2, 0, data2.length);
+        Stat statAfter = tagInode.stat();
+
+        assertTrue(statBefore.getMTime() != statAfter.getMTime());
+    }
+
+    @Test
+    public void testSetAttribitesOnTag() throws Exception {
+        final String tagName = "myTag";
+
+        FsInode base = _rootInode.mkdir("junit");
+        _fs.createTag(base, tagName);
+        FsInode tagInode = new FsInode_TAG(_fs, base.toString(), tagName);
+
+        Stat stat = tagInode.stat();
+        Stat baseStat = base.stat();
+
+        stat.setUid(123);
+        _fs.setInodeAttributes(tagInode, 0, stat);
+
+        assertEquals(baseStat, base.stat());
     }
 }

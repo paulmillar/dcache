@@ -45,7 +45,6 @@ import diskCacheV111.vehicles.PnfsGetStorageInfoMessage;
 import diskCacheV111.vehicles.PnfsModifyCacheLocationMessage;
 import diskCacheV111.vehicles.Pool2PoolTransferMsg;
 import diskCacheV111.vehicles.PoolCheckFileMessage;
-import diskCacheV111.vehicles.PoolCheckMessage;
 import diskCacheV111.vehicles.PoolManagerGetPoolListMessage;
 import diskCacheV111.vehicles.PoolQueryRepositoryMsg;
 import diskCacheV111.vehicles.PoolRemoveFilesMessage;
@@ -111,8 +110,6 @@ import org.dcache.vehicles.FileAttributes;
   */
 
 abstract public class DCacheCoreControllerV2 extends CellAdapter {
-   private final static String _svnId = "$Id$";
-
    private final static Logger _log =
        LoggerFactory.getLogger(DCacheCoreControllerV2.class);
 
@@ -270,16 +267,6 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
        _log.debug("commandArrived - call super cse=[" + cse + "], str = ["+str+"]");
        return super.commandArrived(str, cse);
    }
-
-   public String getSvnId() {
-    return( _svnId );
-   }
-
-   @Override
-   public void getInfo(PrintWriter pw) {
-    pw.println("       Version : " + getSvnId() );
-   }
-
 
    //
    // task feature
@@ -1849,9 +1836,6 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
    protected String getPoolHost( String poolName )
            throws InterruptedException, NoRouteToCellException {
 
-       PoolCheckMessage msg = new PoolCheckMessage(poolName);
-
-       msg.setReplyRequired(true);
        CellMessage      cellMessage = new CellMessage( new CellPath(poolName) , "xgetcellinfo" ) ;
 
        CellMessage answer;

@@ -1,9 +1,11 @@
 package dmg.cells.nucleus ;
 
+import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
@@ -240,8 +242,17 @@ class CellGlue {
           }
       }
 
-      return  newClass.getConstructor( argClasses ).
-                       newInstance( arguments ) ;
+       Constructor<? extends Cell> constructor = newClass.getConstructor(argClasses);
+       try {
+          return constructor.newInstance(arguments) ;
+      } catch (InvocationTargetException e) {
+           for (Class<?> clazz: constructor.getExceptionTypes()) {
+               if (clazz.isAssignableFrom(e.getTargetException().getClass())) {
+                   throw e;
+               }
+           }
+           throw Throwables.propagate(e.getTargetException());
+       }
    }
 
     Map<String, Object> getCellContext()
@@ -290,26 +301,16 @@ class CellGlue {
 
    int getUnique(){ return _uniqueCounter.incrementAndGet() ; }
 
-   CellInfo getCellInfo( String name ){
-      CellNucleus nucleus = _cellList.get( name ) ;
-      if( nucleus == null ){
-         nucleus = _killedCellList.get( name ) ;
-         if( nucleus == null ) {
-             return null;
-         }
-      }
-      return nucleus._getCellInfo() ;
+   CellInfo getCellInfo(String name) {
+       CellNucleus nucleus = getCell(name);
+       return (nucleus == null) ? null : nucleus._getCellInfo();
    }
-   Thread [] getThreads( String name ){
-      CellNucleus nucleus = _cellList.get( name ) ;
-      if( nucleus == null ){
-         nucleus = _killedCellList.get( name ) ;
-         if( nucleus == null ) {
-             return null;
-         }
-      }
-      return nucleus.getThreads() ;
+
+   Thread [] getThreads(String name) {
+       CellNucleus nucleus = getCell(name);
+       return (nucleus == null) ? null : nucleus.getThreads();
    }
+
    private void sendToAll( CellEvent event ){
       //
       // inform our event listener
@@ -391,7 +392,7 @@ class CellGlue {
      * @return The cell with the given name or null if there is no such
      * cell.
      */
-    CellNucleus getCell(String cellName)
+    synchronized CellNucleus getCell(String cellName)
     {
         CellNucleus nucleus = _cellList.get(cellName);
         if (nucleus == null) {
@@ -669,18 +670,17 @@ class CellGlue {
             // here we try to inform the last sender that we are
             // not able to deliver the packet.
             //
-            LOGGER.debug("sendMessage : Route target Not found: {}", routeTarget);
+            LOGGER.debug("Message from {} could not be delivered because no route to {} is known; the sender will be notified.",
+                    msg.getSourcePath(), routeTarget);
             NoRouteToCellException exception =
                  new   NoRouteToCellException(
                               msg.getUOID() ,
                               destination ,
                               "Tunnel cell >"+routeTarget+
                               "< not found at >"+_cellDomainName+"<" ) ;
-            CellPath retAddr = (CellPath)msg.getSourcePath().clone() ;
-            retAddr.revert() ;
+            CellPath retAddr = msg.getSourcePath().revert();
             CellExceptionMessage ret =
                  new CellExceptionMessage( retAddr , exception )  ;
-            LOGGER.warn("Sending CellException to {}", retAddr);
             ret.setLastUOID( msg.getUOID() ) ;
             sendMessage( nucleus , ret ) ;
 

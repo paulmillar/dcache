@@ -29,6 +29,7 @@ import java.security.Principal;
 import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -209,7 +210,8 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
             LocalId localId = xacmlClient.mapCredentials(_mappingServiceURL);
             Preconditions.checkArgument(localId != null, DENIED_MESSAGE + key);
 
-            logger.info("mapping service {} returned localId {} for {} ", _mappingServiceURL, localId, key);
+            logger.debug("mapping service {} returned localId {} for {} ",
+                            _mappingServiceURL, localId, key);
             return localId;
         }
     }
@@ -440,6 +442,8 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
             return;
         }
 
+        addressList = new ArrayList<>(addressList);
+
         Collections.sort(addressList, NetworkUtils.getExternalInternalSorter());
         _resourceDNSHostName = addressList.get(0).getCanonicalHostName();
     }
@@ -585,7 +589,7 @@ public final class XACMLPlugin implements GPlazmaAuthenticationPlugin {
                                 extensions);
             }
         }
-        logger.warn("no XACML mappings found for {}, {}", login, extensionSet);
+        logger.debug("no XACML mappings found for {}, {}", login, extensionSet);
         return null;
     }
 

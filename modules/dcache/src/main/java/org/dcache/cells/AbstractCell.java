@@ -359,13 +359,8 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
                 @Override
                 public void run()
                 {
-                    try {
-                        cdc.restore();
-                        try {
-                            getNucleus().updateWaitQueue();
-                        } finally {
-                            cdc.clear();
-                        }
+                    try (CDC ignored = cdc.restore()) {
+                        getNucleus().updateWaitQueue();
                     } catch (Throwable e) {
                         Thread t = Thread.currentThread();
                         t.getUncaughtExceptionHandler().uncaughtException(t, e);
@@ -466,27 +461,6 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
         for (String s : sw.toString().split("\n")) {
             _logger.error(s);
         }
-    }
-
-    /** @deprecated */
-    @Deprecated
-    public void say(String s)
-    {
-        info(s);
-    }
-
-    /** @deprecated */
-    @Deprecated
-    public void esay(String s)
-    {
-        error(s);
-    }
-
-    /** @deprecated */
-    @Deprecated
-    public void esay(Throwable t)
-    {
-        error(t);
     }
 
     /**
@@ -616,6 +590,8 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
                 } else {
                     result = type.cast(i);
                 }
+            } else if (Enum.class.isAssignableFrom(type)) {
+                result = type.cast(Enum.valueOf(type.asSubclass(Enum.class), so));
             } else {
                 try {
                     Constructor<T> constructor =

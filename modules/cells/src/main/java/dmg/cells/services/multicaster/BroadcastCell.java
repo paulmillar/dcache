@@ -186,8 +186,7 @@ public class BroadcastCell extends CellAdapter {
 
             String tmp = args.getOpt("expires") ;
             if( tmp != null ) {
-                expires = Long.parseLong(tmp) * 1000L + System
-                        .currentTimeMillis();
+                expires = Long.parseLong(tmp) * 1000L;
             }
 
             tmp = args.getOpt("cancelonfailure") ;
@@ -349,8 +348,7 @@ public class BroadcastCell extends CellAdapter {
             String eventClass = event.getEventClass() ;
             CellPath target   = event.getTarget() ;
             if( target == null ){
-                target = (CellPath)msg.getSourcePath().clone() ;
-                target.revert() ;
+                target = msg.getSourcePath().revert();
             }
             if( event instanceof BroadcastRegisterMessage ){
                 BroadcastRegisterMessage reg = (BroadcastRegisterMessage)event ;
@@ -366,7 +364,7 @@ public class BroadcastCell extends CellAdapter {
                     }
                     long  expires = reg.getExpires() ;
                     if( expires > 0 ) {
-                        entry.setExpires(expires);
+                        entry.setExpires(expires + System.currentTimeMillis());
                     }
                 }
             }else if( event instanceof BroadcastUnregisterMessage ){
