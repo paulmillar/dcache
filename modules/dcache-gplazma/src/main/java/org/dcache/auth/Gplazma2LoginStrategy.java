@@ -42,7 +42,6 @@ import org.dcache.gplazma.monitor.RecordingLoginMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import com.google.common.collect.Sets;
 
 import java.net.InetAddress;
@@ -182,12 +181,12 @@ public class Gplazma2LoginStrategy
     public LoginReply login(Subject subject) throws CacheException
     {
         RecordingLoginMonitor monitor = new RecordingLoginMonitor();
-
         LoginResult result = monitor.getResult();
-        _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
 
         try {
             LoginReply reply = convertLoginReply(_gplazma.login(subject, monitor));
+            _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
+
             if(_log.isDebugEnabled()) {
                 printLoginResult(result, EnumSet.noneOf(PrintFeatures.class));
             }
@@ -195,6 +194,8 @@ public class Gplazma2LoginStrategy
 
             return reply;
         } catch (AuthenticationException e) {
+            _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
+
             if(!_failedLogins.has(subject)) {
                 _failedLogins.add(subject);
 
