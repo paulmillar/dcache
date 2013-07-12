@@ -30,7 +30,7 @@
         <version.aspectj>1.7.3</version.aspectj>
         <version.smc>6.1.0</version.smc>
         <version.xerces>2.9.1</version.xerces>
-        <version.jetty>8.1.9.v20130131</version.jetty>
+        <version.jetty>7.6.10.v20130312</version.jetty>
         <version.wicket>1.5.10</version.wicket>
         <version.xrootd4j>1.2.0</version.xrootd4j>
         <version.jglobus>2.0.6-rc3.d</version.jglobus>
