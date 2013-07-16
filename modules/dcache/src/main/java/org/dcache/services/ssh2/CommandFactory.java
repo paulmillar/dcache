@@ -23,7 +23,7 @@ public class CommandFactory implements Factory<Command>, CellMessageSender
     }
 
     @Required
-    public void setIsUseColor(boolean useColor)
+    public void setUseColor(boolean useColor)
     {
         _useColor = useColor;
     }

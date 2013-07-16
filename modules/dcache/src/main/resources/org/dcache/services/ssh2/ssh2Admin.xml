@@ -29,7 +29,7 @@
 
   <bean id="shell-factory" class="org.dcache.services.ssh2.CommandFactory">
     <property name="historyFile" value="${adminHistoryFile}"/>
-    <property name="isUseColor" value="${admin.colors.enable}"/>
+    <property name="useColor" value="${admin.colors.enable}"/>
   </bean>
 
   <bean id="ssh2Server" class="org.dcache.services.ssh2.Ssh2Admin">
