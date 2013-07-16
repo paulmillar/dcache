@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.util.Collection;
 
 public class GridMapFile
@@ -29,6 +30,15 @@ public class GridMapFile
     public GridMapFile(String filename)
     {
         this(new File(filename));
+    }
+
+    public GridMapFile(Reader reader)
+    {
+        try {
+            _map = read(new BufferedReader(reader));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public synchronized void refresh()

@@ -43,6 +43,11 @@ public class GridMapFilePlugin
         _gridMapFile = new GridMapFile(path);
     }
 
+    public GridMapFilePlugin(GridMapFile file)
+    {
+        _gridMapFile = file;
+    }
+
     private Map.Entry<Principal,String> getMappingFor(Set<Principal> principals)
     {
         Principal loginName =
