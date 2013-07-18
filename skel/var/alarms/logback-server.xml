@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <configuration>
-    <appender name="LOGBACK" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="SERVER" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <File>${alarms.dir}/server.log</File>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
@@ -15,7 +15,7 @@
         </triggeringPolicy>
 
         <layout class="ch.qos.logback.classic.PatternLayout">
-            <Pattern>%relative %-5level %logger - %message%n</Pattern>
+            <Pattern>%d{dd MMM yyyy HH:mm:ss} %-5level %logger - %message%n</Pattern>
         </layout>
     </appender>
 
@@ -33,30 +33,8 @@
         </triggeringPolicy>
 
         <encoder>
-            <pattern>%d{dd MMM yyyy HH:mm:ss} %m%n</pattern>
+            <pattern>%-5level %d{dd MMM yyyy HH:mm:ss} \(%X{host}\)\(%X{cells.cell}\)\(%X{cells.domain}\) %m%n</pattern>
         </encoder>
-    </appender>
-
-    <!-- stores all received events; adds alarm metadata on the basis of either
-         a marker or a match with one of the alarmType definitions provided;
-         delegates all received events to other appenders, possibly with using a
-         cloned event with an added alarm marker if it is an alarm and was not
-         originally sent with one.
-         for further information, see the dCache Book -->
-    <appender name="STORE" class="org.dcache.alarms.logback.LogEntryAppender">
-        <storePath>${alarms.store.path}</storePath>
-        <url>${alarms.store.db.url}</url>
-        <user>${alarms.store.db.user}</user>
-        <pass>${alarms.store.db.pass}</pass>
-        <driver>${alarms.store.db.driver}</driver>
-        <propertiesPath>${alarms.store.db.properties}</propertiesPath>
-        <definitionsPath>${alarms.definitions.path}</definitionsPath>
-        <!-- it would be normal to comment this out if you are using an RDBMS
-             and not running periodic deletes -->
-        <appender-ref ref="HISTORY"/>
-        <!-- uncomment this in order to receive alarm mails;
-             see below for how to set mail appender -->
-        <!-- <appender-ref ref="ALARM_MAIL"/> -->
     </appender>
 
     <!--
@@ -74,7 +52,7 @@
         <from></from>
         <subject>dCache Alarm</subject>
         <layout class="ch.qos.logback.classic.PatternLayout">
-            <pattern>%d{dd MMM yyyy HH:mm:ss} \(%X{cells.cell}\) [%X{org.dcache.ndc}] %m%n</pattern>
+            <pattern>%-5level %d{dd MMM yyyy HH:mm:ss} \(%X{host}\)\(%X{cells.cell}\)\(%X{cells.domain}\) %m%n</pattern>
         </layout>
         <cyclicBufferTracker class="ch.qos.logback.core.spi.CyclicBufferTrackerImpl">
             <!-- send just one log entry per email -->
@@ -82,11 +60,38 @@
         </cyclicBufferTracker>
     </appender>
 
-     <logger name="ch.qos.logback" additivity="false">
-         <appender-ref ref="LOGBACK"/>
+    <!-- stores all received events; adds alarm metadata on the basis of either
+         a marker or a match with one of the alarmType definitions provided;
+         delegates all received events to other appenders, possibly with using a
+         cloned event with an added alarm marker if it is an alarm and was not
+         originally sent with one.
+         for further information, see the dCache Book -->
+    <appender name="STORE" class="org.dcache.alarms.logback.LogEntryAppender">
+        <storePath>${alarms.db.xml.path}</storePath>
+        <url>${alarms.db.url}</url>
+        <user>${alarms.db.user}</user>
+        <pass>${alarms.db.password}</pass>
+        <driver>${alarms.db.driver}</driver>
+        <propertiesPath>${alarms.db.config.path}</propertiesPath>
+        <definitionsPath>${alarms.definitions.path}</definitionsPath>
+        <!-- it would be normal to comment this out if you are using an RDBMS
+             and not running periodic deletes -->
+        <appender-ref ref="HISTORY"/>
+        <!-- uncomment this in order to receive alarm mails;
+             see below for how to set mail appender -->
+        <!-- <appender-ref ref="ALARM_MAIL"/> -->
+    </appender>
+
+    <logger name="ch.qos.logback" additivity="false" level="warn">
+         <appender-ref ref="SERVER"/>
     </logger>
 
-    <root level="warn">
-        <appender-ref ref="STORE"/>
+    <!-- do not change the name of this logger (used internally) -->
+    <logger name="domain" additivity="false">
+         <appender-ref ref="SERVER"/>
+    </logger>
+
+    <root level="${alarms.log.root-level}">
+         <appender-ref ref="STORE"/>
     </root>
 </configuration>

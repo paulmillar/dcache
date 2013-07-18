@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dcache</groupId>
-    <version>2.6.0-SNAPSHOT</version>
+    <version>2.7.0-SNAPSHOT</version>
     <artifactId>dcache-parent</artifactId>
     <packaging>pom</packaging>
 
@@ -24,16 +24,16 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <version.slf4j>1.7.2</version.slf4j>
+        <version.slf4j>1.7.5</version.slf4j>
         <version.milton>2.3.0.6</version.milton>
-        <version.spring>3.2.0.RELEASE</version.spring>
-        <version.aspectj>1.7.1</version.aspectj>
+        <version.spring>3.2.3.RELEASE</version.spring>
+        <version.aspectj>1.7.3</version.aspectj>
         <version.smc>6.1.0</version.smc>
         <version.xerces>2.9.1</version.xerces>
-        <version.jetty>7.5.4.v20111024</version.jetty>
-        <version.wicket>1.5.9</version.wicket>
-        <version.xrootd4j>1.1.3</version.xrootd4j>
-        <version.jglobus>2.0.5-dcache-rc4</version.jglobus>
+        <version.jetty>8.1.9.v20130131</version.jetty>
+        <version.wicket>1.5.10</version.wicket>
+        <version.xrootd4j>1.2.0</version.xrootd4j>
+        <version.jglobus>2.0.6-rc3.d</version.jglobus>
         <version.openmq>4.5.2</version.openmq>
 
         <!-- BouncyCastle seems to change the naming convention of
@@ -69,7 +69,8 @@
         <connection>scm:git:https://github.com/dCache/dcache.git</connection>
         <developerConnection>scm:git:git@github.com:dCache/dcache.git</developerConnection>
         <url>https://github.com/dCache/dcache.git</url>
-    </scm>
+      <tag>HEAD</tag>
+  </scm>
 
     <repositories>
         <repository>
@@ -110,7 +111,9 @@
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
-                <version>1.0.9</version>
+                <!-- Remember to update modules/logback-test-config/pom.xml
+                     when upgrading logback. -->
+                <version>1.0.13</version>
             </dependency>
             <dependency>
                 <groupId>jline</groupId>
@@ -131,7 +134,7 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>13.0</version>
+                <version>14.0.1</version>
             </dependency>
             <dependency>
                 <groupId>eu.emi</groupId>
@@ -146,7 +149,7 @@
             <dependency>
                 <groupId>eu.emi</groupId>
                 <artifactId>vomsjapi</artifactId>
-                <version>2.0.0-1</version>
+                <version>2.0.6</version>
             </dependency>
             <dependency>
                 <groupId>org.glite.authz</groupId>
@@ -235,6 +238,12 @@
                         <groupId>commons-logging</groupId>
                         <artifactId>commons-logging</artifactId>
                     </exclusion>
+		    <!-- 'servlet-api' conflicts with Jetty-supplied
+		         'javax.servlet' jar. -->
+		    <exclusion>
+			<groupId>javax.servlet</groupId>
+			<artifactId>servlet-api</artifactId>
+		    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -248,19 +257,14 @@
                 <version>1.1</version>
             </dependency>
             <dependency>
-                <groupId>javax.servlet</groupId>
-                <artifactId>servlet-api</artifactId>
-                <version>2.5</version>
-            </dependency>
-            <dependency>
                 <groupId>com.jolbox</groupId>
                 <artifactId>bonecp</artifactId>
                 <version>0.7.1.RELEASE</version>
             </dependency>
             <dependency>
-                <groupId>postgresql</groupId>
+                <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
-                <version>9.1-901.jdbc4</version>
+                <version>9.2-1002-jdbc4</version>
             </dependency>
             <dependency>
                 <groupId>io.milton</groupId>
@@ -274,9 +278,9 @@
                 </exclusions>
             </dependency>
             <dependency>
-                <groupId>org.jboss.netty</groupId>
+                <groupId>io.netty</groupId>
                 <artifactId>netty</artifactId>
-                <version>3.2.7.Final</version>
+                <version>3.6.5.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.glassfish.grizzly</groupId>
@@ -286,7 +290,7 @@
             <dependency>
                 <groupId>com.sleepycat</groupId>
                 <artifactId>je</artifactId>
-                <version>5.0.58</version>
+                <version>5.0.73</version>
             </dependency>
             <dependency>
                 <groupId>org.glassfish.mq</groupId>
@@ -316,37 +320,32 @@
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-core</artifactId>
-                <version>3.1.3</version>
+                <version>3.2.5</version>
             </dependency>
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-cache</artifactId>
-                <version>3.1.1</version>
-            </dependency>
-            <dependency>
-                <groupId>org.datanucleus</groupId>
-                <artifactId>datanucleus-enhancer</artifactId>
-                <version>3.1.1</version>
+                <version>3.1.2</version>
             </dependency>
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-api-jdo</artifactId>
-                <version>3.1.3</version>
+                <version>3.2.4</version>
             </dependency>
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-api-jpa</artifactId>
-                <version>3.1.3</version>
+                <version>3.2.4</version>
             </dependency>
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-rdbms</artifactId>
-                <version>3.1.3</version>
+                <version>3.2.4</version>
             </dependency>
             <dependency>
                 <groupId>org.datanucleus</groupId>
                 <artifactId>datanucleus-xml</artifactId>
-                <version>3.1.3</version>
+                <version>3.2.0-release</version>
             </dependency>
             <dependency>
                 <groupId>net.sf.saxon</groupId>
@@ -517,13 +516,13 @@
             <dependency>
                 <groupId>com.h2database</groupId>
                 <artifactId>h2</artifactId>
-                <version>1.3.170</version>
+                <version>1.3.171</version>
             </dependency>
 
             <dependency>
                 <groupId>org.hsqldb</groupId>
                 <artifactId>hsqldb</artifactId>
-                <version>2.2.9</version>
+                <version>2.3.0</version>
             </dependency>
 
             <dependency>
@@ -651,6 +650,12 @@
                     <groupId>org.bouncycastle</groupId>
                     <artifactId>bcprov-jdk16</artifactId>
                   </exclusion>
+		  <!-- 'servlet-api' conflicts with Jetty-supplied
+		       'javax.servlet' jar. -->
+                  <exclusion>
+                      <groupId>javax.servlet</groupId>
+                      <artifactId>servlet-api</artifactId>
+                  </exclusion>
                 </exclusions>
             </dependency>
 
@@ -728,6 +733,25 @@
                     </exclusion>
                 </exclusions>
             </dependency>
+        <dependency>
+            <groupId>org.dcache.chimera</groupId>
+            <artifactId>jpnfs</artifactId>
+            <version>0.5.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.dcache.chimera</groupId>
+                    <artifactId>chimera-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.dcache.common</groupId>
+                    <artifactId>dcache-auth</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.dcache</groupId>
+                    <artifactId>oncrpc4j-spring</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -739,6 +763,31 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+           <groupId>org.powermock</groupId>
+            <artifactId>powermock-api-mockito</artifactId>
+            <version>1.5.1</version>
+            <scope>test</scope>
+            <exclusions>
+                <!-- powermock-api-mockito depends on mockito-all,
+                     which includes all dependencies, including
+                     hamcrest, in the jar file.  Unfortunate this
+                     version of hamcrest (v1.1?) is incompatible with
+                     the version we compile against.  Somehow maven 3
+                     works (different CP order?), but using maven 2
+                     has unit-tests in error due to NoSuchMethod
+                     exceptions.
+
+                     Here, we replace mockito-all with mockito-core,
+                     which exposes the hamcrest dependency in the pom
+                     file.  This allowing maven to do the right
+                     thing. -->
+                <exclusion>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-all</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+	<dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>1.9.5</version>
@@ -746,8 +795,14 @@
         </dependency>
         <dependency>
             <groupId>junit</groupId>
-            <artifactId>junit-dep</artifactId>
+            <artifactId>junit</artifactId>
             <version>4.11</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
+            <artifactId>powermock-module-junit4</artifactId>
+            <version>1.5.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -756,7 +811,6 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -765,7 +819,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.2</version>
+                    <version>3.3</version>
                 </plugin>
                 <plugin>
                     <groupId>org.scala-tools</groupId>
@@ -775,18 +829,20 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.0</version>
+                    <version>3.1</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>2.6</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
-                    <version>2.6</version>
+                    <version>2.8</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>2.4</version>
                     <configuration>
@@ -794,10 +850,12 @@
                     </configuration>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-war-plugin</artifactId>
                     <version>2.3</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-clean-plugin</artifactId>
                     <version>2.5</version>
                 </plugin>
@@ -811,20 +869,25 @@
                     <artifactId>buildnumber-maven-plugin</artifactId>
                     <version>1.2</version>
                 </plugin>
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>buildnumber-maven-plugin</artifactId>
-                    <version>1.2</version>
-                </plugin>
-                <plugin>
+		<plugin>
+		  <groupId>org.codehaus.mojo</groupId>
+		  <artifactId>build-helper-maven-plugin</artifactId>
+		  <version>1.8</version>
+		</plugin>
+		<plugin>
+		  <groupId>org.codehaus.mojo</groupId>
+		  <artifactId>exec-maven-plugin</artifactId>
+		  <version>1.2.1</version>
+		</plugin>
+		<plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.13</version>
+                    <version>2.15</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-release-plugin</artifactId>
-                    <version>2.4</version>
+                    <version>2.4.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
@@ -834,42 +897,17 @@
                 <plugin>
                     <groupId>org.datanucleus</groupId>
                     <artifactId>maven-datanucleus-plugin</artifactId>
-                    <version>3.1.3</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.datanucleus</groupId>
-                            <artifactId>datanucleus-core</artifactId>
-                            <version>3.1.3</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.datanucleus</groupId>
-                            <artifactId>datanucleus-api-jdo</artifactId>
-                            <version>3.1.3</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.datanucleus</groupId>
-                            <artifactId>datanucleus-api-jpa</artifactId>
-                            <version>3.1.3</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.datanucleus</groupId>
-                            <artifactId>datanucleus-enhancer</artifactId>
-                            <version>3.1.1</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.dcache</groupId>
-                            <artifactId>logback-test-config</artifactId>
-                            <version>${project.version}</version>
-                        </dependency>
-                    </dependencies>
+                    <version>3.2.0-m1</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-antrun-plugin</artifactId>
                     <version>1.7</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>2.13</version>
+                    <version>2.15</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
@@ -908,6 +946,11 @@
                 <configuration>
                     <doCheck>false</doCheck>
                     <doUpdate>false</doUpdate>
+                    <format>{0,date,yyyy-MM-dd_HH-mm}_{1}</format>
+                    <items>
+                        <item>timestamp</item>
+                        <item>${user.name}</item>
+                    </items>
                 </configuration>
             </plugin>
 
@@ -1010,7 +1053,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-project-info-reports-plugin</artifactId>
-                <version>2.6</version>
+                <version>2.7</version>
                 <reportSets>
                     <reportSet>
                         <reports>
@@ -1041,47 +1084,6 @@
         </plugins>
     </reporting>
 
-    <profiles>
-        <profile>
-            <!--
-            This profile is here for triggering when another scm than svn is
-            used (for example git). Instead of getting the version build number
-            from svn we will use the build date and the user name.
-            -->
-            <id>buildnumber-not-svn</id>
-            <activation>
-                <file>
-                    <missing>.svn</missing>
-                </file>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>buildnumber-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>create</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <doCheck>false</doCheck>
-                            <doUpdate>false</doUpdate>
-                            <format>{0,date,yyyy-MM-dd_HH-mm}_{1}</format>
-                            <items>
-                                <item>timestamp</item>
-                                <item>${user.name}</item>
-                            </items>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-
     <modules>
         <module>modules/logback-test-config</module>
         <module>modules/logback-console-config</module>
@@ -1099,6 +1101,7 @@
         <module>modules/gplazma2-kpwd</module>
         <module>modules/gplazma2-xacml</module>
         <module>modules/gplazma2-ldap</module>
+        <module>modules/gplazma2-gsi</module>
         <module>modules/javatunnel</module>
         <module>modules/srm</module>
         <module>modules/dcache</module>
@@ -1108,18 +1111,13 @@
         <module>modules/dcache-xrootd</module>
         <module>modules/dcache-dcap</module>
         <module>modules/dcache-gplazma</module>
-        <module>modules/dcache-gsi</module>
         <module>modules/dcache-jms</module>
-        <module>modules/webadmin</module>
+        <module>modules/dcache-webadmin</module>
         <module>modules/srmclient</module>
         <module>modules/acl</module>
-        <module>modules/nfs</module>
         <module>modules/chimera</module>
-        <module>plugins</module>
-        <module>modules/packaging</module>
-        <module>modules/fhs</module>
-        <module>modules/tar</module>
-        <module>modules/system-test</module>
         <module>modules/missingfiles-semsg</module>
+        <module>plugins</module>
+        <module>packages</module>
     </modules>
 </project>

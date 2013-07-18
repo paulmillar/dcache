@@ -1,0 +1,102 @@
+<assembly>
+    <id>tar</id>
+    <includeBaseDirectory>true</includeBaseDirectory>
+
+    <dependencySets>
+        <dependencySet>
+            <excludes>
+                <exclude>*:*:war:*</exclude>
+                <exclude>saxon:saxon:*:*</exclude>
+            </excludes>
+            <outputDirectory>share/classes</outputDirectory>
+            <useProjectArtifact>false</useProjectArtifact>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </dependencySet>
+        <dependencySet>
+            <includes>
+                <include>*:*:war:*</include>
+            </includes>
+            <outputDirectory>share/classes/webapps</outputDirectory>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </dependencySet>
+        <dependencySet>
+            <includes>
+                <include>saxon:saxon:*:*</include>
+            </includes>
+            <outputDirectory>share/classes/saxon</outputDirectory>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </dependencySet>
+    </dependencySets>
+
+    <fileSets>
+        <fileSet>
+            <directory>${filtered-skel}</directory>
+            <outputDirectory></outputDirectory>
+            <includes>
+                <include>bin/**</include>
+                <include>sbin/**</include>
+            </includes>
+            <excludes>
+                <exclude>**/.empty-dir</exclude>
+            </excludes>
+            <fileMode>755</fileMode>
+            <directoryMode>755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <directory>${filtered-skel}</directory>
+            <outputDirectory></outputDirectory>
+            <includes>
+                <include>share/defaults/**</include>
+                <include>share/lib/**</include>
+                <include>share/httpd/static/images/bg.svg</include>
+            </includes>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <directory>${skel}</directory>
+            <outputDirectory></outputDirectory>
+            <includes>
+                <include>doc/**</include>
+                <include>etc/**</include>
+                <include>man/**</include>
+                <include>share/**</include>
+                <include>var/**</include>
+            </includes>
+            <excludes>
+                <exclude>**/.empty-dir</exclude>
+                <exclude>share/defaults/**</exclude>
+                <exclude>share/lib/**</exclude>
+                <exclude>share/httpd/static/images/bg.svg</exclude>
+            </excludes>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <directory>${project.build.directory}/chimera-sql/org/dcache/chimera</directory>
+            <outputDirectory>share/chimera</outputDirectory>
+            <includes>
+                <include>sql/**</include>
+            </includes>
+            <fileMode>644</fileMode>
+            <directoryMode>755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <!-- Create empty var/tmp dirctory -->
+            <directory>src/main/assembly</directory>
+            <outputDirectory>/var/tmp</outputDirectory>
+            <excludes>
+                <exclude>**/*</exclude>
+            </excludes>
+        </fileSet>
+    </fileSets>
+</assembly>

@@ -23,6 +23,7 @@ import org.ietf.jgss.GSSManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -31,6 +32,12 @@ import java.net.SocketAddress;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.TimeUnit;
 
+import dmg.cells.nucleus.CDC;
+
+import org.dcache.commons.util.NDC;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static org.dcache.util.Files.checkDirectory;
 import static org.dcache.util.Files.checkFile;
 import static org.globus.axis.gsi.GSIConstants.*;
@@ -55,10 +62,6 @@ public class JettyGSIConnector
 
     protected static final String MODE_SSL = "ssl";
     protected static final String MODE_GSI = "gsi";
-    private static final long DEFAULT_HOST_CERT_REFRESH_INTERVAL =
-        TimeUnit.MILLISECONDS.convert(12, TimeUnit.HOURS);
-    private static final long DEFAULT_TRUST_ANCHOR_REFRESH_INTERVAL =
-        TimeUnit.MILLISECONDS.convert(4, TimeUnit.HOURS);
 
     private GSSCredential _credentials;
     private TrustedCertificates _trustedCerts;
@@ -75,8 +78,10 @@ public class JettyGSIConnector
     private String _serverProxy;
     private String _caCertDir;
     private boolean _encrypt;
-    private long _hostCertRefreshInterval;
-    private long _trustAnchorRefreshInterval;
+    private long _hostCertRefreshInterval = 12;
+    private TimeUnit _hostCertRefreshIntervalUnit = HOURS;
+    private long _trustAnchorRefreshInterval = 4;
+    private TimeUnit _trustAnchorRefreshIntervalUnit = HOURS;
     private long _hostCertRefreshTimestamp = 0;
     private long _trustAnchorRefreshTimestamp = 0;
 
@@ -87,15 +92,7 @@ public class JettyGSIConnector
     private volatile boolean _rejectLimitedProxy = false;
     private volatile Integer _mode = GSIConstants.MODE_SSL;
     private volatile int _handshakeTimeout = 0; // 0 means use maxIdleTime
-
-    /**
-     * Assing default values to the certificate refresh intervals
-     */
-    public JettyGSIConnector()
-    {
-        _hostCertRefreshInterval = DEFAULT_HOST_CERT_REFRESH_INTERVAL;
-        _trustAnchorRefreshInterval = DEFAULT_TRUST_ANCHOR_REFRESH_INTERVAL;
-    }
+    private String[] _excludedCipherSuites = {};
 
     /**
      * Throws an IllegalStateException if the connector is open.
@@ -284,6 +281,11 @@ public class JettyGSIConnector
         _handshakeTimeout = msec;
     }
 
+    public void setExcludeCipherSuites(String[] cipherSuites)
+    {
+        _excludedCipherSuites = checkNotNull(cipherSuites);
+    }
+
     protected ExtendedGSSContext createGSSContext()
         throws GSSException
     {
@@ -304,6 +306,7 @@ public class JettyGSIConnector
         //                       _trustedCerts);
         // }
 
+        context.setBannedCiphers(_excludedCipherSuites);
         context.requestConf(_encrypt);
         return context;
     }
@@ -320,12 +323,11 @@ public class JettyGSIConnector
 
         try {
             if (_credentials == null || _manager == null ||
-               (timeSinceLastServerRefresh >= _hostCertRefreshInterval)) {
+               (timeSinceLastServerRefresh >= _hostCertRefreshIntervalUnit.toMillis(_hostCertRefreshInterval))) {
                     _log.info("Time since last server cert refresh {}",
                               timeSinceLastServerRefresh);
-                    _log.info("Loading server certificates. Current refresh " +
-                              "interval: {} ms",
-                              _hostCertRefreshInterval);
+                    _log.info("Loading server certificates. Current refresh interval: {} {}",
+                              _hostCertRefreshInterval, _hostCertRefreshIntervalUnit);
 
                     X509Credential cred;
                     if (_serverProxy != null && !_serverProxy.equals("")) {
@@ -362,10 +364,10 @@ public class JettyGSIConnector
                 _trustAnchorRefreshTimestamp);
 
         if (_caCertDir != null && (_trustedCerts == null ||
-                (timeSinceLastTARefresh >= _trustAnchorRefreshInterval))) {
+                (timeSinceLastTARefresh >= _trustAnchorRefreshIntervalUnit.toMillis(_trustAnchorRefreshInterval)))) {
             _log.info("Time since last TA Refresh {}", timeSinceLastTARefresh);
-            _log.info("Loading trust anchors. Current refresh interval: {} ms",
-                   _trustAnchorRefreshInterval);
+            _log.info("Loading trust anchors. Current refresh interval: {} {}",
+                   _trustAnchorRefreshInterval, _trustAnchorRefreshIntervalUnit);
             _log.info("CA certificate directory: {}", _caCertDir);
             _trustedCerts = TrustedCertificates.load(_caCertDir);
             _trustAnchorRefreshTimestamp = System.currentTimeMillis();
@@ -520,14 +522,24 @@ public class JettyGSIConnector
         }
     }
 
-    public void setMillisecBetweenHostCertRefresh(int ms)
+    public void setHostCertRefreshInterval(int value)
     {
-        _hostCertRefreshInterval = ms;
+        _hostCertRefreshInterval = value;
     }
 
-    public void setMillisecBetweenTrustAnchorRefresh(int ms)
+    public void setHostCertRefreshIntervalUnit(TimeUnit unit)
     {
-        _trustAnchorRefreshInterval = ms;
+        _hostCertRefreshIntervalUnit = unit;
+    }
+
+    public void setTrustAnchorRefreshInterval(int value)
+    {
+        _trustAnchorRefreshInterval = value;
+    }
+
+    public void setTrustAnchorRefreshIntervalUnit(TimeUnit unit)
+    {
+        _trustAnchorRefreshIntervalUnit = unit;
     }
 
     public class GsiConnection extends ConnectorEndPoint
@@ -540,27 +552,35 @@ public class JettyGSIConnector
         @Override
         public void run()
         {
-            try {
-                int handshakeTimeout = getHandshakeTimeout();
-                int oldTimeout = _socket.getSoTimeout();
-                if (handshakeTimeout > 0) {
-                    _socket.setSoTimeout(handshakeTimeout);
-                }
-
-                GsiSocket gsiSocket = (GsiSocket) _socket;
-                gsiSocket.startHandshake();
-
-                if (handshakeTimeout > 0) {
-                    _socket.setSoTimeout(oldTimeout);
-                }
-
-                super.run();
-            } catch (IOException e) {
-                _log.warn(e.toString());
+            try (CDC ignored = new CDC()) {
                 try {
-                    close();
-                } catch (IOException e2) {
-                    _log.warn(e2.toString());
+                    NDC.push(_socket.getInetAddress().getHostAddress() + ":" +
+                            _socket.getPort());
+                    int handshakeTimeout = getHandshakeTimeout();
+                    int oldTimeout = _socket.getSoTimeout();
+                    if (handshakeTimeout > 0) {
+                        _socket.setSoTimeout(handshakeTimeout);
+                    }
+
+                    GsiSocket gsiSocket = (GsiSocket) _socket;
+                    gsiSocket.startHandshake();
+
+                    if (handshakeTimeout > 0) {
+                        _socket.setSoTimeout(oldTimeout);
+                    }
+
+                    super.run();
+                } catch (EOFException ignoredException) {
+                    _log.debug("Client disconnected while establishing " +
+                            "secure connection");
+                } catch (IOException e) {
+                    _log.warn("Problem while establishing secure connection: {}",
+                            e.toString());
+                    try {
+                        close();
+                    } catch (IOException e2) {
+                        _log.warn("Failed to close local socket: {}", e2.toString());
+                    }
                 }
             }
         }

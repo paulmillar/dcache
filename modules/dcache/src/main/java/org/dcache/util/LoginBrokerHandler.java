@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -22,6 +23,10 @@ import dmg.util.Args;
 import org.dcache.cells.AbstractCellComponent;
 import org.dcache.cells.CellCommandListener;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 /**
  * Utility class to periodically register a door in a login broker.
  */
@@ -32,13 +37,14 @@ public class LoginBrokerHandler
     private final static Logger _log =
         LoggerFactory.getLogger(LoginBrokerHandler.class);
 
-    private static final long EAGER_UPDATE_TIME = 1;
+    private static final long EAGER_UPDATE_TIME = SECONDS.toMillis(1);
 
-    private CellPath _loginBroker;
+    private String[] _loginBrokers;
     private String _protocolFamily;
     private String _protocolVersion;
     private String _protocolEngine;
-    private long   _brokerUpdateTime = 5 * 60;
+    private long   _brokerUpdateTime = MINUTES.toMillis(5);
+    private TimeUnit _brokerUpdateTimeUnit = MILLISECONDS;
     private long _currentBrokerUpdateTime = EAGER_UPDATE_TIME;
     private double _brokerUpdateThreshold = 0.1;
     private LoadProvider _load = new FixedLoad(0.0);
@@ -57,14 +63,22 @@ public class LoginBrokerHandler
         }
     }
 
-    public final static String hh_lb_set_update = "<updateTime/sec>";
+    public static final String hh_lb_set_update = "<updateTime/sec>";
     public synchronized String ac_lb_set_update_$_1(Args args)
     {
-        setUpdateTime(Long.parseLong(args.argv(0)));
+        long time = Long.parseLong(args.argv(0));
+        if (time < 2) {
+            throw new IllegalArgumentException("Update time out of range");
+        }
+
+        _brokerUpdateTime = time;
+        _brokerUpdateTimeUnit = TimeUnit.SECONDS;
+        rescheduleTask();
+
         return "";
     }
 
-    public final static String hh_lb_set_threshold = "<threshold>";
+    public static final String hh_lb_set_threshold = "<threshold>";
     public synchronized String ac_lb_set_threshold_$_1(Args args)
     {
         setUpdateThreshold(Double.parseDouble(args.argv(0)));
@@ -73,7 +87,7 @@ public class LoginBrokerHandler
 
     private synchronized void sendUpdate()
     {
-        if (_loginBroker == null || _hosts == null) {
+        if (_loginBrokers == null || _hosts == null) {
             return;
         }
 
@@ -83,23 +97,25 @@ public class LoginBrokerHandler
                                 _protocolFamily,
                                 _protocolVersion,
                                 _protocolEngine);
-        info.setUpdateTime(_brokerUpdateTime * 1000);
+        info.setUpdateTime(_brokerUpdateTimeUnit.toMillis(_brokerUpdateTime));
         info.setHosts(_hosts);
         info.setPort(_port);
         info.setLoad(_load.getLoad());
 
-        try {
-            sendMessage(new CellMessage(_loginBroker, info));
-            normalUpdates();
-        } catch (NoRouteToCellException e) {
-            _log.error("Failed to send update to " + _loginBroker);
-            eagerUpdates();
+        normalUpdates();
+        for (String loginBroker: _loginBrokers) {
+            try {
+                sendMessage(new CellMessage(new CellPath(loginBroker), info));
+            } catch (NoRouteToCellException e) {
+                _log.error("Failed to send update to {}", loginBroker);
+                eagerUpdates();
+            }
         }
     }
 
     private void eagerUpdates()
     {
-        if(_currentBrokerUpdateTime != EAGER_UPDATE_TIME) {
+        if (_currentBrokerUpdateTime != EAGER_UPDATE_TIME) {
             _currentBrokerUpdateTime = EAGER_UPDATE_TIME;
             rescheduleTask();
         }
@@ -107,8 +123,9 @@ public class LoginBrokerHandler
 
     private void normalUpdates()
     {
-        if(_currentBrokerUpdateTime != _brokerUpdateTime) {
-            _currentBrokerUpdateTime = _brokerUpdateTime;
+        long millis = _brokerUpdateTimeUnit.toMillis(_brokerUpdateTime);
+        if (_currentBrokerUpdateTime != millis) {
+            _currentBrokerUpdateTime = millis;
             rescheduleTask();
         }
     }
@@ -116,15 +133,14 @@ public class LoginBrokerHandler
     @Override
     public synchronized void getInfo(PrintWriter pw)
     {
-        if (_loginBroker == null) {
+        if (_loginBrokers == null) {
             pw.println("    Login Broker : DISABLED");
             return;
         }
-        pw.println("    LoginBroker      : " + _loginBroker);
+        pw.println("    LoginBroker      : " + Arrays.toString(_loginBrokers));
         pw.println("    Protocol Family  : " + _protocolFamily);
         pw.println("    Protocol Version : " + _protocolVersion);
-        pw.println("    Update Time      : " + _brokerUpdateTime +
-                   " seconds");
+        pw.println("    Update Time      : " + _brokerUpdateTime + " " + _brokerUpdateTimeUnit);
         pw.println("    Update Threshold : " +
                    ((int)(_brokerUpdateThreshold * 100.0)) + " %");
 
@@ -187,15 +203,15 @@ public class LoginBrokerHandler
         _load = load;
     }
 
-    public synchronized void setLoginBroker(CellPath loginBroker)
+    public synchronized void setLoginBrokers(String[] loginBrokers)
     {
-        _loginBroker = loginBroker;
+        _loginBrokers = loginBrokers;
         rescheduleTask();
     }
 
-    public synchronized CellPath getLoginBroker()
+    public synchronized String[] getLoginBrokers()
     {
-        return (CellPath) _loginBroker.clone();
+        return Arrays.copyOf(_loginBrokers, _loginBrokers.length);
     }
 
     public synchronized void setProtocolFamily(String protocolFamily)
@@ -243,16 +259,22 @@ public class LoginBrokerHandler
 
     public synchronized void setUpdateTime(long time)
     {
-        if (time < 2) {
-            throw new IllegalArgumentException("Update time out of range");
-        }
         _brokerUpdateTime = time;
-        rescheduleTask();
     }
 
     public synchronized long getUpdateTime()
     {
         return _brokerUpdateTime;
+    }
+
+    public synchronized void setUpdateTimeUnit(TimeUnit unit)
+    {
+        _brokerUpdateTimeUnit = unit;
+    }
+
+    public synchronized TimeUnit getUpdateTimeUnit()
+    {
+        return _brokerUpdateTimeUnit;
     }
 
     public synchronized void setExecutor(ScheduledExecutorService executor)
@@ -291,8 +313,7 @@ public class LoginBrokerHandler
                     sendUpdate();
                 }
             };
-        _task = _executor.scheduleWithFixedDelay(command, 0, _currentBrokerUpdateTime,
-                                                 TimeUnit.SECONDS);
+        _task = _executor.scheduleWithFixedDelay(command, 0, _currentBrokerUpdateTime, MILLISECONDS);
     }
 
     /**

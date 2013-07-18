@@ -31,6 +31,7 @@ import dmg.util.CommandPanicException;
 import dmg.util.CommandSyntaxException;
 import dmg.util.CommandThrowableException;
 import dmg.util.RequestTimeOutException;
+import dmg.util.command.HelpFormat;
 
 /**
  * This class implements the Command Interface, which is part of the sshd-core
@@ -52,9 +53,7 @@ public class ConsoleReaderCommand implements Command, Runnable {
     private static final String CONTROL_C_ANSWER =
         "Got interrupt. Please issue \'logoff\' from "
         + "within the Admin Cell to end this session.\n";
-    private static File _historyFile;
     private final UserAdminShell _userAdminShell;
-    private OutputStream _err;
     private InputStream _in;
     private ExitCallback _exitCallback;
     private OutputStreamWriter _outWriter;
@@ -64,7 +63,8 @@ public class ConsoleReaderCommand implements Command, Runnable {
     private boolean _useColors;
 
     public ConsoleReaderCommand(String username, CellEndpoint cellEndpoint,
-            File historyFile) {
+            File historyFile, boolean useColor) {
+        _useColors = useColor;
         _userAdminShell = new UserAdminShell(username, cellEndpoint,
                 cellEndpoint.getArgs());
         if (historyFile != null && historyFile.isFile()) {
@@ -86,7 +86,7 @@ public class ConsoleReaderCommand implements Command, Runnable {
 
     @Override
     public void setErrorStream(OutputStream err) {
-        _err = err;
+        // we don't use the error stream
     }
 
     @Override
@@ -106,7 +106,6 @@ public class ConsoleReaderCommand implements Command, Runnable {
 
     @Override
     public void start(Environment env) throws IOException {
-        _useColors = env.getEnv().containsKey(Environment.ENV_TERM);
         _console = new ConsoleReader(_in, _outWriter, null, new ConsoleReaderTerminal(env));
         _adminShellThread = new Thread(this);
         _adminShellThread.start();
@@ -120,13 +119,13 @@ public class ConsoleReaderCommand implements Command, Runnable {
         } catch (IOException e) {
             _logger.warn(e.getMessage());
         } finally {
-            _exitCallback.onExit(0);
             try {
                 cleanUp();
             } catch (IOException e) {
-                _logger.warn("Something went wrong cleaning up the console: "
+                _logger.warn("Failed to shutdown console cleanly: "
                         + e.getMessage());
             }
+            _exitCallback.onExit(0);
         }
     }
 
@@ -171,6 +170,14 @@ public class ConsoleReaderCommand implements Command, Runnable {
                 if (str == null) {
                     throw new CommandExitException();
                 }
+                if (_useColors) {
+                    String trimmed = str.trim();
+                    if (trimmed.startsWith("help ")) {
+                        str = "help -format=" + HelpFormat.ANSI + trimmed.substring(4);
+                    } else if (trimmed.equals("help")) {
+                        str = "help -format=" + HelpFormat.ANSI;
+                    }
+                }
                 result = _userAdminShell.executeCommand(str);
             } catch (CommandSyntaxException e) {
                 result = e.getMessage()
@@ -187,18 +194,12 @@ public class ConsoleReaderCommand implements Command, Runnable {
                         + "support@dcache.org: {}" + e.getMessage());
             } catch (CommandException e) {
                 if (e instanceof CommandPanicException) {
-                    result =
-                        ((CommandPanicException) e)
-                                .getTargetException().getMessage();
                     _logger.warn("Something went wrong during the remote "
                             + "execution of the command: {}"
                             + ((CommandPanicException) e).getTargetException());
                     return;
                 }
                 if (e instanceof CommandThrowableException) {
-                    result =
-                        ((CommandThrowableException) e)
-                                .getTargetException().getMessage();
                     _logger.warn("Something went wrong during the remote "
                             + "execution of the command: {}"
                             + ((CommandThrowableException) e)
@@ -268,7 +269,6 @@ public class ConsoleReaderCommand implements Command, Runnable {
         _console.printString(NL);
         _console.flushConsole();
         _outWriter.close();
-        _in.close();
     }
 
     private static class ConsoleReaderTerminal extends UnixTerminal {

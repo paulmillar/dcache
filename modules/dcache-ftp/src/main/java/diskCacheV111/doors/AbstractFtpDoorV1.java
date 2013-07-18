@@ -76,7 +76,6 @@ import javax.security.auth.Subject;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.EOFException;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -106,6 +105,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -147,7 +147,6 @@ import dmg.util.CommandExitException;
 import dmg.util.StreamEngine;
 
 import org.dcache.acl.enums.AccessType;
-import org.dcache.auth.KauthFileLoginStrategy;
 import org.dcache.auth.LoginReply;
 import org.dcache.auth.LoginStrategy;
 import org.dcache.auth.Origin;
@@ -159,7 +158,6 @@ import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.cells.AbstractCell;
 import org.dcache.cells.CellStub;
 import org.dcache.cells.Option;
-import org.dcache.commons.util.NDC;
 import org.dcache.namespace.ACLPermissionHandler;
 import org.dcache.namespace.ChainedPermissionHandler;
 import org.dcache.namespace.FileAttribute;
@@ -382,6 +380,16 @@ public abstract class AbstractFtpDoorV1
     )
     protected String _pnfsManager;
 
+    @Option(name = "gplazma",
+            description = "Cell path to gPlazma",
+            defaultValue = "gPlazma")
+    protected String _gPlazma;
+
+    @Option(name = "billing",
+            description = "Cell path to billing",
+            defaultValue = "billing")
+    protected String _billing;
+
     @Option(
         name = "clientDataPortRange"
     )
@@ -418,6 +426,12 @@ public abstract class AbstractFtpDoorV1
     protected int _poolManagerTimeout;
 
     @Option(
+            name = "poolManagerTimeoutUnit",
+            defaultValue = "SECONDS"
+    )
+    protected TimeUnit _poolManagerTimeoutUnit;
+
+    @Option(
         name = "pnfsTimeout",
         defaultValue = "60",
         unit = "seconds"
@@ -425,11 +439,23 @@ public abstract class AbstractFtpDoorV1
     protected int _pnfsTimeout;
 
     @Option(
+            name = "pnfsTimeoutUnit",
+            defaultValue = "SECONDS"
+    )
+    protected TimeUnit _pnfsTimeoutUnit;
+
+    @Option(
         name = "poolTimeout",
         defaultValue = "300",
         unit = "seconds"
     )
     protected int _poolTimeout;
+
+    @Option(
+            name = "poolTimeoutUnit",
+            defaultValue = "SECONDS"
+    )
+    protected TimeUnit _poolTimeoutUnit;
 
     @Option(
         name = "retryWait",
@@ -476,24 +502,6 @@ public abstract class AbstractFtpDoorV1
         required = true
     )
     protected boolean _isProxyRequiredOnActive;
-
-    /**
-     * If true, the door will first contact the login service for
-     * login processing.
-     */
-    @Option(
-        name = "use-login-service",
-        description = "Whether to use the login service",
-        defaultValue = "false"
-    )
-    protected boolean _useLoginService;
-
-    @Option(
-        name = "kpwd-file",
-        description = "Path to kpwd file",
-        defaultValue = ""
-    )
-    protected String _kpwdFilePath;
 
      /**
      * File (StageConfiguration.conf) containing DNs and FQANs whose owner are allowed to STAGE files
@@ -618,6 +626,7 @@ public abstract class AbstractFtpDoorV1
     protected CellStub _billingStub;
     protected CellStub _poolManagerStub;
     protected CellStub _poolStub;
+    protected CellStub _gPlazmaStub;
     protected TransferRetryPolicy _readRetryPolicy;
     protected TransferRetryPolicy _writeRetryPolicy;
 
@@ -1165,25 +1174,18 @@ public abstract class AbstractFtpDoorV1
             _local_host = _engine.getLocalAddress().getHostAddress();
         }
 
-        if (_useLoginService) {
-            _loginStrategy =
-                new RemoteLoginStrategy(new CellStub(this, new CellPath("gPlazma"), 30000));
-        } else {
-            /* Use kpwd file if login service is not enabled.
-             */
-            if (Strings.isNullOrEmpty(_kpwdFilePath)) {
-                String s = "-kpwd-file file argument wasn't specified";
-                _logger.error(s);
-                throw new IllegalArgumentException(s);
-            }
-            File file = new File(_kpwdFilePath);
-            if (!file.exists()) {
-                String s = "File not found: " + file;
-                _logger.error(s);
-                throw new IllegalArgumentException(s);
-            }
-            _loginStrategy = new KauthFileLoginStrategy(file);
-        }
+        _billingStub =
+                new CellStub(this, new CellPath(_billing));
+        _poolManagerStub =
+                new CellStub(this, new CellPath(_poolManager),
+                        _poolManagerTimeout, _poolManagerTimeoutUnit);
+        _poolStub =
+                new CellStub(this, null, _poolTimeout, _poolTimeoutUnit);
+
+        _gPlazmaStub =
+                new CellStub(this, new CellPath(_gPlazma), 30000);
+
+        _loginStrategy = new RemoteLoginStrategy(_gPlazmaStub);
 
         /* Data channel port range used when client issues PASV
          * command.
@@ -1200,14 +1202,6 @@ public abstract class AbstractFtpDoorV1
 
 	_origin = new Origin(Origin.AuthType.ORIGIN_AUTHTYPE_STRONG,
                              _engine.getInetAddress());
-
-        _billingStub =
-            new CellStub(this, new CellPath("billing"));
-        _poolManagerStub =
-            new CellStub(this, new CellPath(_poolManager),
-                         _poolManagerTimeout * 1000);
-        _poolStub =
-            new CellStub(this, null, _poolTimeout * 1000);
 
         _readRetryPolicy =
             new TransferRetryPolicy(_maxRetries, _retryWait * 1000,
@@ -1259,8 +1253,7 @@ public abstract class AbstractFtpDoorV1
             }
         }
 
-        _pnfs = new PnfsHandler(this, new CellPath(_pnfsManager));
-        _pnfs.setPnfsTimeout(_pnfsTimeout * 1000L);
+        _pnfs = new PnfsHandler(new CellStub(this, new CellPath(_pnfsManager), _pnfsTimeout, _pnfsTimeoutUnit));
         _pnfs.setSubject(_subject);
         ListDirectoryHandler listSource = new ListDirectoryHandler(_pnfs);
         addMessageListener(listSource);
@@ -1435,7 +1428,6 @@ public abstract class AbstractFtpDoorV1
     @Override
     public void run()
     {
-        NDC.push(CDC.getSession());
         try {
             try {
                 /* Notice that we do not close the input stream, as
@@ -1490,8 +1482,6 @@ public abstract class AbstractFtpDoorV1
              * called (although from a different thread).
              */
             kill();
-
-            NDC.clear();
         }
     }
 
@@ -3386,15 +3376,11 @@ public abstract class AbstractFtpDoorV1
         @Override
         public synchronized void run()
         {
-            CDC old = new CDC();
-            try {
-                _cdc.restore();
+            try (CDC ignored = _cdc.restore()) {
                 CellMessage msg =
                         new CellMessage(new CellPath(_pool),
                                 "mover ls -binary " + _moverId);
                 sendMessage(msg, this, _timeout);
-            } finally {
-                old.restore();
             }
         }
 
@@ -3498,9 +3484,7 @@ public abstract class AbstractFtpDoorV1
                     _executor.submit(new FireAndForgetTask(new Runnable() {
                             @Override
                             public void run() {
-                                CDC old = new CDC();
-                                try {
-                                    cdc.restore();
+                                try (CDC ignored = cdc.restore()) {
                                     String command = getOrDone();
                                     while (command != null) {
                                         try {
@@ -3510,8 +3494,6 @@ public abstract class AbstractFtpDoorV1
                                         }
                                         command = getOrDone();
                                     }
-                                } finally {
-                                    old.restore();
                                 }
                             }
                         }));

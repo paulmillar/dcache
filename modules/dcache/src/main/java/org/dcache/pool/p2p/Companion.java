@@ -75,6 +75,8 @@ class Companion
     private final static int PROTOCOL_INFO_MINOR_VERSION = 1;
 
     private final static AtomicInteger _nextId = new AtomicInteger(100);
+    private static final long CONNECT_TIMEOUT = TimeUnit.MINUTES.toMillis(5);
+    private static final long READ_TIMEOUT = TimeUnit.MINUTES.toMillis(10);
 
     private final InetAddress _address;
     private final Repository _repository;
@@ -309,10 +311,12 @@ class Companion
     private ReplicaDescriptor createReplicaEntry()
         throws FileInCacheException
     {
-        return _repository.createEntry(_fileAttributes,
-                                       EntryState.FROM_POOL,
-                                       _targetState,
-                                       _stickyRecords);
+        return _repository.createEntry(
+                _fileAttributes,
+                EntryState.FROM_POOL,
+                _targetState,
+                _stickyRecords,
+                EnumSet.of(Repository.OpenFlags.CREATEFILE));
     }
 
     private HttpURLConnection createConnection(String uri)
@@ -322,6 +326,8 @@ class Companion
         HttpURLConnection connection =
             (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Connection", "close");
+        connection.setConnectTimeout((int) CONNECT_TIMEOUT);
+        connection.setReadTimeout((int) READ_TIMEOUT);
         connection.connect();
         return connection;
     }
@@ -469,7 +475,8 @@ class Companion
 
     private String getInitiator()
     {
-        return _destinationPoolCellname + "@" + _destinationPoolCellDomainName;
+        return "pool:"  + _destinationPoolCellname + "@"
+                        + _destinationPoolCellDomainName;
     }
 
     synchronized void setMoverId(int moverId)

@@ -5,6 +5,7 @@ import java.util.NoSuchElementException;
 
 import diskCacheV111.vehicles.JobInfo;
 
+import org.dcache.pool.movers.Mover;
 import org.dcache.util.IoPriority;
 
 /**
@@ -15,11 +16,11 @@ public interface IoScheduler {
     /**
      * Add a new request to schedule.
      *
-     * @param request to run.
-     * @param priority of the request.
-     * @return a sort hand identifier of the request
+     * @param transfer transfer to add.
+     * @param priority priority of the transfer.
+     * @return a mover id for the transfer
      */
-    public int add(PoolIORequest request, IoPriority priority);
+    public int add(Mover<?> transfer, IoPriority priority);
 
     /**
      * Cancel the request. Any IO in progress will be interrupted.

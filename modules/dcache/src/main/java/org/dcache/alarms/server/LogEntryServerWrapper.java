@@ -68,6 +68,8 @@ package org.dcache.alarms.server;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.base.Strings;
+
 import java.io.File;
 
 import org.dcache.cells.UniversalSpringCell;
@@ -95,6 +97,7 @@ public class LogEntryServerWrapper {
     private String url;
     private String user;
     private String pass;
+    private String level;
     private Integer port;
 
     private SimpleSocketServer server;
@@ -113,6 +116,10 @@ public class LogEntryServerWrapper {
 
     public void setDriver(String driver) {
         this.driver = driver;
+    }
+
+    public void setLevel(String level) {
+        this.level = level;
     }
 
     public void setPass(String pass) {
@@ -144,10 +151,18 @@ public class LogEntryServerWrapper {
     }
 
     public void shutDown() {
-        server.close();
+        if (server != null) {
+            server.close();
+        }
     }
 
     public void startUp() throws JoranException {
+        if (Strings.isNullOrEmpty(url)) {
+            LoggerFactory.getLogger("root")
+                .warn("alarms database type is OFF; server will not be started");
+            return;
+        }
+
         checkNotNull(configFile);
         checkNotNull(baseDir);
         File f = new File(baseDir);
@@ -157,14 +172,16 @@ public class LogEntryServerWrapper {
         LoggerContext loggerContext
             = (LoggerContext) LoggerFactory.getILoggerFactory();
         loggerContext.reset();
+
         loggerContext.putProperty("alarms.dir", f.getAbsolutePath());
-        loggerContext.putProperty("alarms.store.path", path);
-        loggerContext.putProperty("alarms.store.db.driver", driver);
-        loggerContext.putProperty("alarms.store.db.url", url);
-        loggerContext.putProperty("alarms.store.db.user", user);
-        loggerContext.putProperty("alarms.store.db.pass", pass);
-        loggerContext.putProperty("alarms.store.db.properties", properties);
+        loggerContext.putProperty("alarms.db.xml.path", path);
+        loggerContext.putProperty("alarms.db.driver", driver);
+        loggerContext.putProperty("alarms.db.url", url);
+        loggerContext.putProperty("alarms.db.user", user);
+        loggerContext.putProperty("alarms.db.password", pass);
+        loggerContext.putProperty("alarms.db.config.path", properties);
         loggerContext.putProperty("alarms.definitions.path", definitionsPath);
+        loggerContext.putProperty("alarms.log.root-level", level);
 
         JoranConfigurator configurator = new JoranConfigurator();
         configurator.setContext(loggerContext);

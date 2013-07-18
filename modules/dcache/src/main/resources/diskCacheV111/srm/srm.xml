@@ -1,25 +1,74 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-           http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+              http://www.springframework.org/schema/beans/spring-beans.xsd
+              http://www.springframework.org/schema/context
+              http://www.springframework.org/schema/context/spring-context.xsd">
+
+  <context:annotation-config/>
+
+  <!--
+    Note that we have a three-node circular dependency with the
+    following beans referencing each other:
+
+        config   references  storage,
+        storage  references  srm,
+        srm      references  config.
+
+    However, the "srm" bean's requirement on "config" is stronger: not
+    only must "config" exists, but also that it has been configured
+    with the "storage" bean.  This is because the SRM will fetch the
+    AbstractStorageElement object from Configuration, decorate it and
+    replace Configuration with the decorated object.
+
+    Therefore, we must ensure that the following events happen in this
+    order:
+
+        1. "storage" bean is created,
+        2. "config" bean is created,
+        3. "config" bean is configured with the "storage" bean,
+        4. "srm" bean is created.
+
+    Spring does not complain about this circular dependency.  It will
+    create objects and initialise them in an undocumented ordering,
+    which seems to depend on where within the XML file the bean is
+    described.
+
+    To avoid this abitrary behaviour, the Spring 'depends-on'
+    attribute is used to make the ordering explicit:
+
+        srm     depends-on  config,
+        config  depends-on  storage.
+  -->
 
   <bean id="properties" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
     <description>Imported configuration data</description>
     <property name="location" value="arguments:"/>
   </bean>
 
-  <bean id="required" class="org.springframework.beans.factory.annotation.RequiredAnnotationBeanPostProcessor"/>
+  <!-- Convert properties with multiple values separated by comma into an array of strings:
+       key=value1,value2,value3 : String[] {value1, value2, value3}
+    -->
+  <bean class="org.springframework.beans.factory.config.CustomEditorConfigurer">
+      <property name="customEditors">
+          <map>
+              <entry key="java.lang.String[]"
+                     value="org.springframework.beans.propertyeditors.StringArrayPropertyEditor" />
+          </map>
+      </property>
+  </bean>
 
   <bean id="pool-manager-stub" class="org.dcache.cells.CellStub">
     <description>Pool manager communication stub</description>
-    <property name="destination" value="${srmPoolManager}"/>
+    <property name="destination" value="${dcache.service.poolmanager}"/>
     <property name="timeout" value="#{ ${srmPoolManagerTimeout} * 1000}"/>
   </bean>
 
   <bean id="gplazma-stub" class="org.dcache.cells.CellStub">
     <description>gPlazma communication stub</description>
-    <property name="destination" value="${gplazma}"/>
+    <property name="destination" value="${dcache.service.gplazma}"/>
     <property name="timeout" value="30000"/>
   </bean>
 
@@ -49,13 +98,13 @@
 
   <bean id="login-broker-stub" class="org.dcache.cells.CellStub">
     <description>Login broker communication stub</description>
-    <property name="destination" value="LoginBroker"/>
-    <property name="timeout" value="#{ ${srmPnfsTimeout} * 1000 }"/>
+    <property name="destination" value="${srm.lookup.loginbroker}"/>
+    <property name="timeout" value="#{ ${srm.lookup.timeout} * 1000 }"/>
   </bean>
 
   <bean id="pnfs-stub" class="org.dcache.cells.CellStub">
     <description>PNFS manager communication stub</description>
-    <property name="destination" value="${srmPnfsManager}"/>
+    <property name="destination" value="${dcache.service.pnfsmanager}"/>
     <property name="timeout" value="#{ ${srmPnfsTimeout} * 1000 }"/>
     <property name="retryOnNoRouteToCell" value="true"/>
   </bean>
@@ -81,26 +130,42 @@
         <description>Thread pool for scheduled activities</description>
       </bean>
     </property>
-    <property name="updateTime" value="${loginBrokerUpdateTime}"/>
-    <property name="updateThreshold" value="${loginBrokerUpdateThreshold}"/>
+    <property name="updateTime" value="${srm.service.loginbroker.update-period}"/>
+    <property name="updateTimeUnit" value="${srm.service.loginbroker.update-period.unit}"/>
+    <property name="updateThreshold" value="${srm.service.loginbroker.update-threshold}"/>
     <property name="protocolEngine" value="diskCacheV111.srm.dcache.Storage"/>
-    <property name="protocolVersion" value="${protocolVersion}"/>
-    <property name="protocolFamily" value="${protocolFamily}"/>
-    <property name="port" value="${srmPort}"/>
-    <property name="loginBroker">
-      <bean class="dmg.cells.nucleus.CellPath">
-        <constructor-arg value="${srmLoginBroker}"/>
-      </bean>
-    </property>
+    <property name="protocolVersion" value="${srm.service.loginbroker.version}"/>
+    <property name="protocolFamily" value="${srm.service.loginbroker.family}"/>
+    <property name="port" value="${port}"/>
+    <property name="loginBrokers" value="${srm.service.loginbroker}"/>
   </bean>
 
-  <bean id="auth-persistence-manager"
-        class="org.dcache.auth.persistence.AuthRecordPersistenceManager">
-    <description>Persistence manager for authentication</description>
-    <constructor-arg value="${jdbcUrl}"/>
-    <constructor-arg value="${jdbcDriver}"/>
-    <constructor-arg value="${srmDbUser}"/>
-    <constructor-arg value="${srmDbPassword}"/>
+  <bean id="auth-persistence-manager" class="diskCacheV111.srm.dcache.DcacheUserPersistenceManager">
+      <constructor-arg>
+          <bean class="org.dcache.auth.persistence.AuthRecordPersistenceManager">
+              <description>Persistence manager for authentication</description>
+              <constructor-arg value="${db.url}"/>
+              <constructor-arg value="${db.driver}"/>
+              <constructor-arg value="${db.user}"/>
+              <constructor-arg value="${db.password}"/>
+          </bean>
+      </constructor-arg>
+  </bean>
+
+  <bean id="login-strategy" class="org.dcache.services.login.CachingLoginStrategy">
+      <constructor-arg>
+          <bean class="org.dcache.services.login.RemoteLoginStrategy">
+              <property name="cellStub" ref="gplazma-stub"/>
+          </bean>
+      </constructor-arg>
+      <constructor-arg value="1000"/> <!-- Cache size -->
+      <constructor-arg value="${srmAuthzCacheLifetime}"/>
+      <constructor-arg value="#{T(java.util.concurrent.TimeUnit).SECONDS}"/>
+  </bean>
+
+  <bean id="authorization" class="diskCacheV111.srm.dcache.DCacheAuthorization">
+      <constructor-arg ref="login-strategy"/>
+      <constructor-arg ref="auth-persistence-manager"/>
   </bean>
 
   <bean id="storage" class="diskCacheV111.srm.dcache.Storage"
@@ -117,24 +182,29 @@
     <property name="copyManagerStub" ref="copy-manager-stub"/>
     <property name="pinManagerStub" ref="pin-manager-stub"/>
     <property name="gplazmaStub" ref="gplazma-stub"/>
+    <property name="isSpaceManagerEnabled"
+              value="${dcache.enable.spacemanager}"/>
     <property name="loginBrokerUpdatePeriod"
-              value="${srmLoginBrokerUpdatePeriod}"/>
+              value="${srm.lookup.period}"/>
     <property name="numberOfDoorsInRandomSelection"
-              value="${srmNumberOfDoorsInRandomSelection}"/>
+              value="${srm.lookup.population-size}"/>
     <property name="useCustomGetHostByAddress"
               value="${srmCustomGetHostByAddr}"/>
     <property name="ignoreClientProtocolOrder"
               value="${srmIgnoreClientProtocolOrder}"/>
-    <property name="httpRootPath" value="${httpRootPath}"/>
+    <property name="httpRootPath" value="${webdavRootPath}"/>
     <property name="xrootdRootPath"  value="${xrootdRootPath}"/>
     <property name="configuration" ref="config"/>
     <property name="pinOnlineFiles" value="${srmPinOnlineFiles}"/>
+    <property name="srmPutNotSupportedProtocols" value="${srm.protocols.disallowed.put}"/>
+    <property name="srmGetNotSupportedProtocols" value="${srm.protocols.disallowed.get}"/>
+    <property name="srmPreferredProtocols" value="${srm.protocols.preferred}"/>
     <property name="srm" ref="srm"/>
   </bean>
 
-  <bean id="config" class="org.dcache.srm.util.Configuration">
+  <bean id="config" class="org.dcache.srm.util.Configuration" depends-on="storage">
     <description>SRM configuration</description>
-    <property name="port" value="${srmPort}"/>
+    <property name="port" value="${port}"/>
     <property name="timeout" value="${srmTimeout}"/>
     <property name="srmHost" value="${srmHost}"/>
     <property name="srmHostsAsArray" value="${localSrmHosts}"/>
@@ -163,11 +233,11 @@
     <property name="space_reservation_strict"
               value="${srmSpaceReservationStrict}"/>
 
-    <property name="jdbcUrl" value="${jdbcUrl}"/>
-    <property name="jdbcClass" value="${jdbcDriver}"/>
-    <property name="jdbcUser" value="${srmDbUser}"/>
-    <property name="jdbcPass" value="${srmDbPassword}"/>
-    <property name="jdbcPwdfile" value="${srmPasswordFile}"/>
+    <property name="jdbcUrl" value="${db.url}"/>
+    <property name="jdbcClass" value="${db.driver}"/>
+    <property name="jdbcUser" value="${db.user}"/>
+    <property name="jdbcPass" value="${db.password}"/>
+    <property name="jdbcPwdfile" value="${db.password.file}"/>
 
     <property name="getReqTQueueSize" value="${srmGetReqThreadQueueSize}"/>
     <property name="getThreadPoolSize" value="${srmGetReqThreadPoolSize}"/>
@@ -248,6 +318,7 @@
 
     <property name="storage" ref="storage"/>
     <property name="srmUserPersistenceManager" ref="auth-persistence-manager"/>
+    <property name="authorization" ref="authorization"/>
 
     <property name="databaseParametersForList.databaseEnabled"
               value="${srmLsDatabaseEnabled}"/>
@@ -330,11 +401,11 @@
 
 
   <bean id="srm" class="org.dcache.srm.SRM" factory-method="getSRM"
-	destroy-method="stop">
+	destroy-method="stop" depends-on="config">
     <description>SRM engine</description>
 
     <constructor-arg ref="config"/>
-    <constructor-arg value="${srmName}"/>
+    <constructor-arg value="${cell.name}"/>
   </bean>
 
 
@@ -348,6 +419,10 @@
     <property name="maxQueued" value="${srmJettyThreadsMaxQueued}"/>
   </bean>
 
+  <bean id="banned-ciphers" class="org.dcache.util.Crypto"
+        factory-method="getBannedCipherSuitesFromConfigurationValue">
+      <constructor-arg value="${srm.security.ciphers}"/>
+  </bean>
 
   <bean id="server" class="org.eclipse.jetty.server.Server"
         init-method="start" destroy-method="stop">
@@ -402,108 +477,60 @@
     </property>
   </bean>
 
-
-  <beans profile="connector-async">
     <bean id="gsi-connector"
-	  class="org.dcache.util.JettyAsyncGSIConnector">
-      <description>asynchronous GSI connector</description>
-      <property name="port" value="${srmPort}"/>
-      <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${listen}' ) }"/>
+          class="org.dcache.util.JettyGSIConnector">
+        <description>synchronous GSI connector</description>
+        <property name="port" value="${port}"/>
+        <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${srm.net.listen}' ) }"/>
 
-      <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
-      <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
-      <property name="lowResourceMaxIdleTime"
-		value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
-      <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
+        <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
+        <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
+        <property name="lowResourceMaxIdleTime"
+                  value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
+        <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
 
-      <property name="hostCertificatePath" value="${service-cert}"/>
-      <property name="hostKeyPath" value="${service-key}"/>
-      <property name="caCertificatePath" value="${service-trusted-certs}"/>
-      <property name="autoFlush" value="true"/>
-      <property name="encrypt" value="true"/>
-      <property name="requireClientAuth" value="true"/>
-      <property name="acceptNoClientCerts" value="false"/>
-      <property name="gssMode" value="gsi"/>
-      <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
-      <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
+        <property name="hostCertificatePath" value="${grid.hostcert.cert}"/>
+        <property name="hostKeyPath" value="${grid.hostcert.key}"/>
+        <property name="caCertificatePath" value="${grid.ca.path}"/>
+        <property name="autoFlush" value="true"/>
+        <property name="encrypt" value="true"/>
+        <property name="requireClientAuth" value="true"/>
+        <property name="acceptNoClientCerts" value="false"/>
+        <property name="gssMode" value="gsi"/>
+        <property name="handshakeTimeout" value="10000" />
+        <property name="hostCertRefreshInterval" value="${grid.hostcert.refresh}" />
+        <property name="hostCertRefreshIntervalUnit" value="SECONDS" />
+        <property name="trustAnchorRefreshInterval" value="${grid.ca.refresh}" />
+        <property name="trustAnchorRefreshIntervalUnit" value="SECONDS" />
+        <property name="excludeCipherSuites" ref="banned-ciphers"/>
     </bean>
 
     <bean id="ssl-connector"
-	  class="org.dcache.util.JettyAsyncGSIConnector">
-      <description>asynchronous SSL connector</description>
-      <property name="port" value="${srmSslPort}"/>
-      <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${listen}' ) }"/>
+          class="org.dcache.util.JettyGSIConnector">
+        <description>synchronous SSL connector</description>
+        <property name="port" value="${srm.ssl.port}"/>
+        <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${srm.net.listen}' ) }"/>
 
-      <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
-      <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
-      <property name="lowResourceMaxIdleTime"
-		value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
-      <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
+        <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
+        <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
+        <property name="lowResourceMaxIdleTime"
+                  value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
+        <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
 
-      <property name="hostCertificatePath" value="${service-cert}"/>
-      <property name="hostKeyPath" value="${service-key}"/>
-      <property name="caCertificatePath" value="${service-trusted-certs}"/>
-      <property name="autoFlush" value="true"/>
-      <property name="encrypt" value="true"/>
-      <property name="requireClientAuth" value="true"/>
-      <property name="acceptNoClientCerts" value="false"/>
-      <property name="gssMode" value="ssl"/>
-      <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
-      <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
+        <property name="hostCertificatePath" value="${grid.hostcert.cert}"/>
+        <property name="hostKeyPath" value="${grid.hostcert.key}"/>
+        <property name="caCertificatePath" value="${grid.ca.path}"/>
+        <property name="autoFlush" value="true"/>
+        <property name="encrypt" value="true"/>
+        <property name="requireClientAuth" value="true"/>
+        <property name="acceptNoClientCerts" value="false"/>
+        <property name="gssMode" value="ssl"/>
+        <property name="handshakeTimeout" value="10000" />
+        <property name="hostCertRefreshInterval" value="${grid.hostcert.refresh}" />
+        <property name="hostCertRefreshIntervalUnit" value="SECONDS" />
+        <property name="trustAnchorRefreshInterval" value="${grid.ca.refresh}" />
+        <property name="trustAnchorRefreshIntervalUnit" value="SECONDS" />
+        <property name="excludeCipherSuites" ref="banned-ciphers"/>
     </bean>
-  </beans>
-
-
-  <beans profile="connector-sync">
-    <bean id="gsi-connector"
-	  class="org.dcache.util.JettyGSIConnector">
-      <description>synchronous GSI connector</description>
-      <property name="port" value="${srmPort}"/>
-      <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${listen}' ) }"/>
-
-      <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
-      <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
-      <property name="lowResourceMaxIdleTime"
-		value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
-      <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
-
-      <property name="hostCertificatePath" value="${service-cert}"/>
-      <property name="hostKeyPath" value="${service-key}"/>
-      <property name="caCertificatePath" value="${service-trusted-certs}"/>
-      <property name="autoFlush" value="true"/>
-      <property name="encrypt" value="true"/>
-      <property name="requireClientAuth" value="true"/>
-      <property name="acceptNoClientCerts" value="false"/>
-      <property name="gssMode" value="gsi"/>
-      <property name="handshakeTimeout" value="10000" />
-      <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
-      <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
-    </bean>
-
-    <bean id="ssl-connector"
-	  class="org.dcache.util.JettyGSIConnector">
-      <description>synchronous SSL connector</description>
-      <property name="port" value="${srmSslPort}"/>
-      <property name="host" value="#{ T(com.google.common.base.Strings).emptyToNull( '${listen}' ) }"/>
-
-      <property name="acceptors" value="${srmJettyConnectorAcceptors}"/>
-      <property name="maxIdleTime" value="${srmJettyConnectorMaxIdleTime}"/>
-      <property name="lowResourceMaxIdleTime"
-		value="${srmJettyConnectorLowResourceMaxIdleTime}"/>
-      <property name="acceptQueueSize" value="${srmJettyConnectorBackLog}"/>
-
-      <property name="hostCertificatePath" value="${service-cert}"/>
-      <property name="hostKeyPath" value="${service-key}"/>
-      <property name="caCertificatePath" value="${service-trusted-certs}"/>
-      <property name="autoFlush" value="true"/>
-      <property name="encrypt" value="true"/>
-      <property name="requireClientAuth" value="true"/>
-      <property name="acceptNoClientCerts" value="false"/>
-      <property name="gssMode" value="ssl"/>
-      <property name="handshakeTimeout" value="10000" />
-      <property name="millisecBetweenHostCertRefresh" value="#{ ${hostCertificateRefreshPeriod} * 1000 }" />
-      <property name="millisecBetweenTrustAnchorRefresh" value="#{ ${trustAnchorRefreshPeriod} * 1000 }" />
-    </bean>
-  </beans>
 
 </beans>

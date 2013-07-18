@@ -2,14 +2,14 @@
 
 package org.dcache.pool.classic;
 
+import com.google.common.base.Throwables;
+import com.google.common.net.InetAddresses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.security.auth.Subject;
+import org.springframework.beans.factory.annotation.Required;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -17,14 +17,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,7 +67,6 @@ import diskCacheV111.vehicles.ProtocolInfo;
 import diskCacheV111.vehicles.RemoveFileInfoMessage;
 import diskCacheV111.vehicles.StorageInfo;
 
-import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellInfo;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
@@ -84,7 +82,8 @@ import org.dcache.cells.CellMessageReceiver;
 import org.dcache.cells.CellStub;
 import org.dcache.pool.FaultEvent;
 import org.dcache.pool.FaultListener;
-import org.dcache.pool.movers.MoverProtocol;
+import org.dcache.pool.movers.Mover;
+import org.dcache.pool.movers.MoverFactory;
 import org.dcache.pool.p2p.P2PClient;
 import org.dcache.pool.repository.AbstractStateChangeListener;
 import org.dcache.pool.repository.Account;
@@ -92,6 +91,7 @@ import org.dcache.pool.repository.CacheEntry;
 import org.dcache.pool.repository.EntryChangeEvent;
 import org.dcache.pool.repository.EntryState;
 import org.dcache.pool.repository.IllegalTransitionException;
+import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.Repository;
 import org.dcache.pool.repository.SpaceRecord;
 import org.dcache.pool.repository.StateChangeEvent;
@@ -100,6 +100,9 @@ import org.dcache.pool.repository.v5.CacheRepositoryV5;
 import org.dcache.util.IoPriority;
 import org.dcache.util.Version;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.vehicles.PnfsSetFileAttributes;
+
+import static com.google.common.base.Preconditions.checkState;
 
 public class PoolV4
     extends AbstractCellComponent
@@ -125,9 +128,6 @@ public class PoolV4
     private final static Logger _log = LoggerFactory.getLogger(PoolV4.class);
 
     private final String _poolName;
-
-    private final Map<String, Class<? extends MoverProtocol>> _moverHash =
-        new ConcurrentHashMap<>();
 
     /**
      * pool start time identifier.
@@ -181,11 +181,15 @@ public class PoolV4
 
     private ReplicaStatePolicy _replicaStatePolicy;
 
+    private CellPath _replicationManager;
+    private InetAddress _replicationIp;
+
     private boolean _running;
     private double _breakEven = 0.7;
     private double _moverCostFactor = 0.5;
+    private TransferServices _transferServices;
 
-    public PoolV4(String poolName, String args)
+    public PoolV4(String poolName)
     {
         _poolName = poolName;
 
@@ -201,32 +205,50 @@ public class PoolV4
 
     protected void assertNotRunning(String error)
     {
-        if (_running) {
-            throw new IllegalStateException(error);
-        }
+        checkState(!_running, error);
     }
 
+    @Required
     public void setBaseDir(String baseDir)
     {
         assertNotRunning("Cannot change base dir after initialisation");
         _baseDir = baseDir;
     }
 
+    @Required
     public void setVersion(int version)
     {
         _version = version;
     }
 
-    public void setReplicateOnArrival(String replicate)
+    @Required
+    public void setReplicationNotificationDestination(String address)
     {
-        _replicationHandler.init(replicate.equals("") ? "on" : replicate);
+        _replicationManager = (!address.isEmpty()) ? new CellPath(address) : null;
     }
 
+    @Required
+    public void setReplicationIp(String address)
+    {
+        if (!address.isEmpty()) {
+            _replicationIp = InetAddresses.forString(address);
+        } else {
+            try {
+                _replicationIp = InetAddress.getLocalHost();
+            } catch (UnknownHostException ee) {
+                _replicationIp = InetAddress.getLoopbackAddress();
+
+            }
+        }
+    }
+
+    @Required
     public void setAllowCleaningPreciousFiles(boolean allow)
     {
         _cleanPreciousFiles = allow;
     }
 
+    @Required
     public void setVolatile(boolean isVolatile)
     {
         _isVolatile = isVolatile;
@@ -237,6 +259,7 @@ public class PoolV4
         return _isVolatile;
     }
 
+    @Required
     public void setHasTapeBackend(boolean hasTapeBackend)
     {
         _hasTapeBackend = hasTapeBackend;
@@ -273,23 +296,30 @@ public class PoolV4
         }
     }
 
+    @Required
     public void setPoolUpDestination(String name)
     {
         _poolupDestination = name;
     }
 
+    @Required
     public void setBillingStub(CellStub stub)
     {
+        assertNotRunning("Cannot set billing stub after initialization");
         _billingStub = stub;
     }
 
+    @Required
     public void setPnfsHandler(PnfsHandler pnfs)
     {
+        assertNotRunning("Cannot set PNFS handler after initialization");
         _pnfs = pnfs;
     }
 
+    @Required
     public void setRepository(CacheRepositoryV5 repository)
     {
+        assertNotRunning("Cannot set repository after initialization");
         if (_repository != null) {
             _repository.removeFaultListener(this);
         }
@@ -302,51 +332,63 @@ public class PoolV4
         _repository.addListener(new ATimeMaintainer());
     }
 
+    @Required
     public void setAccount(Account account)
     {
+        assertNotRunning("Cannot set account after initialization");
         _account = account;
     }
 
+    @Required
     public void setChecksumModule(ChecksumModule module)
     {
         assertNotRunning("Cannot set checksum module after initialization");
         _checksumModule = module;
     }
 
+    @Required
     public void setStorageQueue(StorageClassContainer queue)
     {
         assertNotRunning("Cannot set storage queue after initialization");
         _storageQueue = queue;
     }
 
+    @Required
     public void setStorageHandler(HsmStorageHandler2 handler)
     {
+        assertNotRunning("Cannot set HSM storage handler after initialization");
         _storageHandler = handler;
     }
 
+    @Required
     public void setHSMSet(HsmSet set)
     {
         assertNotRunning("Cannot set HSM set after initialization");
         _hsmSet = set;
     }
 
+    @Required
     public void setFlushController(HsmFlushController controller)
     {
         assertNotRunning("Cannot set flushing controller after initialization");
         _flushingThread = controller;
     }
 
+    @Required
     public void setPPClient(P2PClient client)
     {
         assertNotRunning("Cannot set P2P client after initialization");
         _p2pClient = client;
     }
 
+    @Required
     public void setReplicaStatePolicy(ReplicaStatePolicy replicaStatePolicy)
     {
+        assertNotRunning("Cannot set replica state policy after initialization");
         _replicaStatePolicy = replicaStatePolicy;
     }
 
+    @Required
     public void setTags(String tags)
     {
         Map<String,String> newTags = new HashMap<>();
@@ -369,14 +411,24 @@ public class PoolV4
         }
     }
 
+    @Required
     public void setIoQueueManager(IoQueueManager ioQueueManager)
     {
+        assertNotRunning("Cannot set I/O queue manager after initialization");
         _ioQueue = ioQueueManager;
     }
 
+    @Required
     public void setPoolMode(PoolV2Mode mode)
     {
         _poolMode = mode;
+    }
+
+    @Required
+    public void setTransferServices(TransferServices transferServices)
+    {
+        assertNotRunning("Cannot set transfer services after initialization");
+        _transferServices = transferServices;
     }
 
     /**
@@ -387,21 +439,7 @@ public class PoolV4
      */
     public void init()
     {
-        assert _baseDir != null : "Base directory must be set";
-        assert _pnfs != null : "PNFS handler must be set";
-        assert _repository != null : "Repository must be set";
-        assert _checksumModule != null : "Checksum module must be set";
-        assert _storageQueue != null : "Storage queue must be set";
-        assert _storageHandler != null : "Storage handler must be set";
-        assert _hsmSet != null : "HSM set must be set";
-        assert _flushingThread != null : "Flush controller must be set";
-        assert _p2pClient != null : "P2P client must be set";
-        assert _account != null : "Account must be set";
-
-        if (_isVolatile && _hasTapeBackend) {
-            throw new IllegalStateException("Volatile pool cannot have a tape backend");
-        }
-
+        checkState(!_isVolatile || !_hasTapeBackend, "Volatile pool cannot have a tape backend");
         disablePool(PoolV2Mode.DISABLED_STRICT, 1, "Initializing");
         _pingThread.start();
     }
@@ -420,9 +458,14 @@ public class PoolV4
                     _repository.load();
                     enablePool();
                     _flushingThread.start();
+                } catch (RuntimeException e) {
+                    _log.error("Repository reported a problem. Please report this to support@dcache.org.", e);
+                    _log.warn("Pool not enabled {}", _poolName);
+                    disablePool(PoolV2Mode.DISABLED_DEAD | PoolV2Mode.DISABLED_STRICT,
+                            666, "Init failed: " + e.getMessage());
                 } catch (Throwable e) {
-                    _log.error("Repository reported a problem : " + e.getMessage());
-                    _log.warn("Pool not enabled " + _poolName);
+                    _log.error("Repository reported a problem: " + e.getMessage());
+                    _log.warn("Pool not enabled {}", _poolName);
                     disablePool(PoolV2Mode.DISABLED_DEAD | PoolV2Mode.DISABLED_STRICT,
                                 666, "Init failed: " + e.getMessage());
                 }
@@ -434,6 +477,7 @@ public class PoolV4
     @Override
     public void beforeStop()
     {
+        _flushingThread.stop();
         _pingThread.stop();
         disablePool(PoolV2Mode.DISABLED_DEAD | PoolV2Mode.DISABLED_STRICT,
                 666, "Shutdown");
@@ -498,14 +542,9 @@ public class PoolV4
 
         @Override
         public void accessTimeChanged(EntryChangeEvent event) {
-            PnfsId id = event.getPnfsId();
-            try {
-                FileAttributes fileAttributes = new FileAttributes();
-                fileAttributes.setAccessTime(System.currentTimeMillis());
-                _pnfs.setFileAttributes(id, fileAttributes);
-            } catch (CacheException e) {
-                _log.warn("Failed to update ATime: {}", e.getMessage());
-            }
+            FileAttributes fileAttributes = new FileAttributes();
+            fileAttributes.setAccessTime(System.currentTimeMillis());
+            _pnfs.notify(new PnfsSetFileAttributes(event.getPnfsId(), fileAttributes));
         }
     }
 
@@ -608,7 +647,7 @@ public class PoolV4
     {
         pw.println("Base directory    : " + _baseDir);
         pw.println("Version           : " + VERSION + " (Sub="
-                   + _version + ")");
+                + _version + ")");
         pw.println("Gap               : " + _gap);
         pw.println("Report remove     : " + (_reportOnRemovals ? "on" : "off"));
         pw.println("Pool Mode         : " + _poolMode);
@@ -655,132 +694,112 @@ public class PoolV4
     //
     //
 
-    private int queueIoRequest(PoolIoFileMessage message,
-                               PoolIORequest request)
+    private boolean isDuplicateIoRequest(CellPath pathFromSource, PoolIoFileMessage message)
+    {
+        if (!(message instanceof PoolAcceptFileMessage)
+                && !message.isPool2Pool()) {
+            long id = message.getId();
+            String door = pathFromSource.getSourceAddress().toString();
+            JobInfo job = _ioQueue.findJob(door, id);
+            if (job != null) {
+                switch (_dupRequest) {
+                case DUP_REQ_NONE:
+                    _log.info("Dup Request : none <" + door + ":" + id + ">");
+                    break;
+                case DUP_REQ_IGNORE:
+                    _log.info("Dup Request : ignoring <" + door + ":" + id + ">");
+                    return true;
+                case DUP_REQ_REFRESH:
+                    long jobId = job.getJobId();
+                    _log.info("Dup Request : refreshing <" + door + ":"
+                            + id + "> old = " + jobId);
+                    _ioQueue.cancel((int)jobId);
+                    break;
+                default:
+                    throw new RuntimeException("Dup Request : PANIC (code corrupted) <"
+                            + door + ":" + id + ">");
+                }
+            }
+        }
+        return false;
+    }
+
+    private Mover<?> createMover(CellPath source, PoolIoFileMessage message) throws CacheException
+    {
+        FileAttributes attributes = message.getFileAttributes();
+        PnfsId pnfsId = attributes.getPnfsId();
+        ProtocolInfo pi = message.getProtocolInfo();
+
+        MoverFactory moverFactory = _transferServices.getMoverFactory(pi);
+        ReplicaDescriptor handle;
+        try {
+            if (message instanceof PoolAcceptFileMessage) {
+                List<StickyRecord> stickyRecords =
+                        _replicaStatePolicy.getStickyRecords(attributes);
+                EntryState targetState =
+                        _replicaStatePolicy.getTargetState(attributes);
+                handle = _repository.createEntry(attributes,
+                        EntryState.FROM_CLIENT,
+                        targetState,
+                        stickyRecords,
+                        EnumSet.of(Repository.OpenFlags.CREATEFILE));
+            } else {
+                Set<Repository.OpenFlags> openFlags =
+                        message.isPool2Pool()
+                                ? EnumSet.noneOf(Repository.OpenFlags.class)
+                                : EnumSet.of(Repository.OpenFlags.NOATIME);
+                handle = _repository.openEntry(pnfsId, openFlags);
+            }
+        } catch (FileNotInCacheException e) {
+            throw new FileNotInCacheException("File " + pnfsId + " does not exist in " + _poolName, e);
+        } catch (FileInCacheException e) {
+            throw new FileInCacheException("File " + pnfsId + " already exists in " + _poolName, e);
+        } catch (InterruptedException e) {
+            throw new CacheException("Pool is shutting down", e);
+        }
+        try {
+            return moverFactory.createMover(handle, message, source);
+        } catch (Throwable t) {
+            handle.close();
+            throw Throwables.propagate(t);
+        }
+    }
+
+    private int queueIoRequest(PoolIoFileMessage message, Mover<?> mover)
     {
         String queueName = message.getIoQueueName();
 
         if (message instanceof PoolAcceptFileMessage) {
-            return _ioQueue.add(queueName, request, IoPriority.HIGH);
+            return _ioQueue.add(queueName, mover, IoPriority.HIGH);
         } else if (message.isPool2Pool()) {
-            return _ioQueue.add(P2P_QUEUE_NAME, request, IoPriority.HIGH);
+            return _ioQueue.add(P2P_QUEUE_NAME, mover, IoPriority.HIGH);
         } else {
-            return _ioQueue.add(queueName, request, IoPriority.REGULAR);
+            return _ioQueue.add(queueName, mover, IoPriority.REGULAR);
         }
     }
 
     private void ioFile(CellMessage envelope, PoolIoFileMessage message)
     {
-        FileAttributes attributes = message.getFileAttributes();
-        PnfsId pnfsId = attributes.getPnfsId();
         try {
-            long id = message.getId();
-            ProtocolInfo pi = message.getProtocolInfo();
-            Subject subject = message.getSubject();
-            StorageInfo si = attributes.getStorageInfo();
-            String initiator = message.getInitiator();
-            String pool = message.getPoolName();
-            String queueName = message.getIoQueueName();
-            CellPath source = (CellPath)envelope.getSourcePath().clone();
-            Set<Repository.OpenFlags> openFlags =
-                    (Set<Repository.OpenFlags>) (
-                        message.isPool2Pool() ? Collections.emptySet() :
-                            Collections.singleton(Repository.OpenFlags.NOATIME)
-                    );
-
-            String door =
-                source.getCellName() + "@" + source.getCellDomainName();
-
-            /* Eliminate duplicate requests.
-             */
-            if (!(message instanceof PoolAcceptFileMessage)
-                && !message.isPool2Pool()) {
-
-                JobInfo job = _ioQueue.findJob(door, id);
-                if (job != null) {
-                    switch (_dupRequest) {
-                    case DUP_REQ_NONE:
-                        _log.info("Dup Request : none <" + door + ":" + id + ">");
-                        break;
-                    case DUP_REQ_IGNORE:
-                        _log.info("Dup Request : ignoring <" + door + ":" + id + ">");
-                        return;
-                    case DUP_REQ_REFRESH:
-                        long jobId = job.getJobId();
-                        _log.info("Dup Request : refresing <" + door + ":"
-                            + id + "> old = " + jobId);
-                        _ioQueue.cancel((int)jobId);
-                        break;
-                    default:
-                        throw new RuntimeException("Dup Request : PANIC (code corrupted) <"
-                                                   + door + ":" + id + ">");
-                    }
-                }
+            if (isDuplicateIoRequest(envelope.getSourcePath(), message)) {
+                return;
             }
-
-            /* Queue new request.
-             */
-            MoverProtocol mover = getProtocolHandler(pi);
-            if (mover == null) {
-                throw new CacheException(27,
-                        "PANIC : Could not get handler for " +
-                                pi);
-            }
-
-            PoolIOTransfer transfer;
-            if (message instanceof PoolAcceptFileMessage) {
-                List<StickyRecord> stickyRecords =
-                    _replicaStatePolicy.getStickyRecords(attributes);
-                EntryState targetState =
-                    _replicaStatePolicy.getTargetState(attributes);
-                transfer =
-                    new PoolIOWriteTransfer(attributes, pi, subject, mover, _repository,
-                                            _checksumModule,
-                                            targetState, stickyRecords);
-            } else {
-                transfer =
-                    new PoolIOReadTransfer(attributes, pi, subject, mover, openFlags, _repository);
-            }
+            Mover<?> mover = createMover(envelope.getSourcePath().revert(), message);
             try {
-                source.revert();
-                PoolIORequest request =
-                    new PoolIORequest(transfer, id, initiator, pool, queueName, _billingStub,
-                            new CellStub(getCellEndpoint(), source), getCellAddress(), this);
-                message.setMoverId(queueIoRequest(message, request));
-                transfer = null;
-            } finally {
-                if (transfer != null) {
-                    /* This is only executed if enqueuing the request
-                     * failed. Therefore we only log failures and
-                     * propagate the original error to the client.
-                     */
-                    try {
-                        transfer.close();
-                    } catch (IOException e) {
-                        _log.error("IO error while closing entry: "
-                                   + e.getMessage());
-                    } catch (InterruptedException e) {
-                        _log.error("Interrupted while closing entry: "
-                                   + e.getMessage());
-                    }
-                }
+                message.setMoverId(queueIoRequest(message, mover));
+            } catch (Throwable t) {
+                mover.postprocess(new NopCompletionHandler<Void, Void>());
+                throw Throwables.propagate(t);
             }
             message.setSucceeded();
-        } catch (FileInCacheException e) {
-            _log.warn("Pool already contains replica");
-            message.setFailed(e.getRc(), "Pool already contains " + pnfsId);
-        } catch (FileNotInCacheException e) {
-            _log.warn("Pool does not contain replica");
-            message.setFailed(e.getRc(), "Pool does not contain " + pnfsId);
         } catch (CacheException e) {
             _log.error(e.getMessage());
             message.setFailed(e.getRc(), e.getMessage());
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             _log.error("Possible bug found: " + e.getMessage(), e);
             message.setFailed(CacheException.DEFAULT_ERROR_CODE,
                               "Failed to enqueue mover: " + e.getMessage());
         }
-
         try {
             envelope.revertDirection();
             sendMessage(envelope);
@@ -796,19 +815,6 @@ public class PoolV4
     private class ReplicationHandler
         extends AbstractStateChangeListener
     {
-        private boolean _enabled;
-        private CellPath _replicationManager = new CellPath("PoolManager");
-        private String _destinationHostName;
-        private String _destinationMode = "keep";
-        private boolean _replicateOnRestore;
-
-        //
-        // replicationManager,Hostname,modeOfDestFile
-        //
-        private ReplicationHandler()
-        {
-        }
-
         @Override
         public void stateChanged(StateChangeEvent event)
         {
@@ -827,74 +833,29 @@ public class PoolV4
             }
         }
 
-        public void init(String vars)
-        {
-            if (_destinationHostName == null) {
-                try {
-                    _destinationHostName = InetAddress.getLocalHost()
-                        .getHostAddress();
-                } catch (UnknownHostException ee) {
-                    _destinationHostName = "localhost";
-                }
-            }
-            if ((vars == null) || vars.equals("off")) {
-                _enabled = false;
-                return;
-            } else if (vars.equals("on")) {
-                _enabled = true;
-                return;
-            }
-            _enabled = true;
-
-            String[] args = vars.split(",");
-            if (args.length > 0 && !args[0].equals("")) {
-                _replicationManager = new CellPath(args[0]);
-            }
-            _destinationHostName = ((args.length > 1) && !args[1].equals("")) ? args[1]
-                : _destinationHostName;
-            _destinationMode = ((args.length > 2) && !args[2].equals("")) ? args[2]
-                : _destinationMode;
-
-            if (_destinationHostName.equals("*")) {
-                try {
-                    _destinationHostName = InetAddress.getLocalHost()
-                        .getHostAddress();
-                } catch (UnknownHostException ee) {
-                    _destinationHostName = "localhost";
-                }
-            }
-        }
-
         @Override
         public String toString()
         {
-            StringBuilder sb = new StringBuilder();
-
-            if (_enabled) {
-                sb.append("{Mgr=").append(_replicationManager).append(",Host=")
-                    .append(_destinationHostName).append(",DestMode=")
-                    .append(_destinationMode).append("}");
+            if (_replicationManager != null) {
+                return "{Mgr=" + _replicationManager + ",Host=" + _replicationIp + "}";
             } else {
-                sb.append("Disabled");
+                return "Disabled";
             }
-            return sb.toString();
         }
 
         private void initiateReplication(PnfsId id, String source)
         {
-            if ((!_enabled)
-                || (source.equals("restore") && !_replicateOnRestore)) {
-                return;
-            }
-            try {
-                _initiateReplication(_repository.getEntry(id), source);
-            } catch (InterruptedException e) {
-                _log.error("Problem in sending replication request: " + e);
-                Thread.currentThread().interrupt();
-            } catch (CacheException e) {
-                _log.error("Problem in sending replication request: " + e);
-            } catch (NoRouteToCellException e) {
-                _log.error("Problem in sending replication request: " + e.getMessage());
+            if (_replicationManager != null) {
+                try {
+                    _initiateReplication(_repository.getEntry(id), source);
+                } catch (InterruptedException e) {
+                    _log.error("Problem in sending replication request: " + e);
+                    Thread.currentThread().interrupt();
+                } catch (CacheException e) {
+                    _log.error("Problem in sending replication request: " + e);
+                } catch (NoRouteToCellException e) {
+                    _log.error("Problem in sending replication request: " + e.getMessage());
+                }
             }
         }
 
@@ -912,50 +873,15 @@ public class PoolV4
             attributes.setStorageInfo(storageInfo);
             attributes.setLocations(Collections.singleton(_poolName));
             attributes.setSize(fileAttributes.getSize());
+            attributes.setAccessLatency(fileAttributes.getAccessLatency());
+            attributes.setRetentionPolicy(fileAttributes.getRetentionPolicy());
 
             PoolMgrReplicateFileMsg req =
                 new PoolMgrReplicateFileMsg(attributes,
                                             new DCapProtocolInfo("DCap", 3, 0,
-                                                  new InetSocketAddress(_destinationHostName, 2222)));
+                                                    new InetSocketAddress(_replicationIp, 2222)));
             req.setReplyRequired(false);
             sendMessage(new CellMessage(_replicationManager, req));
-        }
-    }
-
-    // ///////////////////////////////////////////////////////////
-    //
-    // The mover class loader
-    //
-    //
-    private Map<String, Class<? extends MoverProtocol>> _handlerClasses =
-        new Hashtable<>();
-
-    private MoverProtocol getProtocolHandler(ProtocolInfo info)
-    {
-        Class<?>[] argsClass = { CellEndpoint.class };
-        String moverClassName = info.getProtocol() + "-"
-            + info.getMajorVersion();
-        Class<? extends MoverProtocol> mover = _moverHash.get(moverClassName);
-
-        try {
-            if (mover == null) {
-                moverClassName = "org.dcache.pool.movers." + info.getProtocol()
-                    + "Protocol_" + info.getMajorVersion();
-
-                mover = _handlerClasses.get(moverClassName);
-
-                if (mover == null) {
-                    mover = Class.forName(moverClassName).asSubclass(MoverProtocol.class);
-                    _handlerClasses.put(moverClassName, mover);
-                }
-
-            }
-            Constructor<? extends MoverProtocol> moverCon = mover.getConstructor(argsClass);
-            Object[] args = { getCellEndpoint() };
-            return moverCon.newInstance(args);
-        } catch (Exception e) {
-            _log.error("Could not create mover for " + moverClassName, e);
-            return null;
         }
     }
 
@@ -1018,14 +944,7 @@ public class PoolV4
                     }
                 }
 
-                try {
-                    send(_message);
-                } catch (NoRouteToCellException e) {
-                    _log.error("Failed to send reply: " + e.getMessage());
-                } catch (InterruptedException e) {
-                    _log.error("Failed to send reply: " + e.getMessage());
-                    Thread.currentThread().interrupt();
-                }
+                reply(_message);
             }
         }
     }
@@ -1081,14 +1000,7 @@ public class PoolV4
                     _message.setReply(CacheException.UNEXPECTED_SYSTEM_EXCEPTION, error);
                 }
 
-                try {
-                    send(_message);
-                } catch (NoRouteToCellException e) {
-                    _log.error("Cannot send P2P reply: " + e.getMessage());
-                } catch (InterruptedException e) {
-                    _log.error("Cannot send P2P reply: " + e.getMessage());
-                    Thread.currentThread().interrupt();
-                }
+                reply(_message);
             }
         }
     }
@@ -1557,12 +1469,12 @@ public class PoolV4
         info.setQueueSizes(_ioQueue.getActiveJobs() - p2pQueue.getActiveJobs(),
                            _ioQueue.getMaxActiveJobs() - p2pQueue.getMaxActiveJobs(),
                            _ioQueue.getQueueSize() - p2pQueue.getQueueSize(),
-                           _storageHandler.getFetchScheduler().getActiveJobs(),
-                           _suppressHsmLoad ? 0 : _storageHandler.getFetchScheduler().getMaxActiveJobs(),
-                           _storageHandler.getFetchScheduler().getQueueSize(),
-                           _storageHandler.getStoreScheduler().getActiveJobs(),
-                           _suppressHsmLoad ? 0 : _storageHandler.getStoreScheduler().getMaxActiveJobs(),
-                           _storageHandler.getStoreScheduler().getQueueSize());
+                           _storageHandler.getActiveFetchJobs(),
+                           _suppressHsmLoad ? 0 : _storageHandler.getMaxActiveFetchJobs(),
+                           _storageHandler.getFetchQueueSize(),
+                           _storageHandler.getActiveStoreJobs(),
+                           _suppressHsmLoad ? 0 : _storageHandler.getMaxActiveStoreJobs(),
+                           _storageHandler.getStoreQueueSize());
         return info;
     }
 
@@ -1735,10 +1647,17 @@ public class PoolV4
         return _pnfs.getPathByPnfsId(new PnfsId(args.argv(0)));
     }
 
-    public static final String hh_set_replication = "off|on|<mgr>,<host>,<destMode>";
-    public String ac_set_replication_$_1(Args args)
+    public static final String hh_set_replication = "[-off] [<mgr> [<host>]]";
+    public String ac_set_replication_$_0_2(Args args)
     {
-        setReplicateOnArrival(args.argv(0));
+        if (args.hasOption("off")) {
+            setReplicationNotificationDestination("");
+        } else if (args.argc() > 0) {
+            setReplicationNotificationDestination(args.argv(0));
+            if (args.argc() > 1) {
+                setReplicationIp(args.argv(1));
+            }
+        }
         return _replicationHandler.toString();
     }
 
@@ -1759,31 +1678,6 @@ public class PoolV4
 
         return "hsm load suppression swithed : "
             + (_suppressHsmLoad ? "on" : "off");
-    }
-
-    public static final String hh_movermap_define = "<protocol>-<major> <moverClassName>";
-    public String ac_movermap_define_$_2(Args args) throws Exception
-    {
-        _moverHash.put(args.argv(0), Class.forName(args.argv(1)).asSubclass(MoverProtocol.class));
-        return "";
-    }
-
-    public static final String hh_movermap_undefine = "<protocol>-<major>";
-    public String ac_movermap_undefine_$_1(Args args)
-    {
-        _moverHash.remove(args.argv(0));
-        return "";
-    }
-
-    public static final String hh_movermap_ls = "";
-    public String ac_movermap_ls(Args args)
-    {
-        StringBuilder sb = new StringBuilder();
-
-        for (Map.Entry<String, Class<? extends MoverProtocol>> entry: _moverHash.entrySet()) {
-            sb.append(entry.getKey()).append(" -> ").append(entry.getValue().getName()).append("\n");
-        }
-        return sb.toString();
     }
 
     public static final String hh_set_duplicate_request = "none|ignore|refresh";
@@ -1943,25 +1837,6 @@ public class PoolV4
         return "";
     }
 
-    public static final String hh_flush_class = "<hsm> <storageClass> [-count=<count>]";
-    public String ac_flush_class_$_2(Args args)
-    {
-        String tmp = args.getOpt("count");
-        int count = ((tmp == null) || tmp.equals("")) ? 0 : Integer
-            .parseInt(tmp);
-        long id = _flushingThread.flushStorageClass(args.argv(0), args.argv(1),
-                                                    count);
-        return "Flush Initiated (id=" + id + ")";
-    }
-
-    public static final String hh_flush_pnfsid = "<pnfsid> # flushs a single pnfsid";
-    public String ac_flush_pnfsid_$_1(Args args)
-        throws CacheException, InterruptedException
-    {
-        _storageHandler.store(new PnfsId(args.argv(0)), null);
-        return "Flush Initiated";
-    }
-
     public static final String hh_mover_set_max_active = "<maxActiveIoMovers> -queue=<queueName>";
     public static final String hh_mover_queue_ls = "";
     public static final String hh_mover_ls = "[-binary [jobId] ]";
@@ -2029,7 +1904,9 @@ public class PoolV4
         return sb.toString();
     }
 
-    public Object ac_mover_ls_$_0_1(Args args) throws NoSuchElementException {
+    public Object ac_mover_ls_$_0_1(Args args)
+            throws NoSuchElementException, NumberFormatException
+    {
         String queueName = args.getOpt("queue");
         boolean binary = args.hasOption("binary");
 
@@ -2062,6 +1939,7 @@ public class PoolV4
     }
 
     public Object ac_p2p_ls_$_0_1(Args args)
+            throws NoSuchElementException, NumberFormatException
     {
         IoScheduler p2pQueue = _ioQueue.getQueue(P2P_QUEUE_NAME);
 

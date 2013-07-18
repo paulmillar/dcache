@@ -1,5 +1,6 @@
 package org.dcache.gplazma;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -7,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
 
+import java.lang.reflect.Modifier;
 import java.security.Principal;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -60,6 +62,7 @@ import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Collections2.filter;
 import static com.google.common.collect.Iterables.getFirst;
+import static com.google.common.collect.Iterables.removeIf;
 
 public class GPlazma
 {
@@ -68,6 +71,14 @@ public class GPlazma
 
     private static final LoginMonitor LOGGING_LOGIN_MONITOR =
             new LoggingLoginMonitor();
+    private static final Predicate<Object> IS_PUBLIC = new Predicate<Object>()
+    {
+        @Override
+        public boolean apply(Object o)
+        {
+            return Modifier.isPublic(o.getClass().getModifiers());
+        }
+    };
 
     private KnownFailedLogins _failedLogins = new KnownFailedLogins();
 
@@ -309,29 +320,23 @@ public class GPlazma
             sessionStrategy = _sessionStrategy;
         }
 
-        Set<Principal> identifiedPrincipals = doAuthPhase(authStrategy, monitor,
-                subject);
+        Set<Principal> principals = new HashSet<>();
+        doAuthPhase(authStrategy, monitor, subject, principals);
+        doMapPhase(mapStrategy, monitor, principals);
+        doAccountPhase(accountStrategy, monitor, principals);
+        Set<Object> attributes = doSessionPhase(sessionStrategy, monitor, principals);
+        removeIf(principals, not(IS_PUBLIC));
 
-        Set<Principal> authorizedPrincipals = doMapPhase(mapStrategy, monitor,
-                identifiedPrincipals);
-
-        doAccountPhase(accountStrategy, monitor, authorizedPrincipals);
-
-        Set<Object> attributes = doSessionPhase(sessionStrategy, monitor,
-                authorizedPrincipals);
-
-        return buildReply(monitor, subject, authorizedPrincipals, attributes);
+        return buildReply(monitor, subject, principals, attributes);
     }
 
-
-    private Set<Principal> doAuthPhase(AuthenticationStrategy strategy,
-            LoginMonitor monitor, Subject subject)
+    private void doAuthPhase(AuthenticationStrategy strategy,
+            LoginMonitor monitor, Subject subject, Set<Principal> principals)
             throws AuthenticationException
     {
         Set<Object> publicCredentials = subject.getPublicCredentials();
         Set<Object> privateCredentials = subject.getPrivateCredentials();
 
-        Set<Principal> principals = new HashSet<>();
         principals.addAll(subject.getPrincipals());
 
         NDC.push("AUTH");
@@ -347,29 +352,23 @@ public class GPlazma
             NDC.pop();
             monitor.authEnds(principals, result);
         }
-
-        return principals;
     }
 
 
-    private Set<Principal> doMapPhase(MappingStrategy strategy,
-            LoginMonitor monitor, Set<Principal> identifiedPrincipals)
+    private void doMapPhase(MappingStrategy strategy,
+            LoginMonitor monitor, Set<Principal> principals)
             throws AuthenticationException
     {
-        Set<Principal> authorizedPrincipals = new HashSet<>();
-
         NDC.push("MAP");
         Result result = Result.FAIL;
         try {
-            monitor.mapBegins(identifiedPrincipals);
-            strategy.map(monitor, identifiedPrincipals, authorizedPrincipals);
+            monitor.mapBegins(principals);
+            strategy.map(monitor, principals);
             result = Result.SUCCESS;
         } finally {
             NDC.pop();
-            monitor.mapEnds(authorizedPrincipals, result);
+            monitor.mapEnds(principals, result);
         }
-
-        return authorizedPrincipals;
     }
 
 

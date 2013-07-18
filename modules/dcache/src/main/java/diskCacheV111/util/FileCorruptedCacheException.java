@@ -46,7 +46,7 @@ public class FileCorruptedCacheException extends CacheException
         _actualSize = Optional.absent();
     }
 
-    public FileCorruptedCacheException(String message, Exception cause)
+    public FileCorruptedCacheException(String message, Throwable cause)
     {
         super(FILE_CORRUPTED, message, cause);
         _expectedChecksums = Optional.absent();
@@ -66,7 +66,7 @@ public class FileCorruptedCacheException extends CacheException
 
     public FileCorruptedCacheException(long expectedSize, long actualSize)
     {
-        super(FILE_CORRUPTED, "Checksum mismatch (expected=" + expectedSize + ", actual=" + actualSize+ ")");
+        super(FILE_CORRUPTED, "File size mismatch (expected=" + expectedSize + ", actual=" + actualSize+ ")");
         _expectedChecksums = Optional.absent();
         _actualChecksums = Optional.absent();
         _expectedSize = Optional.of(expectedSize);

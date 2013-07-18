@@ -98,6 +98,7 @@ public class XrootdDoor
     private CellStub _billingStub;
 
     private int _moverTimeout = 180000;
+    private TimeUnit _moverTimeoutUnit = TimeUnit.MILLISECONDS;
 
     private PnfsHandler _pnfs;
 
@@ -233,6 +234,16 @@ public class XrootdDoor
         _moverTimeout = timeout;
     }
 
+    public void setMoverTimeoutUnit(TimeUnit unit)
+    {
+        _moverTimeoutUnit = unit;
+    }
+
+    public TimeUnit getMoverTimeoutUnit()
+    {
+        return _moverTimeoutUnit;
+    }
+
     /**
      * Sets the ScheduledExecutorService used for periodic tasks.
      */
@@ -313,7 +324,7 @@ public class XrootdDoor
         try {
             transfer.readNameSpaceEntry();
             transfer.selectPoolAndStartMover(_ioQueue, RETRY_POLICY);
-            address = transfer.waitForRedirect(_moverTimeout);
+            address = transfer.waitForRedirect(_moverTimeout, _moverTimeoutUnit);
             if (address == null) {
                 throw new CacheException(transfer.getPool() + " failed to open TCP socket");
             }
@@ -365,7 +376,7 @@ public class XrootdDoor
             try {
                 transfer.selectPoolAndStartMover(_ioQueue, RETRY_POLICY);
 
-                address = transfer.waitForRedirect(_moverTimeout);
+                address = transfer.waitForRedirect(_moverTimeout, _moverTimeoutUnit);
                 if (address == null) {
                     throw new CacheException(transfer.getPool() + " failed to open TCP socket");
                 }
@@ -699,29 +710,10 @@ public class XrootdDoor
 
     public void messageArrived(XrootdDoorAdressInfoMessage msg)
     {
-        _log.debug("Received redirect msg from mover");
-
+        _log.trace("Received redirect msg from mover");
         XrootdTransfer transfer = _transfers.get(msg.getXrootdFileHandle());
-
         if (transfer != null) {
-            transfer.setUUIDSupported(msg.isUUIDEnabledPool());
-            // REVISIT: pick the first IPv4 address from the
-            // collection at this point, we can't determine, which of
-            // the pool IP-addresses is the right one, so we select
-            // the first
-            Collection<NetIFContainer> interfaces =
-                Collections.checkedCollection(msg.getNetworkInterfaces(),
-                                              NetIFContainer.class);
-            Inet4Address ip = getFirstIpv4(interfaces);
-
-            if (ip != null) {
-                InetSocketAddress address =
-                    new InetSocketAddress(ip, msg.getServerPort());
-                transfer.redirect(address);
-            } else {
-                _log.warn("No valid IP-address received from pool. Redirection not possible");
-                transfer.redirect(null);
-            }
+            transfer.redirect(msg.getSocketAddress());
         }
     }
 

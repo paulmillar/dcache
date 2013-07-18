@@ -30,7 +30,6 @@ import java.util.Set;
 import org.dcache.auth.AuthorizationRecord;
 import org.dcache.auth.Group;
 import org.dcache.auth.GroupList;
-import org.dcache.srm.SRMUser;
 import org.dcache.srm.SRMUserPersistenceManager;
 
 /**
@@ -65,18 +64,13 @@ public class  AuthRecordPersistenceManager implements SRMUserPersistenceManager{
         p.setProperty("javax.persistence.jdbc.url", jdbcUrl);
         p.setProperty("javax.persistence.jdbc.user", user);
         p.setProperty("javax.persistence.jdbc.password", pass);
+        p.setProperty("datanucleus.connectionPoolingType", "BoneCP");
+        p.setProperty("datanucleus.connectionPool.minPoolSize", "1");
+        p.setProperty("datanucleus.connectionPool.maxPoolSize", "20");
 
         EntityManagerFactory emf =
             Persistence.createEntityManagerFactory("AuthRecordPersistenceUnit", p);
         em = emf.createEntityManager();
-    }
-
-    @Override
-    public SRMUser persist(SRMUser user) {
-        if(user instanceof AuthorizationRecord ) {
-            return persist((AuthorizationRecord) user);
-        }
-        throw new IllegalArgumentException("illegal user type: "+user.getClass());
     }
 
     public synchronized AuthorizationRecord persist(AuthorizationRecord rec) {
