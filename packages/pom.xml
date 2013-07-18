@@ -128,16 +128,13 @@
     </dependency>
     <dependency>
         <groupId>org.dcache</groupId>
-<<<<<<< HEAD:modules/packaging/pom.xml
         <artifactId>gplazma2-homedir</artifactId>
         <version>${project.version}</version>
     </dependency>
     <dependency>
         <groupId>org.dcache</groupId>
         <artifactId>webadmin</artifactId>
-=======
         <artifactId>dcache-webadmin</artifactId>
->>>>>>> upstream/master:packages/pom.xml
         <version>${project.version}</version>
         <type>war</type>
     </dependency>
