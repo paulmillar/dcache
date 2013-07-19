@@ -1,7 +1,5 @@
 package dmg.cells.nucleus ;
 
-import org.dcache.commons.util.NDC;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -10,7 +8,6 @@ import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -51,7 +48,7 @@ public class CellMessage implements Cloneable , Serializable {
      _lastUmid     = _umid ;
      _session      = CDC.getSession();
      _messageStream = null;
-     _isDiagnoseEnabled = NDC.isDiagnoseEnabled();
+     _isDiagnoseEnabled = CDC.isDiagnoseEnabled();
   }
 
   @Override
@@ -111,7 +108,7 @@ public boolean equals( Object obj ){
      _source      = new CellPath() ;
      _lastUmid    = _umid ;
      _isPersistent = true;
-     _isDiagnoseEnabled = NDC.isDiagnoseEnabled();
+     _isDiagnoseEnabled = CDC.isDiagnoseEnabled();
   }
   public boolean isFinalDestination(){ return _destination.isFinalDestination() ; }
   public boolean isFirstDestination(){ return _destination.isFirstDestination() ; }

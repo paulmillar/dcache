@@ -29,6 +29,9 @@ public class JDC
 {
     public final static String MDC_SESSION = "cells.session";
 
+    // Note this must be the same value as CDC.MDC_DIAGNOSE
+    public final static String MDC_DIAGNOSE = "cells.diagnose";
+
     private final static String DELIM = ":";
     private final static long THREE_YEARS = 3*365*24*3600*1000;
 
@@ -36,6 +39,7 @@ public class JDC
 
     private final NDC _ndc;
     private final String _session;
+    private final String _diagnose;
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -44,6 +48,7 @@ public class JDC
     {
         _session = getSession();
         _ndc = NDC.cloneNdc();
+        _diagnose = MDC.get(MDC_DIAGNOSE);
     }
 
     /**
@@ -70,11 +75,17 @@ public class JDC
     public void apply()
     {
         setMdc(MDC_SESSION, _session);
+        setMdc(MDC_DIAGNOSE, _diagnose);
         if (_ndc == null) {
             NDC.clear();
         } else {
             NDC.set(_ndc);
         }
+    }
+
+    static public void setDiagnoseEnabled(boolean enabled)
+    {
+        setMdc(MDC_DIAGNOSE, enabled ? "enabled" : null);
     }
 
     /**
@@ -105,6 +116,7 @@ public class JDC
     {
         setSession(prefix + createUniq());
         NDC.push(getSession());
+        MDC.remove(MDC_DIAGNOSE);
     }
 
     static public String createUniq()
@@ -128,6 +140,7 @@ public class JDC
     static public void clear()
     {
         MDC.remove(MDC_SESSION);
+        MDC.remove(MDC_DIAGNOSE);
         NDC.clear();
     }
 }

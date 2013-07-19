@@ -70,8 +70,7 @@
   </bean>
 
   
-  <bean id="diagnose-triggers"
-       class="org.dcache.util.DiagnoseTriggers">
+  <bean id="diagnose-triggers" class="dmg.util.CDCDiagnoseTriggers">
       <description>The set of addresses that trigger diagnostic logging</description>
   </bean>
 

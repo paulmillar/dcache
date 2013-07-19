@@ -130,7 +130,7 @@
   </bean>
 
   <bean id="diagnose-triggers"
-	class="org.dcache.util.DiagnoseTriggers">
+	class="org.dcache.srm.util.JDCDiagnoseTriggers">
       <description>The set of addresses that trigger additional logging</description>
   </bean>
 

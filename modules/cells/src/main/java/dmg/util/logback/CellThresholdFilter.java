@@ -123,7 +123,7 @@ public class CellThresholdFilter extends TurboFilter
             return FilterReply.NEUTRAL;
         }
 
-        if (NDC.isDiagnoseEnabled() && level.isGreaterOrEqual(Level.DEBUG)) {
+        if (CDC.isDiagnoseEnabled() && level.isGreaterOrEqual(Level.DEBUG)) {
             return FilterReply.ACCEPT;
         }
 

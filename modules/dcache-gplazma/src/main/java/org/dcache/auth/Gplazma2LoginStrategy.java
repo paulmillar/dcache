@@ -3,6 +3,9 @@ package org.dcache.auth;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
 
 import javax.security.auth.Subject;
@@ -10,12 +13,12 @@ import javax.security.auth.Subject;
 import java.io.File;
 import java.security.Principal;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Collection;
-import java.util.EnumSet;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import diskCacheV111.namespace.NameSpaceProvider;
@@ -24,6 +27,7 @@ import diskCacheV111.util.PermissionDeniedCacheException;
 
 import dmg.cells.nucleus.EnvironmentAware;
 import dmg.util.Args;
+import dmg.util.CDCDiagnoseTriggers;
 import dmg.util.Formats;
 import dmg.util.Replaceable;
 
@@ -34,28 +38,18 @@ import org.dcache.gplazma.GPlazma;
 import org.dcache.gplazma.NoSuchPrincipalException;
 import org.dcache.gplazma.configuration.ConfigurationLoadingStrategy;
 import org.dcache.gplazma.configuration.FromFileConfigurationLoadingStrategy;
+import org.dcache.gplazma.configuration.PluginsLifecycleAware;
 import org.dcache.gplazma.loader.DcacheAwarePluginFactory;
 import org.dcache.gplazma.loader.PluginFactory;
 import org.dcache.gplazma.monitor.LoginResult;
 import org.dcache.gplazma.monitor.LoginResultPrinter;
 import org.dcache.gplazma.monitor.RecordingLoginMonitor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.dcache.util.DiagnoseTriggers;
 
-import com.google.common.collect.Sets;
-
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.concurrent.Callable;
-
-import dmg.util.command.Argument;
-import dmg.util.command.Command;
-import static com.google.common.collect.Iterables.getFirst;
 import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Collections2.filter;
-import org.dcache.gplazma.configuration.PluginsLifecycleAware;
-import org.dcache.util.DiagnoseTriggers;
+import static com.google.common.collect.Iterables.getFirst;
 
 /**
  * A LoginStrategy that wraps a org.dcache.gplazma.GPlazma
@@ -75,7 +69,7 @@ public class Gplazma2LoginStrategy
     private KnownFailedLogins _failedLogins = new KnownFailedLogins();
 
     private DiagnoseTriggers<Principal> _diagnosePrincipals =
-            new DiagnoseTriggers<>();
+            new CDCDiagnoseTriggers<>();
 
     @Required
     public void setConfigurationFile(String configurationFile)

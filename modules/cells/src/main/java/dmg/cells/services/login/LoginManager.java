@@ -21,6 +21,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.Vector;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import dmg.cells.nucleus.CellAdapter;
@@ -40,11 +42,15 @@ import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.CellVersion;
 import dmg.cells.nucleus.NoRouteToCellException;
 import dmg.util.Args;
+import dmg.util.CDCDiagnoseTriggers;
 import dmg.util.KeepAliveListener;
 import dmg.util.StreamEngine;
 import dmg.util.UserValidatable;
+import dmg.util.command.Argument;
+import dmg.util.command.Command;
 
 import org.dcache.auth.Subjects;
+import org.dcache.util.DiagnoseTriggers;
 import org.dcache.util.Version;
 
 import static com.google.common.collect.Maps.newHashMap;
@@ -83,6 +89,8 @@ public class       LoginManager
   private int             _childCount;
   private String          _authenticator;
   private KeepAliveThread _keepAlive;
+  private final DiagnoseTriggers<InetAddress> _diagnoseAddresses =
+          new CDCDiagnoseTriggers<>();
 
   private LoginBrokerHandler _loginBrokerHandler;
   private static Logger _log = LoggerFactory.getLogger(LoginManager.class);
@@ -987,6 +995,7 @@ public void cleanUp(){
      }
      @Override
      public void run(){
+       _diagnoseAddresses.accept(_socket.getInetAddress());
        Thread t = Thread.currentThread() ;
        try{
           _log.info( "acceptThread ("+t+"): creating protocol engine" ) ;
@@ -1100,4 +1109,99 @@ public void cleanUp(){
           return false;
       }
   }
+
+    @Command(name="diagnose add", hint="add an IP address",
+            usage = "Add an IP address to the list.  The supplied address " +
+                    "may be specified as an IPv4 address, an IPv6 address or " +
+                    "as a hostname, which will be resolved to an address.\n\n" +
+                    "All dCache components will log additional information " +
+                    "when a client next connects from any of the " +
+                    "listed address.  This information may be useful when " +
+                    "diagnosing a client-specific problem.\n\n" +
+                    "If a client triggers additional logging then its address " +
+                    "is removed from the list so subsequent connections from " +
+                    "the same client will not trigger the same detailed " +
+                    "logging (i.e., this is a 'one-shot' diagnostic " +
+                    "logging).  If subsequent additional logging is needed " +
+                    "then this command must be called again.\n\n" +
+                    "Additional logging may be triggered through gPlazma.  " +
+                    "This has the advantage of being independent of which " +
+                    "door the client connects to, but will miss some early " +
+                    "interaction within the door.")
+    public class DiagnoseAddCommand implements Callable<String>
+    {
+        @Argument(factoryMethod="getByName")
+        InetAddress address;
+
+        @Override
+        public String call() throws UnknownHostException
+        {
+
+            _diagnoseAddresses.add(address);
+            return "";
+        }
+    }
+
+    @Command(name="diagnose rm", hint="remove a specific IP address",
+            usage = "Manually remove an IP address so that a client " +
+                    "connecting from that address will no longer trigger " +
+                    "additional logging in all dCache components.\n\n" +
+                    "Note that a client's address is removed automatically " +
+                    "if it triggers additiona logging; therefore, in most " +
+                    "cases, this command is not needed.")
+    public class DiagnoseRmCommand implements Callable<String>
+    {
+        @Argument(factoryMethod="getByName")
+        InetAddress address;
+
+        @Override
+        public String call() throws UnknownHostException
+        {
+            _diagnoseAddresses.remove(address);
+            return "";
+        }
+    }
+
+    @Command(name="diagnose clear", hint="remove all IP addresses",
+            usage = "Removes all addresses that would trigger dCache " +
+                    "components to logging additional, diagnostic " +
+                    "information.  This is equivalent to calling the " +
+                    "'diagnose rm' command for each of currently active " +
+                    "address.\n\n" +
+                    "Note that an address is removed automatically once a " +
+                    "client connects; therefore, in many cases, this command " +
+                    "is not be needed.")
+    public class DiagnoseClearCommand implements Callable<String>
+    {
+        @Override
+        public String call() throws UnknownHostException
+        {
+            _diagnoseAddresses.clear();
+            return "";
+        }
+    }
+
+    @Command(name="diagnose ls", hint="show all IP addresses",
+            usage = "Print a list of addresses that will trigger additional " +
+                    "logging.  When a client connects from any of the listed " +
+                    "addresses all dCache components will log additional " +
+                    "information.  The session-ID may be used to extract " +
+                    "this information from log files.  Once a client has " +
+                    "triggered this additional information, the address is " +
+                    "removed automatically.")
+    public class DiagnoseListCommand implements Callable<String>
+    {
+        @Override
+        public String call() throws UnknownHostException
+        {
+            StringBuilder sb = new StringBuilder();
+
+            for(InetAddress address : _diagnoseAddresses.getAll()) {
+                sb.append(address).append('\n');
+            }
+
+            return sb.toString();
+        }
+    }
+
 }

@@ -5,12 +5,11 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.dcache.commons.util.NDC;
-
 import static java.util.Collections.newSetFromMap;
 
 /**
- * This class holds a set of triggers for the NDC enableDiagnose method.
+ * This class holds a set of triggers for somehow enabling diagnostic, the
+ * exact way this is achieved is specified in the concrete subclass.
  * One may add or remove one or multiple triggers, and the combined set of
  * triggers may be viewed or cleared.
  *
@@ -25,7 +24,7 @@ import static java.util.Collections.newSetFromMap;
  *
  * This class is generic and requires the specified type be immutable.
  */
-public class DiagnoseTriggers<T>
+abstract public class DiagnoseTriggers<T>
 {
     private final Set<T> _triggers =
             newSetFromMap(new ConcurrentHashMap<T, Boolean>());
@@ -102,7 +101,7 @@ public class DiagnoseTriggers<T>
     {
         boolean isTriggered = _triggers.remove(item);
         if (isTriggered) {
-            NDC.enableDiagnose();
+            enableDiagnose();
         }
         return isTriggered;
     }
@@ -119,8 +118,10 @@ public class DiagnoseTriggers<T>
     {
         boolean isTriggered = _triggers.removeAll(items);
         if (isTriggered) {
-            NDC.enableDiagnose();
+            enableDiagnose();
         }
         return isTriggered;
     }
+
+    public abstract void enableDiagnose();
 }

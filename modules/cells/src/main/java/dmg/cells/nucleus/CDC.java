@@ -45,6 +45,7 @@ public class CDC implements AutoCloseable
     public final static String MDC_DOMAIN = "cells.domain";
     public final static String MDC_CELL = "cells.cell";
     public final static String MDC_SESSION = "cells.session";
+    public final static String MDC_DIAGNOSE = "cells.diagnose";
 
     private final static TimebasedCounter _sessionCounter =
         new TimebasedCounter();
@@ -53,6 +54,7 @@ public class CDC implements AutoCloseable
     private final String _session;
     private final String _cell;
     private final String _domain;
+    private String _diagnose;
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -62,6 +64,7 @@ public class CDC implements AutoCloseable
         _session = MDC.get(MDC_SESSION);
         _cell = MDC.get(MDC_CELL);
         _domain = MDC.get(MDC_DOMAIN);
+        _diagnose = MDC.get(MDC_DIAGNOSE);
         _ndc = NDC.cloneNdc();
     }
 
@@ -84,6 +87,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_DOMAIN, _domain);
         setMdc(MDC_CELL, _cell);
         setMdc(MDC_SESSION, _session);
+        setMdc(MDC_DIAGNOSE, _diagnose);
         if (_ndc == null) {
             NDC.clear();
         } else {
@@ -143,6 +147,7 @@ public class CDC implements AutoCloseable
     static public void setSession(String session)
     {
         setMdc(MDC_SESSION, session);
+        MDC.remove(MDC_DIAGNOSE);
     }
 
     /**
@@ -202,6 +207,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_CELL, cellName);
         setMdc(MDC_DOMAIN, domainName);
         MDC.remove(MDC_SESSION);
+        MDC.remove(MDC_DIAGNOSE);
         NDC.clear();
         return cdc;
     }
@@ -243,7 +249,7 @@ public class CDC implements AutoCloseable
         NDC.push(getMessageContext(envelope));
         setMdc(MDC_SESSION, (session == null) ? null : session.toString());
         if (envelope.isDiagnoseEnabled()) {
-            NDC.enableDiagnose();
+            MDC.put(MDC_DIAGNOSE, "enabled");
         }
     }
 
@@ -275,14 +281,24 @@ public class CDC implements AutoCloseable
     public static void updateDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {
-            NDC.enableDiagnose();
+            MDC.put(MDC_DIAGNOSE, "enabled");
         }
     }
 
     public void updateStoredDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {
-            _ndc.enableStoredDiagnose();
+            _diagnose = "enabled";
         }
+    }
+
+    public static boolean isDiagnoseEnabled()
+    {
+        return MDC.get(MDC_DIAGNOSE) != null;
+    }
+
+    public static void setDiagnoseEnabled(boolean enabled)
+    {
+        setMdc(MDC_DIAGNOSE, enabled ? "enabled" : null);
     }
 }
