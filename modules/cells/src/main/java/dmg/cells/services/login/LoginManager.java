@@ -33,6 +33,7 @@ import java.util.Vector;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellAdapter;
 import dmg.cells.nucleus.CellEvent;
 import dmg.cells.nucleus.CellEventListener;
@@ -818,8 +819,9 @@ public void cleanUp(){
              startLoginBrokerUpdates();
              while (true) {
                  Socket socket;
-                 try {
+                 try (CDC ignored = new CDC()) {
                      socket = _serverSocket.accept();
+                     _diagnoseAddresses.accept(socket.getInetAddress());
                      socket.setKeepAlive(true);
                      socket.setTcpNoDelay(true);
                      if (_logSocketIO.isDebugEnabled()) {
@@ -995,7 +997,6 @@ public void cleanUp(){
      }
      @Override
      public void run(){
-       _diagnoseAddresses.accept(_socket.getInetAddress());
        Thread t = Thread.currentThread() ;
        try{
           _log.info( "acceptThread ("+t+"): creating protocol engine" ) ;
