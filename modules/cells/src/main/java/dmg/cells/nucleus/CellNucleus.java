@@ -651,10 +651,12 @@ public class CellNucleus implements ThreadFactory
 
     private Runnable wrapLoggingContext(final Runnable runnable)
     {
+        final boolean isDiagnoseEnabled = CDC.isDiagnoseEnabled();
         return new Runnable() {
             @Override
             public void run() {
                 try (CDC ignored = CDC.reset(CellNucleus.this)) {
+                    CDC.setDiagnoseEnabled(isDiagnoseEnabled);
                     runnable.run();
                 }
             }
