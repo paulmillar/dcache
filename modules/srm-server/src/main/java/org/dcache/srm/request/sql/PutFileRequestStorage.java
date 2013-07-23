@@ -201,7 +201,7 @@ public class PutFileRequestStorage extends DatabaseFileRequestStorage<PutFileReq
 
         Job.JobHistory[] jobHistoryArray =
         getJobHistory(ID,_con);
-        return new PutFileRequest(
+        PutFileRequest request = new PutFileRequest(
         ID,
         NEXTJOBID ,
         CREATIONTIME,
@@ -225,6 +225,8 @@ public class PutFileRequestStorage extends DatabaseFileRequestStorage<PutFileReq
         SIZE,
         retentionPolicy,
         accessLatency);
+        request.setOrdinal(ordinalForRequest(REQUESTID, ID));
+        return request;
     }
 
     @Override

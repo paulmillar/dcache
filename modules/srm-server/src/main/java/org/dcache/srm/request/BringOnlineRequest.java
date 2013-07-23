@@ -139,9 +139,11 @@ public final class BringOnlineRequest extends ContainerRequest<BringOnlineFileRe
         }
         this.desiredOnlineLifetimeInSeconds = desiredOnlineLifetimeInSeconds;
         List<BringOnlineFileRequest> requests = Lists.newArrayListWithCapacity(surls.length);
+        int index = 1;
         for(URI surl : surls) {
             BringOnlineFileRequest request = new BringOnlineFileRequest(getId(),
                     requestCredentialId, surl, lifetime, max_number_of_retries);
+            request.setOrdinal(index++);
             requests.add(request);
         }
         setFileRequests(requests);

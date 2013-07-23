@@ -130,10 +130,12 @@ public final class GetRequest extends ContainerRequest<GetFileRequest> {
         this.protocols = Arrays.copyOf(protocols, protocols.length);
 
         List<GetFileRequest> requests = Lists.newArrayListWithCapacity(surls.length);
+        int index = 1;
         for(URI surl : surls) {
             GetFileRequest request = new GetFileRequest(getId(),
                     requestCredentialId, surl, lifetime,
                     max_number_of_retries);
+            request.setOrdinal(index++);
             requests.add(request);
         }
         setFileRequests(requests);

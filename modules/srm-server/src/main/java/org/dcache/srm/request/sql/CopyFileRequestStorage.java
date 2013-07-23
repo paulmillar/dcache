@@ -221,8 +221,7 @@ public class CopyFileRequestStorage extends DatabaseFileRequestStorage<CopyFileR
         Job.JobHistory[] jobHistoryArray =
         getJobHistory(ID,_con);
 
-
-           return new CopyFileRequest(
+        CopyFileRequest request = new CopyFileRequest(
             ID,
             NEXTJOBID ,
             this,
@@ -252,6 +251,8 @@ public class CopyFileRequestStorage extends DatabaseFileRequestStorage<CopyFileR
              REMOTEFILEID,
              SPACERESERVATIONID,
              TRANSFERID);
+        request.setOrdinal(ordinalForRequest(REQUESTID, ID));
+        return request;
     }
 
     @Override

@@ -153,6 +153,7 @@ public final class PutRequest extends ContainerRequest<PutFileRequest> {
                     requestCredentialId, surls[i], sizes[i], lifetime,
                     max_number_of_retries, spaceToken, retentionPolicy,
                     accessLatency);
+            request.setOrdinal(i+1);
             requests.add(request);
         }
         setFileRequests(requests);

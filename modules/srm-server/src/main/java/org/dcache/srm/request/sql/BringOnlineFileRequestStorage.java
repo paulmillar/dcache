@@ -76,7 +76,7 @@ public class BringOnlineFileRequestStorage extends DatabaseFileRequestStorage<Br
            String PINID = set.getString(next_index);
             Job.JobHistory[] jobHistoryArray =
             getJobHistory(ID,_con);
-           return new BringOnlineFileRequest(
+           BringOnlineFileRequest request = new BringOnlineFileRequest(
             ID,
             NEXTJOBID ,
             CREATIONTIME,
@@ -95,6 +95,8 @@ public class BringOnlineFileRequestStorage extends DatabaseFileRequestStorage<Br
             SURL,
             FILEID,
             PINID);
+           request.setOrdinal(ordinalForRequest(REQUESTID, ID));
+           return request;
     }
 
     @Override

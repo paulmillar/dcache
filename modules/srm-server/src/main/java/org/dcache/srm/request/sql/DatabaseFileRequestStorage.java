@@ -9,8 +9,14 @@ package org.dcache.srm.request.sql;
 import org.springframework.dao.DataAccessException;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.dcache.srm.request.FileRequest;
 import org.dcache.srm.util.Configuration;
@@ -152,4 +158,72 @@ public abstract class DatabaseFileRequestStorage<F extends FileRequest<?>> exten
     /*protected java.util.Set getFileRequests(String requestId) throws java.sql.SQLException{
         return getJobsByCondition(" REQUESTID = '"+requestId+"'");
     }*/
+
+
+    /* FIXME: need to use JdbcTemplate
+
+    Set<Long> queryIdsForRequest(long requestId) throws SQLException
+    {
+        Set<Long> ids = new HashSet<>();
+
+        String sql = "SELECT ID FROM " + getTableName() + " WHERE REQUESTID=?";
+
+        Connection con = pool.getConnection();
+        try (PreparedStatement statement = con.prepareStatement(sql)) {
+            statement.setLong(1, requestId);
+
+            try (ResultSet results = statement.executeQuery()) {
+                while (results.next()) {
+                    ids.add(results.getLong(1));
+                }
+            }
+        } finally {
+            pool.returnConnection(con);
+        }
+
+        return ids;
+    }
+
+    long ordinalForRequest(long requestId, long id) throws SQLException
+    {
+        Set<Long> ids = queryIdsForRequest(requestId);
+
+        if (ids.isEmpty()) {
+            throw new IllegalArgumentException("No request with ID " + requestId);
+        }
+
+        List<Long> ordered = new ArrayList<>(ids);
+        Collections.sort(ordered);
+
+        if (ordered.get(0) < 0 && ordered.get(ordered.size()-1) > 0) {
+            int i = 0;
+            while (ordered.get(i) < 0) {
+                i++;
+            }
+            Collections.rotate(ordered, -i);
+        }
+
+        int index = 1;
+        for (long thisId : ordered) {
+            if (thisId == id) {
+                return index;
+            }
+            index++;
+        }
+
+        throw new IllegalArgumentException("FileRequest ID " + id +
+                " not associated with request ID " + requestId);
+    }
+    */
+
+    long ordinalForRequest(long requestId, long id)
+    {
+        return 0;
+    }
+
+    Set<Long> queryIdsForRequest(long requestId)
+    {
+        return Collections.emptySet();
+    }
+
 }

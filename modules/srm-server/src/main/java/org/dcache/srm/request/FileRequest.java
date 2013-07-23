@@ -96,6 +96,7 @@ import org.dcache.srm.util.JDC;
 import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.Iterables.any;
 import static java.util.Arrays.asList;
@@ -129,6 +130,10 @@ public abstract class FileRequest<R extends ContainerRequest> extends Job {
     //error message if error, or just information message
 
     private transient QOSTicket qosTicket;
+
+    // The 1-indexed ordinal number of this FileRequest within the containing
+    // ContainRequest.
+    private long ordinal;
 
     /**
      * Status code from version 2.2
@@ -191,6 +196,17 @@ public abstract class FileRequest<R extends ContainerRequest> extends Job {
         if(getJobStorage().isJdbcLogRequestHistoryInDBEnabled()) {
             addHistoryEvent( description);
         }
+    }
+
+    public void setOrdinal(long ordinal)
+    {
+        checkArgument(ordinal > 0, "ordinal must be 1 or more");
+        this.ordinal = ordinal;
+    }
+
+    public long getOrdinal()
+    {
+        return ordinal;
     }
 
     /**
@@ -408,8 +424,14 @@ public abstract class FileRequest<R extends ContainerRequest> extends Job {
     @Override
     public JDC applyJdc()
     {
+        String ord;
+        if (ordinal >= 1) {
+            ord = String.valueOf(ordinal);
+        } else {
+            ord = "<unknown " + id + ">";
+        }
         JDC current = jdc.apply();
-        JDC.appendToSession(String.valueOf(requestId) + ':' + String.valueOf(id));
+        JDC.appendToSession(String.valueOf(requestId) + ':' + ord);
         return current;
     }
 

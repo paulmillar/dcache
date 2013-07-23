@@ -168,7 +168,7 @@ public class GetFileRequestStorage extends DatabaseFileRequestStorage<GetFileReq
            String PINID = set.getString(next_index);
             Job.JobHistory[] jobHistoryArray =
             getJobHistory(ID,_con);
-           return new GetFileRequest(
+           GetFileRequest request = new GetFileRequest(
             ID,
             NEXTJOBID ,
             CREATIONTIME,
@@ -188,6 +188,8 @@ public class GetFileRequestStorage extends DatabaseFileRequestStorage<GetFileReq
             TURL,
             FILEID,
             PINID);
+           request.setOrdinal(ordinalForRequest(REQUESTID, ID));
+           return request;
     }
 
     @Override

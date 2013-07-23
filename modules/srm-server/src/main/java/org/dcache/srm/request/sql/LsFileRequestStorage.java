@@ -53,7 +53,7 @@ public class LsFileRequestStorage extends DatabaseFileRequestStorage<LsFileReque
                 String SURL = set.getString(next_index++);
                 Job.JobHistory[] jobHistoryArray =
                         getJobHistory(ID,connection);
-                return new LsFileRequest(ID,
+                LsFileRequest request = new LsFileRequest(ID,
                                          NEXTJOBID ,
                                          CREATIONTIME,
                                          LIFETIME,
@@ -69,6 +69,8 @@ public class LsFileRequestStorage extends DatabaseFileRequestStorage<LsFileReque
                                          CREDENTIALID,
                                          STATUSCODE,
                                          SURL);
+                request.setOrdinal(ordinalForRequest(REQUESTID, ID));
+                return request;
         }
 
         @Override

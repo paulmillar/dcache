@@ -221,6 +221,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
             CopyFileRequest request = new CopyFileRequest(getId(),
                     requestCredentialId,from_urls[i],to_urls[i], spaceToken,
                     lifetime, max_number_of_retries);
+            request.setOrdinal(i+1);
             requests.add(request);
         }
         setFileRequests(requests);

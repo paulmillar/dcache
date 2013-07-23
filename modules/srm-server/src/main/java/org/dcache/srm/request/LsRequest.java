@@ -65,10 +65,12 @@ public final class LsRequest extends ContainerRequest<LsFileRequest> {
                 this.longFormat = longFormat;
                 this.maxNumOfResults = maxNumOfResults;
                 List<LsFileRequest> requests = Lists.newArrayListWithCapacity(surls.length);
+                int index = 1;
                 for (URI surl: surls) {
                     LsFileRequest fileRequest = new LsFileRequest(getId(),
                             requestCredentialId, surl, lifetime,
                             max_number_of_retries);
+                    fileRequest.setOrdinal(index++);
                     requests.add(fileRequest);
                 }
                 setFileRequests(requests);
