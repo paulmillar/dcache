@@ -263,6 +263,7 @@ public class CDC implements AutoCloseable
     static public void clearMessageContext()
     {
         MDC.remove(MDC_SESSION);
+        MDC.remove(MDC_DIAGNOSE);
         NDC.pop();
     }
 
