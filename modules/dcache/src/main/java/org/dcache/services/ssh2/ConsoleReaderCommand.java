@@ -53,9 +53,7 @@ public class ConsoleReaderCommand implements Command, Runnable {
     private static final String CONTROL_C_ANSWER =
         "Got interrupt. Please issue \'logoff\' from "
         + "within the Admin Cell to end this session.\n";
-    private static File _historyFile;
-    private final UserAdminShell _userAdminShell;
-    private OutputStream _err;
+    private UserAdminShell _userAdminShell;
     private InputStream _in;
     private ExitCallback _exitCallback;
     private OutputStreamWriter _outWriter;
@@ -63,11 +61,12 @@ public class ConsoleReaderCommand implements Command, Runnable {
     private ConsoleReader _console;
     private History _history;
     private boolean _useColors;
+    private final CellEndpoint _endpoint;
 
-    public ConsoleReaderCommand(String username, CellEndpoint cellEndpoint,
-            File historyFile) {
-        _userAdminShell = new UserAdminShell(username, cellEndpoint,
-                cellEndpoint.getArgs());
+    public ConsoleReaderCommand(CellEndpoint endpoint,
+            File historyFile, boolean useColor) {
+        _useColors = useColor;
+        _endpoint = endpoint;
         if (historyFile != null && historyFile.isFile()) {
             try {
                 _history = new History(historyFile);
@@ -87,7 +86,7 @@ public class ConsoleReaderCommand implements Command, Runnable {
 
     @Override
     public void setErrorStream(OutputStream err) {
-        _err = err;
+        // we don't use the error stream
     }
 
     @Override
@@ -107,7 +106,9 @@ public class ConsoleReaderCommand implements Command, Runnable {
 
     @Override
     public void start(Environment env) throws IOException {
-        _useColors = env.getEnv().containsKey(Environment.ENV_TERM);
+        String user = env.getEnv().get(Environment.ENV_USER);
+        _userAdminShell = new UserAdminShell(user, _endpoint,
+                _endpoint.getArgs());
         _console = new ConsoleReader(_in, _outWriter, null, new ConsoleReaderTerminal(env));
         _adminShellThread = new Thread(this);
         _adminShellThread.start();
@@ -196,18 +197,12 @@ public class ConsoleReaderCommand implements Command, Runnable {
                         + "support@dcache.org: {}" + e.getMessage());
             } catch (CommandException e) {
                 if (e instanceof CommandPanicException) {
-                    result =
-                        ((CommandPanicException) e)
-                                .getTargetException().getMessage();
                     _logger.warn("Something went wrong during the remote "
                             + "execution of the command: {}"
                             + ((CommandPanicException) e).getTargetException());
                     return;
                 }
                 if (e instanceof CommandThrowableException) {
-                    result =
-                        ((CommandThrowableException) e)
-                                .getTargetException().getMessage();
                     _logger.warn("Something went wrong during the remote "
                             + "execution of the command: {}"
                             + ((CommandThrowableException) e)

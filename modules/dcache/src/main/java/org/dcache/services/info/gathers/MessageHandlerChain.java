@@ -4,11 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import diskCacheV111.vehicles.Message;
 
@@ -20,7 +20,7 @@ import dmg.cells.nucleus.NoRouteToCellException;
 import dmg.cells.nucleus.SerializationException;
 import dmg.cells.nucleus.UOID;
 
-import org.dcache.services.info.base.StateUpdateManager;
+import org.dcache.cells.CellMessageSender;
 
 
 /**
@@ -34,7 +34,9 @@ import org.dcache.services.info.base.StateUpdateManager;
  *
  * @author Paul Millar <paul.millar@desy.de>
  */
-public class MessageHandlerChain implements MessageMetadataRepository<UOID>, MessageSender, CellMessageAnswerable {
+public class MessageHandlerChain implements MessageMetadataRepository<UOID>,
+        MessageSender, CellMessageAnswerable, CellMessageSender
+{
 
 	/** The period between successive flushes of ancient metadata, in milliseconds */
 	private static final long METADATA_FLUSH_THRESHOLD = 3600000; // 1 hour
@@ -47,39 +49,34 @@ public class MessageHandlerChain implements MessageMetadataRepository<UOID>, Mes
 
 	private static final Logger _log = LoggerFactory.getLogger( MessageHandlerChain.class);
 
-	private List<MessageHandler> _messageHandler = new LinkedList<>();
+        private final List<MessageHandler> _messageHandler = new LinkedList<>();
 
-	private final CellEndpoint _endpoint;
+	private CellEndpoint _endpoint;
 
-	final private StateUpdateManager _sum;
-
-	public MessageHandlerChain( StateUpdateManager sum, CellEndpoint endpoint) {
-		_sum = sum;
-		_endpoint = endpoint;
-	}
-
-	/**
-	 * Add a new MessageHandler to the list.
-	 * @param handler a new handler to add to the list.
-	 */
-	public void addMessageHandler( MessageHandler handler) {
-	    _log.debug( "Adding MessageHandler " + handler.getClass().getCanonicalName());
-		_messageHandler.add(handler);
-	}
+        @Override
+        public void setCellEndpoint(CellEndpoint endpoint)
+        {
+            _endpoint = endpoint;
+        }
 
 	/**
 	 * @return a simple array of registered MessageHandlers subclass types.
 	 */
-	public String[] listMessageHandlers() {
-		int i=0;
-		String[] msgHandlers = new String[_messageHandler.size()];
+	public String[] listMessageHandlers()
+        {
+            int i=0;
+            String[] msgHandlers;
 
-		for( MessageHandler mh : _messageHandler) {
-                    msgHandlers[i++] = mh.getClass()
-                            .getSimpleName(); // We're assuming only one instance per Class
+            synchronized (_messageHandler) {
+                msgHandlers = new String[_messageHandler.size()];
+
+                for( MessageHandler mh : _messageHandler) {
+                    // We're assuming only one instance per Class
+                    msgHandlers[i++] = mh.getClass().getSimpleName();
                 }
+            }
 
-		return msgHandlers;
+            return msgHandlers;
 	}
 
 
@@ -131,14 +128,13 @@ public class MessageHandlerChain implements MessageMetadataRepository<UOID>, Mes
 	}
 
 
-	/**
-	 * Add a standard set of handlers for reply Messages
-	 */
-	public void addDefaultHandlers() {
-		addMessageHandler( new LinkgroupListMsgHandler( _sum));
-		addMessageHandler( new LinkgroupDetailsMsgHandler( _sum));
-		addMessageHandler( new SrmSpaceDetailsMsgHandler( _sum));
-	}
+    public void setHandlers(List<MessageHandler> handlers)
+    {
+        synchronized (_messageHandler) {
+            _messageHandler.clear();
+            _messageHandler.addAll(handlers);
+        }
+    }
 
 
 	/**
@@ -160,7 +156,7 @@ public class MessageHandlerChain implements MessageMetadataRepository<UOID>, Mes
         }
     }
 
-    private final Map<UOID,MessageMetadata> _msgMetadata = new HashMap<>();
+    private final Map<UOID,MessageMetadata> _msgMetadata = new ConcurrentHashMap<>();
     private Date _nextFlushOldMetadata;
 
     @Override
@@ -169,29 +165,30 @@ public class MessageHandlerChain implements MessageMetadataRepository<UOID>, Mes
     }
 
     @Override
-    public long getMetricTTL( UOID messageId) {
+    public long getMetricTTL( UOID messageId)
+    {
         flushOldMetadata();
 
-        if( _log.isDebugEnabled()) {
-            _log.debug("Querying for metric ttl stored against message-ID " + messageId);
-        }
+        _log.debug("Querying for metric ttl stored against message-ID {}",
+                messageId);
 
-        if( !_msgMetadata.containsKey( messageId)) {
-            throw new IllegalArgumentException("No metadata recorded for message " + messageId);
-        }
+        MessageMetadata metadata = _msgMetadata.get(messageId);
 
-        MessageMetadata metadata = _msgMetadata.get( messageId);
+        if (metadata == null) {
+            throw new IllegalArgumentException("No metadata recorded for " +
+                    "message " + messageId);
+        }
 
         return metadata._ttl;
     }
 
     @Override
-    public void remove( UOID messageId) {
-        if( !_msgMetadata.containsKey( messageId)) {
-            throw new IllegalArgumentException("No metadata recorded for message " + messageId);
+    public void remove( UOID messageId)
+    {
+        if (_msgMetadata.remove(messageId) == null) {
+            throw new IllegalArgumentException("No metadata recorded for " +
+                    "message " + messageId);
         }
-
-        _msgMetadata.remove( messageId);
     }
 
 
@@ -254,10 +251,12 @@ public class MessageHandlerChain implements MessageMetadataRepository<UOID>, Mes
             return;
         }
 
-        for( MessageHandler mh : _messageHandler) {
-            if (mh.handleMessage((Message) messagePayload, getMetricTTL(request
-                    .getLastUOID()))) {
-                return;
+        synchronized (_messageHandler) {
+            for( MessageHandler mh : _messageHandler) {
+                if (mh.handleMessage((Message) messagePayload,
+                        getMetricTTL(request.getLastUOID()))) {
+                    return;
+                }
             }
         }
     }

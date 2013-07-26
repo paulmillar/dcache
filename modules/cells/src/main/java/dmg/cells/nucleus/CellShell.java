@@ -324,29 +324,7 @@ public class      CellShell
           return super.command(c);
       }
    }
-   public Object binCommand( String c ){
-      Args args = new Args( c ) ;
-      if( args.argc() == 0 ) {
-          return "";
-      }
-      String cs = args.argv(0) ;
-       switch (cs) {
-       case ".getroutes":
-           return _nucleus.getRoutingList();
-       case ".getcelltunnelinfos":
-           return _nucleus.getCellTunnelInfos();
-       case ".getcellinfos":
-           List<String> list = _nucleus.getCellNames();
-           CellInfo[] info = new CellInfo[list.size()];
-           for (int i = 0; i < list.size(); i++) {
-               info[i] = _nucleus.getCellInfo(list.get(i));
-           }
-           return info;
-       default:
-           return null;
-       }
 
-   }
    ////////////////////////////////////////////////////////////
    //
    //  version
@@ -375,8 +353,9 @@ public class      CellShell
    public Object ac_getroutes( Args args ){
        return _nucleus.getRoutingList() ;
    }
-   public Object ac_getcelltunnelinfos( Args args ){
-       return _nucleus.getCellTunnelInfos() ;
+   public CellTunnelInfo[] ac_getcelltunnelinfos( Args args ){
+       List<CellTunnelInfo> cellTunnelInfos = _nucleus.getCellTunnelInfos();
+       return cellTunnelInfos.toArray(new CellTunnelInfo[cellTunnelInfos.size()]);
    }
    public Object ac_getcellinfo_$_1( Args args ) throws CommandException {
       CellInfo info = _nucleus.getCellInfo( args.argv(0) ) ;
@@ -1163,14 +1142,14 @@ public class      CellShell
          }
          if( value == null ) {
              throw new
-                     CommandException(1, "variable not define : " + varName);
+                     CommandException(1, "variable is not defined : " + varName);
          }
 
          if( strong ){
              String strValue = value.toString() ;
              if( strValue.trim().equals("") ) {
                  throw new
-                         CommandException(2, "variable defined but empty : " + varName);
+                         CommandException(2, "variable is defined but empty : " + varName);
              }
          }
       }
@@ -1227,7 +1206,7 @@ public class      CellShell
       }
 
       if (input == null) {
-          throw new CommandException("Variable not defined: " + varName);
+          throw new CommandException("Variable is not defined: " + varName);
       }
 
       try {
@@ -2015,7 +1994,7 @@ public class      CellShell
         } else if (scheme.equals("env")) {
             Object o = _environment.get(ssp);
             if (o == null) {
-                throw new IOException("Variable not defined: " + ssp);
+                throw new IOException("Variable is not defined: " + ssp);
             }
             return new StringReader(o.toString());
         } else if (scheme.equals("cell")) {
