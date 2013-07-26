@@ -147,7 +147,6 @@ public class CDC implements AutoCloseable
     static public void setSession(String session)
     {
         setMdc(MDC_SESSION, session);
-        MDC.remove(MDC_DIAGNOSE);
     }
 
     /**
