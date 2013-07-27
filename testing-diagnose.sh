@@ -94,6 +94,16 @@ logoff
 EOF
 }
 
+function addLocalhostToCell() # $1 cell name
+{
+    ssh -T -p 22224 admin@localhost <<EOF >/dev/null
+cd $1
+diagnose add localhost
+..
+logoff
+EOF
+}
+
 function lsGplazmaDiagnose()
 {
     ssh -T -p 22224 admin@localhost <<EOF
@@ -106,12 +116,11 @@ EOF
 
 function exerciseSrm()
 {
-    echo "#"
-    echo "#  exerciseSrm"
+    echo "##  exerciseSrm ($1)"
     cd /home/paul/Hg/lua-srm/
     lua exercise-srm.lua
     cd - >/dev/null
-    echo "#"
+    echo "##"
     echo "#"
 }
 
@@ -123,24 +132,36 @@ function preLog()
 
 function postLog()
 {
-    tail -n +$START $base/var/log/dCacheDomain.log 
+    tail -n +$(( $START + 1 )) $base/var/log/dCacheDomain.log 
     echo "#"
-    echo "#"
+    echo "##"
 }
 
 ensureDcacheRunning
 
 
 preLog
-exerciseSrm
+exerciseSrm "no triggers"
 postLog
 
 addToGplazmaDiagnose "dn:$DN"
 
 preLog
-exerciseSrm
+exerciseSrm "DN in gPlazma"
 postLog
 
 preLog
-exerciseSrm
+exerciseSrm "no triggers"
 postLog
+
+addLocalhostToCell SRM-vedrfolnir
+
+preLog
+exerciseSrm "localhost in SRM"
+postLog
+
+preLog
+exerciseSrm "no triggers"
+postLog
+
+
