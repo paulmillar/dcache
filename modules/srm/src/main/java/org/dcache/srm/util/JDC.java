@@ -174,7 +174,6 @@ public class JDC implements AutoCloseable
     static public JDC createSession(String request)
     {
         JDC current = new JDC();
-        MDC.remove(MDC_DIAGNOSE);
         setSession(_epoc + Long.toString(_id.incrementAndGet()) + ":" + request);
         return current;
     }
