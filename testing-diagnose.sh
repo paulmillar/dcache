@@ -5,12 +5,12 @@
 #   Trig.:  gPlazma   IP address
 # Door:
 #
-# SRM
+# SRM        done      done
+# dcap
 # xrootd
 # FTP
 # gsiftp
 # WebDAV
-# dcap
 # gsidcap
 # NFS v3
 # NFS v4.1
@@ -116,10 +116,19 @@ EOF
 
 function exerciseSrm()
 {
-    echo "##  exerciseSrm ($1)"
+    echo "##  exercise SRM ($1)"
     cd /home/paul/Hg/lua-srm/
     lua exercise-srm.lua
     cd - >/dev/null
+    echo "##"
+    echo "#"
+}
+
+
+function exerciseDcap()
+{
+    echo "##  exercise dcap ($1)"
+    dccp  /etc/profile dcap://localhost/public/test1 >/dev/null 2>&1 || :
     echo "##"
     echo "#"
 }
@@ -164,4 +173,18 @@ preLog
 exerciseSrm "no triggers"
 postLog
 
+
+preLog
+exerciseDcap "no triggers"
+postLog
+
+addLocalhostToCell DCap-vedrfolnir
+
+preLog
+exerciseDcap "localhost in dcap door"
+postLog
+
+preLog
+exerciseDcap "no triggers"
+postLog
 
