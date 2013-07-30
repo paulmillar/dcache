@@ -114,77 +114,80 @@ logoff
 EOF
 }
 
-function exerciseSrm()
+
+function buildURI() # $1 schema-type
 {
-    echo "##  exercise SRM ($1)"
-    cd /home/paul/Hg/lua-srm/
-    lua exercise-srm.lua
-    cd - >/dev/null
-    echo "##"
-    echo "#"
+    if [ "$COUNTER" = "" ]; then
+	COUNTER=0
+    else
+	COUNTER=$(( $COUNTER + 1 ))
+    fi
+
+    URI=$1://localhost/public/$$-$COUNTER
 }
 
 
-function exerciseDcap()
-{
-    echo "##  exercise dcap ($1)"
-    dccp  /etc/profile dcap://localhost/public/test1 >/dev/null 2>&1 || :
-    echo "##"
-    echo "#"
-}
 
-
-function preLog()
+function exercise() # $1 protocol, $2 label
 {
     START=$(wc -l $base/var/log/dCacheDomain.log | awk '{print $1}')
-}
+    echo "##  exercise $1 ($2)"
+    case $1 in
+	SRM)
+	    cd /home/paul/Hg/lua-srm/
+	    lua exercise-srm.lua
+	    cd - >/dev/null
+	    ;;
 
-function postLog()
-{
+	dcap)
+	    buildURI dcap
+	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+	    ;;
+
+	gsidcap)
+	    buildURI gsidcap
+	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+	    ;;
+    esac
+    echo "##"
+    echo "#"
     tail -n +$(( $START + 1 )) $base/var/log/dCacheDomain.log 
     echo "#"
     echo "##"
 }
 
+host=$(uname -n)
+
 ensureDcacheRunning
 
-
-preLog
-exerciseSrm "no triggers"
-postLog
+exercise SRM "no triggers"
 
 addToGplazmaDiagnose "dn:$DN"
 
-preLog
-exerciseSrm "DN in gPlazma"
-postLog
+exercise SRM "DN in gPlazma"
+exercise SRM "no triggers"
 
-preLog
-exerciseSrm "no triggers"
-postLog
+addLocalhostToCell SRM-$host
 
-addLocalhostToCell SRM-vedrfolnir
+exercise SRM "locahost in SRM"
+exercise SRM "no triggers"
 
-preLog
-exerciseSrm "localhost in SRM"
-postLog
+exercise dcap "no triggers"
 
-preLog
-exerciseSrm "no triggers"
-postLog
+addLocalhostToCell DCap-$host
 
+exercise dcap "localhost in dcap door"
+exercise dcap "no triggers"
 
-preLog
-exerciseDcap "no triggers"
-postLog
+exercise gsidcap "no triggers"
 
-addLocalhostToCell DCap-vedrfolnir
+addToGplazmaDiagnose "dn:$DN"
 
-preLog
-exerciseDcap "localhost in dcap door"
-postLog
+exercise gsidcap "DN in gPlazma"
+exercise gsidcap "no triggers"
 
-preLog
-exerciseDcap "no triggers"
-postLog
+addLocalhostToCell DCap-gsi-$host
+
+exercise gsidcap "localhost in dcap door"
+exercise gsidcap "no triggers"
 
