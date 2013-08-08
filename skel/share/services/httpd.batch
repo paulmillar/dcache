@@ -10,10 +10,12 @@ onerror shutdown
 check -strong httpd.net.port
 check -strong dcache.paths.config
 check -strong dcache.paths.etc
-check -strong cell.name
+check -strong httpd.cell.name
 check -strong httpd.enable.authn
 check -strong httpd.enable.alarm-cleaner
 check -strong httpd.enable.plots.pool-queue
+
+check httpd.statistics.location
 
 check -strong httpd.static-content.scripts
 check -strong httpd.static-content.docs
@@ -142,18 +144,18 @@ exec env checkBillingPlotsProperties -ifok
 
 ####################################################################
 #  The following block defines the context set_alias_statistics to be either
-#  "set alias statistics directory ${statisticsLocation}" if
-#  ${statisticsLocation} exists and is a directory, or an empty string otherwise
+#  "set alias statistics directory ${httpd.statistics.location}" if
+#  ${httpd.statistics.location} exists and is a directory, or an empty string otherwise
 #
 define env defineStatisticsAlias.exe endDefine
-   set context set_alias_statistics "set alias statistics directory ${statisticsLocation}"
+   set context set_alias_statistics "set alias statistics directory ${httpd.statistics.location}"
 endDefine
 define env defineEmptyStatisticsAlias.exe endDefine
    set context set_alias_statistics ""
 endDefine
 
 onerror continue
-test -d ${statisticsLocation}
+test -d ${httpd.statistics.location}
 set env have_stats_loc ${rc}
 
 onerror shutdown
@@ -162,7 +164,7 @@ exec env defineEmptyStatisticsAlias.exe -ifnotok=have_stats_loc
 
 ####################################################################
 
-define context ${cell.name}Setup endDefine
+define context ${httpd.cell.name}Setup endDefine
    set alias webadmin webapp ${httpd.container.webapps.dir}
    set alias <home> redirect webadmin
    set alias <default> context missing.html
@@ -277,5 +279,5 @@ create diskCacheV111.cells.WebCollectorV3 collector \
 ####################################################################
 
 onerror shutdown
-create org.dcache.cells.UniversalSpringCell ${cell.name} \
+create org.dcache.cells.UniversalSpringCell ${httpd.cell.name} \
         "classpath:org/dcache/services/httpd/httpd.xml"

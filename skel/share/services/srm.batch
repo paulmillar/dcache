@@ -4,6 +4,7 @@
 
 onerror shutdown
 
+check -strong srm.cell.name
 check -strong srm.net.port
 check -strong srm.net.ssl-port
 check -strong srm.net.host
@@ -21,11 +22,11 @@ check -strong srm.authn.hostcert.refresh.unit
 
 check -strong srm.client-transport
 
-check -strong db.driver
-check -strong db.url
-check -strong db.user
-check db.password
-check db.password.file
+check -strong srm.db.driver
+check -strong srm.db.url
+check -strong srm.db.user
+check srm.db.password
+check srm.db.password.file
 
 check -strong srm.service.gplazma.cache.size
 check -strong srm.service.gplazma.cache.timeout
@@ -225,5 +226,5 @@ onerror shutdown
 
 exec file:${dcache.paths.share}/cells/threadmanager.fragment
 
-create org.dcache.cells.UniversalSpringCell ${cell.name} \
+create org.dcache.cells.UniversalSpringCell ${srm.cell.name} \
    "classpath:diskCacheV111/srm/srm.xml -export"
