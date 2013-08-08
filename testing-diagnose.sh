@@ -6,12 +6,12 @@
 # Door:
 #
 # SRM        done      done
-# dcap
+# dcap        --       done
+# gsidcap    done      done
+# WebDAV
 # xrootd
 # FTP
 # gsiftp
-# WebDAV
-# gsidcap
 # NFS v3
 # NFS v4.1
 
@@ -115,7 +115,7 @@ EOF
 }
 
 
-function buildURI() # $1 schema-type
+function buildURI() # $1 schema-type, $2 port number
 {
     if [ "$COUNTER" = "" ]; then
 	COUNTER=0
@@ -123,7 +123,11 @@ function buildURI() # $1 schema-type
 	COUNTER=$(( $COUNTER + 1 ))
     fi
 
-    URI=$1://localhost/public/$$-$COUNTER
+    if [ -n "$2" ]; then
+	port=":$2"
+    fi
+
+    URI=$1://localhost${port}/public/$$-$COUNTER
 }
 
 
@@ -147,6 +151,11 @@ function exercise() # $1 protocol, $2 label
 	gsidcap)
 	    buildURI gsidcap
 	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+	    ;;
+
+	WebDAV)
+	    buildURI http 2880
+	    curl -X PROPFIND $URI
 	    ;;
     esac
     echo "##"
@@ -191,3 +200,4 @@ addLocalhostToCell DCap-gsi-$host
 exercise gsidcap "localhost in dcap door"
 exercise gsidcap "no triggers"
 
+exercise WebDAV "no triggers"
