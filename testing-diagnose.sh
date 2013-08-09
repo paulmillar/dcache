@@ -30,6 +30,29 @@ base=$(cd $(dirname $0)/packages/system-test/target/dcache; pwd)
 dcache=$base/bin/dcache
 
 
+function srmLs() # $1 host, $2 port, $3 abs. path
+{
+    curl -s https://$1:$2/srm/managerv2 -E /tmp/x509up_u1000 --insecure -H "Content-Type: text/xml; charset=utf-8" -H 'SOAPAction: ""' -X POST --data-binary @- <<EOF  >/dev/null
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+        xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:srm22="http://srm.lbl.gov/StorageResourceManager">
+    <SOAP-ENV:Body SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+        <srm22:srmLs>
+            <srmLsRequest>
+                <arrayOfSURLs>
+                    <urlArray>srm://localhost$3</urlArray>
+                </arrayOfSURLs>
+                <storageSystemInfo/>
+            </srmLsRequest>
+        </srm22:srmLs>
+    </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+EOF
+}
+
 
 function notListening() # $1 list of ports that should be open
 {
@@ -137,27 +160,43 @@ function exercise() # $1 protocol, $2 label
     START=$(wc -l $base/var/log/dCacheDomain.log | awk '{print $1}')
     echo "##  exercise $1 ($2)"
     case $1 in
-	SRM)
-	    cd /home/paul/Hg/lua-srm/
-	    lua exercise-srm.lua
-	    cd - >/dev/null
+	SRM)	
+	    srmLs localhost 8443 /
+	    ;;
+
+	SRM-over-SSL)	
+	    srmLs localhost 8445 /
 	    ;;
 
 	dcap)
 	    buildURI dcap
 	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+
+	    # The abortCacheProtocol method waits 10 seconds then logs
+	    # something. We need to allow for this so the log files
+	    # are reasonable.
+	    sleep 10
 	    ;;
 
 	gsidcap)
 	    buildURI gsidcap
 	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+
+	    # The abortCacheProtocol method waits 10 seconds then logs
+	    # something. We need to allow for this so the log files
+	    # are reasonable.
+	    sleep 10
 	    ;;
 
 	WebDAV)
 	    buildURI http 2880
-	    curl -X PROPFIND $URI
+	    curl -so/dev/null -X PROPFIND $URI
 	    ;;
     esac
+
+    # Try to reduce race condition with exit logging
+    sleep 0.1
+
     echo "##"
     echo "#"
     tail -n +$(( $START + 1 )) $base/var/log/dCacheDomain.log 
@@ -181,6 +220,18 @@ addLocalhostToCell SRM-$host
 exercise SRM "locahost in SRM"
 exercise SRM "no triggers"
 
+exercise SRM-over-SSL "no triggers"
+
+addToGplazmaDiagnose "dn:$DN"
+
+exercise SRM-over-SSL "DN in gPlazma"
+exercise SRM-over-SSL "no triggers"
+
+addLocalhostToCell SRM-$host
+
+exercise SRM-over-SSL "locahost in SRM"
+exercise SRM-over-SSL "no triggers"
+
 exercise dcap "no triggers"
 
 addLocalhostToCell DCap-$host
@@ -200,4 +251,9 @@ addLocalhostToCell DCap-gsi-$host
 exercise gsidcap "localhost in dcap door"
 exercise gsidcap "no triggers"
 
+exercise WebDAV "no triggers"
+
+addLocalhostToCell WebDAV-$host
+
+exercise WebDAV "localhost in WebDAV door"
 exercise WebDAV "no triggers"
