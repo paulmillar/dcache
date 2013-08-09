@@ -5,20 +5,21 @@
 #   Trig.:  gPlazma   IP address
 # Door:
 #
-# SRM        done      done
+# srm        done      done
 # dcap        --       done
 # gsidcap    done      done
-# WebDAV
-# xrootd
-# FTP
+# webdav      --       done
+# webdavs    done      done
+# ftp
 # gsiftp
+# xrootd
 # NFS v3
 # NFS v4.1
 
 set -e
 
 rc=0
-voms-proxy-info >/dev/null 2>&1 || rc=1
+voms-proxy-info -exists >/dev/null 2>&1 || rc=1
 if [ $rc -eq 1 ]; then
     voms-proxy-init
 fi
@@ -30,9 +31,10 @@ base=$(cd $(dirname $0)/packages/system-test/target/dcache; pwd)
 dcache=$base/bin/dcache
 
 
+#  Issue an SRM ls operation using curl
 function srmLs() # $1 host, $2 port, $3 abs. path
 {
-    curl -s https://$1:$2/srm/managerv2 -E /tmp/x509up_u1000 --insecure -H "Content-Type: text/xml; charset=utf-8" -H 'SOAPAction: ""' -X POST --data-binary @- <<EOF  >/dev/null
+    curl -s https://$1:$2/srm/managerv2 -E /tmp/x509up_u1000 --insecure -H "Content-Type: text/xml; charset=utf-8" -H 'SOAPAction: ""' -X POST --data-binary @- <<EOF >/dev/null
 <?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
         xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
@@ -183,14 +185,28 @@ function exercise() # $1 protocol, $2 label
 	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
 
 	    # The abortCacheProtocol method waits 10 seconds then logs
-	    # something. We need to allow for this so the log files
-	    # are reasonable.
+	    # something. We need to allow for this so the captured log
+	    # files don't misplace this message.
 	    sleep 10
 	    ;;
 
-	WebDAV)
+	webdav)
 	    buildURI http 2880
 	    curl -so/dev/null -X PROPFIND $URI
+	    ;;
+
+	webdavs)
+	    buildURI https 2881
+	    curl -so/dev/null -u admin:dickerelch --insecure -X PROPFIND $URI
+	    # curl --cert ~/.globus/usercert.pem --key ~/.globus/userkey.pem -so/dev/null --insecure -X PROPFIND $URI
+	    ;;
+
+	ftp)
+	    curl -so/dev/null -l -u admin:dickerelch ftp://localhost:22126/
+	    ;;
+
+	*)
+	    echo ERROR: unknown protocol $1
 	    ;;
     esac
 
@@ -251,9 +267,33 @@ addLocalhostToCell DCap-gsi-$host
 exercise gsidcap "localhost in dcap door"
 exercise gsidcap "no triggers"
 
-exercise WebDAV "no triggers"
+exercise webdav "no triggers"
 
 addLocalhostToCell WebDAV-$host
 
-exercise WebDAV "localhost in WebDAV door"
-exercise WebDAV "no triggers"
+exercise webdav "localhost in webdav door"
+exercise webdav "no triggers"
+
+exercise webdavs "no triggers"
+
+addLocalhostToCell WebDAV-S-$host
+
+exercise webdavs "localhost in webdavs door"
+exercise webdavs "no triggers"
+
+addToGplazmaDiagnose "name:admin"
+
+exercise webdavs "name in gPlazma"
+exercise webdavs "no triggers"
+
+exercise ftp "no triggers"
+
+addLocalhostToCell FTP-$host
+
+exercise ftp "localhost in ftp door"
+exercise ftp "no triggers"
+
+addToGplazmaDiagnose "name:admin"
+
+exercise ftp "name in gPlazma"
+exercise ftp "no triggers"
