@@ -6,6 +6,7 @@ import io.milton.servlet.ServletResponse;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
+import org.springframework.beans.factory.annotation.Required;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -14,12 +15,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 
 import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellInfo;
 
 import org.dcache.cells.CellMessageSender;
+import org.dcache.util.DiagnoseTriggers;
 import org.dcache.util.Transfer;
 
 /**
@@ -33,6 +36,14 @@ public class MiltonHandler
     private HttpManager _httpManager;
     private String _cellName;
     private String _domainName;
+    private DiagnoseTriggers<InetAddress> _diagnoseAddresses;
+
+    @Required
+    public void setDiagnoseTriggers(DiagnoseTriggers<InetAddress> triggers)
+    {
+        _diagnoseAddresses = triggers;
+    }
+
 
     public void setHttpManager(HttpManager httpManager)
     {
@@ -54,6 +65,8 @@ public class MiltonHandler
     {
         try (CDC ignored = CDC.reset(_cellName, _domainName)) {
             Transfer.initSession();
+            InetAddress address = InetAddress.getByName(request.getRemoteAddr());
+            _diagnoseAddresses.accept(address);
             ServletContext context = ContextHandler.getCurrentContext();
             ServletRequest req = new DcacheServletRequest(request, context);
             ServletResponse resp = new DcacheServletResponse(response);

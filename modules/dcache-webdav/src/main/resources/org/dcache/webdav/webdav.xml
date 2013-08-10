@@ -198,6 +198,7 @@
               </bean>
               <bean class="org.dcache.webdav.MiltonHandler">
                   <property name="httpManager" ref="http-manager"/>
+                  <property name="diagnoseTriggers" ref="diagnose-triggers"/>
               </bean>
               <bean class="org.eclipse.jetty.server.handler.DefaultHandler"/>
           </list>
@@ -301,8 +302,8 @@
 	  <property name="hostCertRefreshInterval" value="${webdav.authn.hostcert.refresh}"/>
 	  <property name="hostCertRefreshIntervalUnit" value="${webdav.authn.hostcert.refresh.unit}"/>
 	  <property name="trustAnchorRefreshInterval" value="${webdav.authn.capath.refresh}"/>
+          <property name="diagnoseTriggers" ref="diagnose-triggers"/>
       <property name="trustAnchorRefreshIntervalUnit" value="${webdav.authn.capath.refresh.unit}"/>
-	  <property name="diagnoseTriggers" ref="diagnose-triggers"/>
       <property name="excludeCipherSuites" ref="banned-ciphers"/>
       </bean>
   </beans>
