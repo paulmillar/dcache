@@ -111,6 +111,7 @@ function ensureDcacheRunning()
 
 function addToGplazmaDiagnose() # $1 principal
 {
+    TRIGGER="$1 in gPlazma"
     ssh -T -p 22224 admin@localhost <<EOF >/dev/null
 cd gPlazma
 diagnose add "$1"
@@ -121,6 +122,7 @@ EOF
 
 function addLocalhostToCell() # $1 cell name
 {
+    TRIGGER="localhost in $1"
     ssh -T -p 22224 admin@localhost <<EOF >/dev/null
 cd $1
 diagnose add localhost
@@ -131,9 +133,69 @@ EOF
 
 function lsGplazmaDiagnose()
 {
-    ssh -T -p 22224 admin@localhost <<EOF
+    ssh -T -p 22224 admin@localhost <<EOF | sed -n '/diagnose ls/,/\.\./p' | grep ':'
 cd gPlazma
 diagnose ls
+..
+logoff
+EOF
+}
+
+
+function lsCellDiagnose() # $1 cell name
+{
+    ssh -T -p 22224 admin@localhost <<EOF | sed -n '/diagnose ls/,/\.\./p' | grep '\.[0-9][0-9]*\.'
+cd $1
+diagnose ls
+..
+logoff
+EOF
+}
+
+
+function assertGplazmaDiagnoseEmpty
+{
+    count=$(lsGplazmaDiagnose | wc -l)
+
+    if [ $count -ne 0 ]; then
+	echo "##"
+	echo "## ERROR: gPlazma still has principals:"
+	lsGplazmaDiagnose | while read p; do echo "##   $p"; done
+	echo "##"
+	clearGplazmaDiagnose
+    fi
+}
+
+
+function assertCellDiagnoseEmpty # $1 cell name
+{
+    count=$(lsCellDiagnose "$1" | wc -l)
+
+    if [ $count -ne 0 ]; then
+	echo "##"
+	echo "## ERROR: cell $1 still has principals:"
+	lsCellDiagnose "$1" | while read p; do echo "##   $p"; done
+	echo "##"
+	clearCellDiagnose "$1"
+    fi
+}
+
+
+function clearGplazmaDiagnose()
+{
+    ssh -T -p 22224 admin@localhost <<EOF >/dev/null
+cd gPlazma
+diagnose clear
+..
+logoff
+EOF
+}
+
+function clearCellDiagnose() # $1 cell name
+{
+    ssh -T -p 22224 admin@localhost <<EOF >/dev/null
+cd $1
+diagnose clear
 ..
 logoff
 EOF
@@ -157,10 +219,20 @@ function buildURI() # $1 schema-type, $2 port number
 
 
 
-function exercise() # $1 protocol, $2 label
+##
+##  Do 'something' with the dCache via stated protocol.  Ideally this
+##  something exercises multiple cells within the dCache instance.
+##
+function exercise() # $1 protocol
 {
+    if [ -n "$TRIGGER" ]; then
+	label="$TRIGGER"
+    else
+	label="no triggers"
+    fi
+
     START=$(wc -l $base/var/log/dCacheDomain.log | awk '{print $1}')
-    echo "##  exercise $1 ($2)"
+    echo "##  exercise $1 ($label)"
     case $1 in
 	SRM)	
 	    srmLs localhost 8443 /
@@ -218,82 +290,40 @@ function exercise() # $1 protocol, $2 label
     tail -n +$(( $START + 1 )) $base/var/log/dCacheDomain.log 
     echo "#"
     echo "##"
+
+    unset TRIGGER
 }
+
+
+
+function testProtocol() # $1 protocol, $2 cell name, $3 gPlazma principal (optional)
+{
+    exercise $1
+    addLocalhostToCell $2
+    exercise $1
+    assertCellDiagnoseEmpty $2
+    exercise $1
+
+    if [ -n "$3" ]; then
+	addToGplazmaDiagnose "$3"
+
+	exercise $1
+
+	assertGplazmaDiagnoseEmpty
+
+	exercise $1
+    fi
+}
+
 
 host=$(uname -n)
 
 ensureDcacheRunning
 
-exercise SRM "no triggers"
-
-addToGplazmaDiagnose "dn:$DN"
-
-exercise SRM "DN in gPlazma"
-exercise SRM "no triggers"
-
-addLocalhostToCell SRM-$host
-
-exercise SRM "locahost in SRM"
-exercise SRM "no triggers"
-
-exercise SRM-over-SSL "no triggers"
-
-addToGplazmaDiagnose "dn:$DN"
-
-exercise SRM-over-SSL "DN in gPlazma"
-exercise SRM-over-SSL "no triggers"
-
-addLocalhostToCell SRM-$host
-
-exercise SRM-over-SSL "locahost in SRM"
-exercise SRM-over-SSL "no triggers"
-
-exercise dcap "no triggers"
-
-addLocalhostToCell DCap-$host
-
-exercise dcap "localhost in dcap door"
-exercise dcap "no triggers"
-
-exercise gsidcap "no triggers"
-
-addToGplazmaDiagnose "dn:$DN"
-
-exercise gsidcap "DN in gPlazma"
-exercise gsidcap "no triggers"
-
-addLocalhostToCell DCap-gsi-$host
-
-exercise gsidcap "localhost in dcap door"
-exercise gsidcap "no triggers"
-
-exercise webdav "no triggers"
-
-addLocalhostToCell WebDAV-$host
-
-exercise webdav "localhost in webdav door"
-exercise webdav "no triggers"
-
-exercise webdavs "no triggers"
-
-addLocalhostToCell WebDAV-S-$host
-
-exercise webdavs "localhost in webdavs door"
-exercise webdavs "no triggers"
-
-addToGplazmaDiagnose "name:admin"
-
-exercise webdavs "name in gPlazma"
-exercise webdavs "no triggers"
-
-exercise ftp "no triggers"
-
-addLocalhostToCell FTP-$host
-
-exercise ftp "localhost in ftp door"
-exercise ftp "no triggers"
-
-addToGplazmaDiagnose "name:admin"
-
-exercise ftp "name in gPlazma"
-exercise ftp "no triggers"
+testProtocol SRM          SRM-$host      "dn:$DN"
+testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
+testProtocol dcap         DCap-$host
+testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
+testProtocol webdav       WebDAV-$host
+testProtocol webdavs      WebDAV-S-$host "name:admin"
+testProtocol ftp          FTP-$host      "name:admin"
