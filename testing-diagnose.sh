@@ -10,11 +10,6 @@
 # gsidcap    done      done
 # webdav      --       done
 # webdavs    done      done
-# ftp
-# gsiftp
-# xrootd
-# NFS v3
-# NFS v4.1
 
 set -e
 
@@ -22,6 +17,12 @@ rc=0
 voms-proxy-info -exists >/dev/null 2>&1 || rc=1
 if [ $rc -eq 1 ]; then
     voms-proxy-init
+fi
+
+rc=0
+ssh-add -l >/dev/null || rc=1
+if [ $rc -eq 1 ]; then
+    ssh-add || :
 fi
 
 DN=$(voms-proxy-info|awk 'BEGIN{FS=": "}/identity/{print $2}')
@@ -50,6 +51,25 @@ function srmLs() # $1 host, $2 port, $3 abs. path
                 <storageSystemInfo/>
             </srmLsRequest>
         </srm22:srmLs>
+    </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+EOF
+}
+
+#  Issue an SRM ls operation using curl
+function srmPing() # $1 host, $2 port
+{
+    curl -s https://$1:$2/srm/managerv2 -E /tmp/x509up_u1000 --insecure -H "Content-Type: text/xml; charset=utf-8" -H 'SOAPAction: ""' -X POST --data-binary @- <<EOF >/dev/null
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+        xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:srm22="http://srm.lbl.gov/StorageResourceManager">
+    <SOAP-ENV:Body SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+        <srm22:srmPing>
+            <srmPingRequest/>
+        </srm22:srmPing>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>
 EOF
@@ -90,6 +110,7 @@ function ensureDcacheRunning()
 
     if [ $rc -eq 1 ]; then
 	$dcache start
+	i_started_dcache=1
     fi
 
     declaredPorts=$($dcache ports | grep TCP | awk '/TCP *[0-9]* *$/{print $5}')
@@ -97,7 +118,7 @@ function ensureDcacheRunning()
     msg=0
     while [ "$(notListening "$declaredPorts")" != "" ]; do
 	if [ $msg -eq 0 ]; then
-	    echo -n Waiting for dCache to start up
+	    echo -n "Waiting for dCache to start up: "
 	    msg=1
 	else
 	    echo -n '.'
@@ -105,6 +126,14 @@ function ensureDcacheRunning()
 	sleep 3
     done
     [ $msg -eq 1 ] && echo || :
+
+    if [ -n "$i_started_dcache" ]; then
+	#  SRM initialises some components when the first client
+	#  connects.  This can print some crap, which upsets the
+	#  tests.  Therefore, we do a simple SRM operation to avoid
+	#  this.
+	srmPing localhost 8443
+    fi
 }
 
 
@@ -325,5 +354,12 @@ testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
 testProtocol dcap         DCap-$host
 testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
 testProtocol webdav       WebDAV-$host
-testProtocol webdavs      WebDAV-S-$host "name:admin"
-testProtocol ftp          FTP-$host      "name:admin"
+testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
+testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
+
+#  TODO
+#
+# gsiftp
+# xrootd
+# NFS v3
+# NFS v4.1
