@@ -1058,7 +1058,13 @@ public void cleanUp(){
 
        }catch( Exception e ){
           try{ _socket.close() ; }catch(IOException ee ){/* dead any way....*/}
-          _log.warn( "Exception in secure protocol : {}", e.toString() ) ;
+          String message = "Exception in secure protocol : " + e.toString();
+          if (e instanceof InvocationTargetException) {
+              Throwable cause = e.getCause();
+              message = "Exception (ITE) in secure protocol : " +
+                      (cause == null ? "(null)" : cause.toString());
+          }
+          _log.warn("{}", message);
           _loginFailures ++ ;
           synchronized( _childHash ){ _childCount -- ; }
        }
