@@ -45,7 +45,6 @@ public class CDC implements AutoCloseable
     public final static String MDC_DOMAIN = "cells.domain";
     public final static String MDC_CELL = "cells.cell";
     public final static String MDC_SESSION = "cells.session";
-    public final static String MDC_DIAGNOSE = "cells.diagnose";
 
     private final static TimebasedCounter _sessionCounter =
         new TimebasedCounter();
@@ -54,7 +53,46 @@ public class CDC implements AutoCloseable
     private final String _session;
     private final String _cell;
     private final String _domain;
-    private String _diagnose;
+    private final DiagnoseStatus _activeDiagnoseStatus;
+    private final DiagnoseStatus _copyOfDiagnoseStatus;
+
+    private static class DiagnoseStatus
+    {
+        private volatile boolean _isEnabled;
+
+        public DiagnoseStatus()
+        {
+        }
+
+        public DiagnoseStatus(boolean initialState)
+        {
+            _isEnabled = initialState;
+        }
+
+        public boolean isEnabled()
+        {
+            return _isEnabled;
+        }
+
+        public void setEnabled(boolean isEnabled)
+        {
+            _isEnabled = isEnabled;
+        }
+    }
+
+    /**
+     * Thread-local storage of a DiagnoseStatus object.  Child threads inherit
+     * their parent object.  The thread-local storage may have an alternative
+     * DiagnoseStatus object stored; for example, when restoring a captured CDC
+     * or when resetting the diagnostic context.
+     */
+    private static ThreadLocal<DiagnoseStatus> _diagnoseStorage =
+            new InheritableThreadLocal<DiagnoseStatus>() {
+        @Override
+        protected DiagnoseStatus initialValue() {
+            return new DiagnoseStatus();
+        }
+    };
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -64,7 +102,14 @@ public class CDC implements AutoCloseable
         _session = MDC.get(MDC_SESSION);
         _cell = MDC.get(MDC_CELL);
         _domain = MDC.get(MDC_DOMAIN);
-        _diagnose = MDC.get(MDC_DIAGNOSE);
+        _activeDiagnoseStatus = _diagnoseStorage.get();
+        _copyOfDiagnoseStatus = new DiagnoseStatus(_activeDiagnoseStatus.isEnabled());
+       // WRONG: should create new DiagnoseStatus based on current DiagnoseStatus and make that active
+        // The close method should restore the original DiagnoseStatus and the restore method should
+        // make the currently active one active.
+        //
+        //  TODO: double check this works for FTP command queue.
+
         _ndc = NDC.cloneNdc();
     }
 
@@ -82,12 +127,12 @@ public class CDC implements AutoCloseable
         }
     }
 
-    private void apply()
+    private void apply(DiagnoseStatus diagnose)
     {
         setMdc(MDC_DOMAIN, _domain);
         setMdc(MDC_CELL, _cell);
         setMdc(MDC_SESSION, _session);
-        setMdc(MDC_DIAGNOSE, _diagnose);
+        _diagnoseStorage.set(diagnose);
         if (_ndc == null) {
             NDC.clear();
         } else {
@@ -98,7 +143,7 @@ public class CDC implements AutoCloseable
     @Override
     public void close()
     {
-        apply();
+        apply(_copyOfDiagnoseStatus);
     }
 
     /**
@@ -108,7 +153,7 @@ public class CDC implements AutoCloseable
     public CDC restore()
     {
         CDC cdc = new CDC();
-        apply();
+        apply(_activeDiagnoseStatus);
         return cdc;
     }
 
@@ -206,7 +251,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_CELL, cellName);
         setMdc(MDC_DOMAIN, domainName);
         MDC.remove(MDC_SESSION);
-        MDC.remove(MDC_DIAGNOSE);
+        resetDiagnose();
         NDC.clear();
         return cdc;
     }
@@ -248,7 +293,7 @@ public class CDC implements AutoCloseable
         NDC.push(getMessageContext(envelope));
         setMdc(MDC_SESSION, (session == null) ? null : session.toString());
         if (envelope.isDiagnoseEnabled()) {
-            MDC.put(MDC_DIAGNOSE, "enabled");
+            setDiagnoseEnabled(true);
         }
     }
 
@@ -263,7 +308,7 @@ public class CDC implements AutoCloseable
     static public void clearMessageContext()
     {
         MDC.remove(MDC_SESSION);
-        MDC.remove(MDC_DIAGNOSE);
+        resetDiagnose();
         NDC.pop();
     }
 
@@ -281,24 +326,29 @@ public class CDC implements AutoCloseable
     public static void updateDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {
-            MDC.put(MDC_DIAGNOSE, "enabled");
+            setDiagnoseEnabled(true);
         }
     }
 
     public void updateStoredDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {
-            _diagnose = "enabled";
+            _activeDiagnoseStatus.setEnabled(true);
         }
     }
 
     public static boolean isDiagnoseEnabled()
     {
-        return MDC.get(MDC_DIAGNOSE) != null;
+        return _diagnoseStorage.get().isEnabled();
     }
 
-    public static void setDiagnoseEnabled(boolean enabled)
+    public static void setDiagnoseEnabled(boolean isEnabled)
     {
-        setMdc(MDC_DIAGNOSE, enabled ? "enabled" : null);
+        _diagnoseStorage.get().setEnabled(isEnabled);
+    }
+
+    private static void resetDiagnose()
+    {
+        _diagnoseStorage.set(new DiagnoseStatus());
     }
 }

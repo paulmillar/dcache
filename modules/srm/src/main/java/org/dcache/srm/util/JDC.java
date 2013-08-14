@@ -53,7 +53,7 @@ public class JDC implements AutoCloseable
     // as the mapping JDC --> CDC currently requires this coincidence.
     public final static String MDC_SESSION = "cells.session";
 
-    // Note this must be the same value as CDC.MDC_DIAGNOSE
+    // FIXME: this doesn't communicate with CDC any more
     public final static String MDC_DIAGNOSE = "cells.diagnose";
 
     private static final String _epoc = createEpocString() + ":";
