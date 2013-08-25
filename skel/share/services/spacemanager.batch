@@ -7,6 +7,7 @@ exec file:${dcache.paths.share}/cells/threadmanager.fragment
 
 onerror shutdown
 check -strong spacemanager.cell.name
+check -strong spacemanager.cell.export
 check -strong spacemanager.db.url
 check -strong spacemanager.db.driver
 check -strong spacemanager.db.user
@@ -14,13 +15,13 @@ check -strong spacemanager.db.password
 check -strong spacemanager.default-access-latency
 check -strong spacemanager.enable.reserve-space-for-non-srm-tranfers
 check spacemanager.authz.link-group-file-name
-check -strong spacemanager.enable.spacemanager
+check -strong spacemanager.enable.space-reservation
 check -strong spacemanager.service.poolmanager
 check -strong spacemanager.service.pnfsmanager
 
 create diskCacheV111.services.space.Manager ${spacemanager.cell.name} \
        "default \
-        -export \
+        -export=${spacemanager.cell.export} \
         -jdbcUrl=${spacemanager.db.url} \
         -jdbcDriver=${spacemanager.db.driver} \
         -dbUser=${spacemanager.db.user} \
@@ -33,5 +34,5 @@ create diskCacheV111.services.space.Manager ${spacemanager.cell.name} \
         -returnFlushedSpaceToReservation=true \
         -returnRemovedSpaceToReservation=true \
         -linkGroupAuthorizationFileName=${spacemanager.authz.link-group-file-name} \
-        -spaceManagerEnabled=${spacemanager.enable.spacemanager} \
+        -spaceManagerEnabled=${spacemanager.enable.space-reservation} \
 "
