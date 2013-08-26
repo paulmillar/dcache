@@ -53,16 +53,12 @@ public class CDC implements AutoCloseable
     private final String _session;
     private final String _cell;
     private final String _domain;
+    private final DiagnoseStatus _originalDiagnoseStatus;
     private final DiagnoseStatus _activeDiagnoseStatus;
-    private final DiagnoseStatus _copyOfDiagnoseStatus;
 
     private static class DiagnoseStatus
     {
         private volatile boolean _isEnabled;
-
-        public DiagnoseStatus()
-        {
-        }
 
         public DiagnoseStatus(boolean initialState)
         {
@@ -78,37 +74,65 @@ public class CDC implements AutoCloseable
         {
             _isEnabled = isEnabled;
         }
+
+        @Override
+        public DiagnoseStatus clone()
+        {
+            return new DiagnoseStatus(_isEnabled);
+        }
     }
 
     /**
      * Thread-local storage of a DiagnoseStatus object.  Child threads inherit
-     * their parent object.  The thread-local storage may have an alternative
-     * DiagnoseStatus object stored; for example, when restoring a captured CDC
-     * or when resetting the diagnostic context.
+     * their parent object when created.  The thread-local storage may have an
+     * alternative DiagnoseStatus object later on.
      */
     private static ThreadLocal<DiagnoseStatus> _diagnoseStorage =
-            new InheritableThreadLocal<DiagnoseStatus>() {
+            new ThreadLocal<DiagnoseStatus>() {
         @Override
         protected DiagnoseStatus initialValue() {
-            return new DiagnoseStatus();
+            return new DiagnoseStatus(false);
         }
     };
 
     /**
      * Captures the cells diagnostic context of the calling thread.
+     *
+     * For the diagnose command there are two use-cases to consider:
+     * isolation/roll-back and sharing.
+     *
+     *   1. ability to roll-back enabling of diagnose messages; for example:
+     *
+     *       try (CDC ignored = new CDC()) {
+     *           // commands here
+     *           CDC.setDiagnoseEnabled(true);
+     *           // more commands with diagnose enabled
+     *       }
+     *
+     *       // commands isolated from effect of enabling diagnose
+     *
+     *   2. the ability for two threads to share the same diagnose context; for
+     *      example, thread-1 does:
+     *
+     *       final CDC captured = new CDC();
+     *
+     *      and, when thread-2 does:
+     *
+     *       try (CDC ignored = captured.restore()) {
+     *           CDC.setDiagnoseEnabled(true);
+     *       }
+     *
+     *      then diagnose should be enabled for thread-1, too.
      */
     public CDC()
     {
         _session = MDC.get(MDC_SESSION);
         _cell = MDC.get(MDC_CELL);
         _domain = MDC.get(MDC_DOMAIN);
-        _activeDiagnoseStatus = _diagnoseStorage.get();
-        _copyOfDiagnoseStatus = new DiagnoseStatus(_activeDiagnoseStatus.isEnabled());
-       // WRONG: should create new DiagnoseStatus based on current DiagnoseStatus and make that active
-        // The close method should restore the original DiagnoseStatus and the restore method should
-        // make the currently active one active.
-        //
-        //  TODO: double check this works for FTP command queue.
+
+        _originalDiagnoseStatus = _diagnoseStorage.get();
+        _activeDiagnoseStatus = _originalDiagnoseStatus.clone();
+        _diagnoseStorage.set(_activeDiagnoseStatus);
 
         _ndc = NDC.cloneNdc();
     }
@@ -143,7 +167,7 @@ public class CDC implements AutoCloseable
     @Override
     public void close()
     {
-        apply(_copyOfDiagnoseStatus);
+        apply(_originalDiagnoseStatus);
     }
 
     /**
@@ -347,8 +371,8 @@ public class CDC implements AutoCloseable
         _diagnoseStorage.get().setEnabled(isEnabled);
     }
 
-    private static void resetDiagnose()
+    static void resetDiagnose()
     {
-        _diagnoseStorage.set(new DiagnoseStatus());
+        _diagnoseStorage.set(new DiagnoseStatus(false));
     }
 }

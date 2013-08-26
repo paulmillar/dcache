@@ -111,6 +111,11 @@ public class JDC implements AutoCloseable
         setMdc(MDC_DIAGNOSE, enabled ? "enabled" : null);
     }
 
+    static public boolean isDiagnoseEnabled()
+    {
+        return MDC.get(MDC_DIAGNOSE) != null;
+    }
+
     /**
      * Returns this session's identifier.  The value is bound to the current
      * thread.

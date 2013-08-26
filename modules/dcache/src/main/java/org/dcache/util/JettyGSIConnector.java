@@ -572,9 +572,7 @@ public class JettyGSIConnector
         @Override
         public void run()
         {
-            try (CDC ignored = new CDC()) {
-                _constructorsCDC.restore();
-
+            try (CDC ignored = _constructorsCDC.restore()) {
                 try {
                     int handshakeTimeout = getHandshakeTimeout();
                     int oldTimeout = _socket.getSoTimeout();
