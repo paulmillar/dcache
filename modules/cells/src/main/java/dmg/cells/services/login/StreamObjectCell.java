@@ -80,7 +80,7 @@ public class StreamObjectCell
     public StreamObjectCell(String name, StreamEngine engine, Args args)
         throws Exception
     {
-        super(name, args, false);
+        super(name, args);
 
         _engine = engine;
         _nucleus = getNucleus();
@@ -103,12 +103,15 @@ public class StreamObjectCell
 
             prepareClass(args.argv(0));
         } catch (Exception e) {
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
         useInterpreter(false);
-        start();
+    }
+
+    @Override
+    public void start() throws Exception
+    {
+        super.start();
         _workerThread = _nucleus.newThread(this, "Worker");
         _workerThread.start();
     }

@@ -44,7 +44,7 @@ public class      ObjectLoginCell
   private CellNucleus    _nucleus ;
 
   public ObjectLoginCell( String name , StreamEngine engine ){
-     super( name , "" , false ) ;
+     super( name , "");
 
      _engine  = engine ;
      _nucleus = getNucleus() ;
@@ -56,15 +56,18 @@ public class      ObjectLoginCell
         _host = _engine.getInetAddress() ;
 
      }catch(Exception e ){
-        start() ;
-        kill() ;
-        throw new IllegalArgumentException( "Problem : "+e.toString() ) ;
+        throw selfDestructFrom(new IllegalArgumentException("Problem : " + e));
      }
+      useInterpreter( false ) ;
+  }
+
+  @Override
+  public void start()
+  {
      _workerThread = _nucleus.newThread( this ) ;
      _workerThread.start() ;
-      useInterpreter( false ) ;
-     start() ;
   }
+
   @Override
   public void run(){
     if( Thread.currentThread() == _workerThread ){

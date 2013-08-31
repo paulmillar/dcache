@@ -3,6 +3,7 @@ package dmg.cells.services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +29,7 @@ public class BatchCell extends CellAdapter implements Runnable
     public BatchCell(String name, String [] argStrings)
         throws Exception
     {
-        super(name, "", true);
+        super(name, "");
 
         try {
             useInterpreter(false);
@@ -39,18 +40,15 @@ public class BatchCell extends CellAdapter implements Runnable
 
             _in = new StringReader(input.toString());
             _source = name;
-            Thread worker = new Thread(this);
-            worker.start();
         } catch (Exception e) {
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
     }
 
     public BatchCell(String name, String argString)
         throws Exception
     {
-        super(name, argString, true);
+        super(name, argString);
 
         try {
             Args args = getArgs();
@@ -68,12 +66,16 @@ public class BatchCell extends CellAdapter implements Runnable
             } else {
                 _in = new FileReader(_source);
             }
-            Thread worker = new Thread(this);
-            worker.start();
         } catch (Exception e) {
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
+    }
+
+    @Override
+    public void start()
+    {
+        Thread worker = new Thread(this);
+        worker.start();
     }
 
     @Override

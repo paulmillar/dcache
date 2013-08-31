@@ -75,7 +75,7 @@ public class HsmFlushControlManager  extends CellAdapter {
       *                 Options are forwarded to the driver as well.
       */
     public HsmFlushControlManager( String name , String  args ) throws Exception {
-       super( name , args , false ) ;
+       super(name, args);
        _nucleus = getNucleus() ;
        _args    = getArgs() ;
        try{
@@ -88,14 +88,10 @@ public class HsmFlushControlManager  extends CellAdapter {
               _poolGroupList.add(_args.argv(0));
               _args.shift();
            }
-           String tmp = _args.getOpt("scheduler") ;
-           if( ( tmp != null ) && ( ! tmp.equals("") ) ){
-               _eventDispatcher.loadHandler( tmp , false  , _args ) ;
-           }
 
            _queueWatch = new QueueWatch() ;
 
-           tmp = _args.getOpt("poolCollectionUpdate") ;
+           String tmp = _args.getOpt("poolCollectionUpdate") ;
            if( ( tmp != null ) && ( ! tmp.equals("") ) ){
                try{
                   _getPoolCollectionTicker = Long.parseLong(tmp) * 60L * 1000L ;
@@ -122,17 +118,23 @@ public class HsmFlushControlManager  extends CellAdapter {
            }
 
        }catch(Exception e){
-          start() ;
-          kill() ;
-          throw e ;
+          throw selfDestructFrom(e);
        }
        useInterpreter( true );
-       _nucleus.newThread( _queueWatch , "queueWatch").start() ;
 
-       start();
+       _poolCollector = new PoolCollector();
+    }
 
-       _poolCollector = new PoolCollector() ;
+    @Override
+    public void start() throws Exception
+    {
+        String tmp = _args.getOpt("scheduler") ;
+        if( ( tmp != null ) && ( ! tmp.equals("") ) ){
+            _eventDispatcher.loadHandler( tmp , false  , _args ) ;
+        }
 
+        super.start();
+        _nucleus.newThread( _queueWatch , "queueWatch").start();
     }
 
     private class QueueWatch implements Runnable {

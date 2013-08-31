@@ -48,7 +48,6 @@ public class PoolInfoObserverV3 extends AbstractCell
         throws InterruptedException, ExecutionException
     {
         super(name, PoolInfoObserverV3.class.getName(), new Args(args));
-        doInit();
     }
 
     @Override

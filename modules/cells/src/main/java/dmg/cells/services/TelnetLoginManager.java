@@ -57,7 +57,7 @@ public class      TelnetLoginManager
   */
   public TelnetLoginManager( String name , String args )
   {
-       super( name , args , false ) ;
+       super(name, args);
        _nucleus       = getNucleus() ;
        _args          = getArgs() ;
        _cellName      = name ;
@@ -92,25 +92,23 @@ public class      TelnetLoginManager
              }
           }
           _serverSocket  = new ServerSocket( _listenPort ) ;
-       }catch( Exception e ){
-          start() ;
-          kill() ;
-          if( e instanceof IllegalArgumentException ) {
-              throw (IllegalArgumentException) e;
-          }
-
-          throw new IllegalArgumentException( e.toString() ) ;
+       } catch (Exception cause) {
+           IllegalArgumentException e =
+                   cause instanceof IllegalArgumentException ?
+                   (IllegalArgumentException) cause :
+                   new IllegalArgumentException(cause.toString());
+           throw selfDestructFrom(e);
        }
+  }
 
-
-
+  @Override
+  public void start() throws Exception
+  {
        _listenThread  = new Thread( this , "listenThread" ) ;
        _listenThread.start() ;
-
-//       _nucleus.setPrintoutLevel( 0xf ) ;
-
-       start() ;
+       super.start();
   }
+
   @Override
   public void cleanUp(){
       try {

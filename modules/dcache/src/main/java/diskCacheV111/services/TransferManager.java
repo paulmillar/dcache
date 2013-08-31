@@ -93,7 +93,6 @@ public abstract class TransferManager extends AbstractCell
                 throws InterruptedException, ExecutionException
         {
                 super(cellName, args);
-                doInit();
         }
 
         @Override

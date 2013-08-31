@@ -131,7 +131,7 @@ public class       LoginManager
   */
   public LoginManager( String name , String argString ) throws Exception {
 
-      super( name , argString , false ) ;
+      super(name, argString);
 
       _nucleus  = getNucleus() ;
       _args     = getArgs() ;
@@ -241,21 +241,21 @@ public class       LoginManager
          _listenThread  = new ListenThread(listenPort) ;
          _log.info( "Listening on port "+_listenThread.getListenPort() ) ;
 
-
-         _nucleus.newThread( _listenThread , "listen" ).start() ;
-         _nucleus.newThread( new LocationThread() , "Location" ).start() ;
-         _nucleus.newThread( _keepAlive , "KeepAlive" ).start() ;
-
       }catch( Exception e ){
          if(e instanceof RuntimeException) {
              _log.warn( "LoginManger >"+getCellName()+"< got exception : "+e, e);
          }
-         start() ;
-         kill() ;
-         throw e ;
+         throw selfDestructFrom(e);
       }
+  }
 
-      start();
+  @Override
+  public void start() throws Exception
+  {
+      super.start();
+      _nucleus.newThread( _listenThread , "listen" ).start() ;
+      _nucleus.newThread( new LocationThread() , "Location" ).start() ;
+      _nucleus.newThread( _keepAlive , "KeepAlive" ).start() ;
   }
 
     private void checkProtocol() throws IllegalArgumentException {

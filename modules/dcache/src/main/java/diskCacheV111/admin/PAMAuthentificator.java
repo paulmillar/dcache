@@ -77,7 +77,7 @@ public class PAMAuthentificator  extends CellAdapter {
 
    public PAMAuthentificator( String cellName , String args ) throws Exception {
 
-      super( cellName , PAMAuthentificator.class.getName(), args , false );
+      super(cellName, PAMAuthentificator.class.getName(), args);
 
       _nucleus  = getNucleus() ;
       _cellName = cellName;
@@ -166,12 +166,9 @@ public class PAMAuthentificator  extends CellAdapter {
 
 
       }catch(Exception e) {
-         start();
-         kill();
-         throw e;
+         throw selfDestructFrom(e);
       }
       export();
-      start() ;
    }
    private UserMetaDataProvider initUserServiceProvider( String className )
       throws Exception {

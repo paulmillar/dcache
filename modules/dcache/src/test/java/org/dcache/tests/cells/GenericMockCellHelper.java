@@ -1,5 +1,6 @@
 package org.dcache.tests.cells;
 
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,12 @@ public class GenericMockCellHelper extends CellAdapterHelper {
     public GenericMockCellHelper(String name, String args) {
         super(name, args);
         _nucleus = new NucleusHelper(this, name + "-fake");
+
+        try {
+            start();
+        } catch (Exception e) {
+            Throwables.propagate(e);
+        }
     }
 
     @Override

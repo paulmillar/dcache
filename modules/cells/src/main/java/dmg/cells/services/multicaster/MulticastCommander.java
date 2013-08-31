@@ -20,11 +20,9 @@ public class MulticastCommander extends CellAdapter {
    private CellPath    _path    = new CellPath("mc") ;
    public MulticastCommander( String name , String args )
    {
-       super( name , args , false ) ;
+       super(name, args);
        _nucleus = getNucleus() ;
        _args    = getArgs() ;
-
-       start() ;
    }
    @Override
    public void messageToForward( CellMessage msg ){

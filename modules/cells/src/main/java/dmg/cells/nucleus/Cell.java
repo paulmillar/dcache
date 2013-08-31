@@ -13,6 +13,24 @@ package  dmg.cells.nucleus ;
 
   */
 public interface Cell {
+
+   /**
+    * Notification that the cell should do any activity that cannot safely be
+    * done from the constructor.  For example, this can include delivering and
+    * accepting messages and starting any background activity.
+    *
+    * The thread creating the cell is required to call start exactly once.
+    * Any "setter" methods needed to configure the cell must be called before
+    * calling start.  There is no explicit mechanism to mark such setters, but
+    * the concept is equivalent to calling all @Required setters in Spring.
+    *
+    * If this method throws an exception then the cell is considered defunct
+    * and no other methods of this class may not be used.  As a consequence,
+    * the Cell class must take care that any background activity will terminate
+    * promptly without any further interaction.
+    */
+   public void start() throws Exception;
+
    /**
      *  'getInfo' is frequently called by the Domain Kernel
      *  to obtain information out of the particular Cell.

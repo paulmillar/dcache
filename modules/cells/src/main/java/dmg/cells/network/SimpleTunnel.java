@@ -78,11 +78,6 @@ public class SimpleTunnel implements Cell, Runnable, CellTunnel {
       _socket  = new Socket( address , port ) ;
       _mode    = "Connection" ;
       _nucleus = new CellNucleus( this , cellName ) ;
-
-      _connectorThread = _nucleus.newThread( this , "Connector" ) ;
-      _connectorThread.start() ;
-
-
    }
    public SimpleTunnel( String cellName , Socket socket ){
 
@@ -91,13 +86,15 @@ public class SimpleTunnel implements Cell, Runnable, CellTunnel {
 
 
       _socket  = socket ;
+   }
 
+   @Override
+   public void start()
+   {
       _connectorThread = _nucleus.newThread( this , "Connector" ) ;
       _connectorThread.start() ;
-
-
-
    }
+
    @Override
    public CellTunnelInfo getCellTunnelInfo(){
        return new CellTunnelInfo( _nucleus.getCellName() ,

@@ -174,7 +174,6 @@ public final class Manager
                 throws InterruptedException, ExecutionException
         {
                 super(name, argString);
-                doInit();
         }
 
         @Override

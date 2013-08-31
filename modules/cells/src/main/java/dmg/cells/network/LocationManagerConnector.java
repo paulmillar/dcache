@@ -36,13 +36,18 @@ public class LocationManagerConnector
 
     public LocationManagerConnector(String cellName, String args)
     {
-        super(cellName, "System", args, true);
+        super(cellName, "System", args);
 
         Args a = getArgs();
         _domain = a.getOpt("domain");
         _lm = a.getOpt("lm");
-
         _thread = getNucleus().newThread(this, "TunnelConnector");
+    }
+
+    @Override
+    public void start() throws Exception
+    {
+        super.start();
         _thread.start();
     }
 

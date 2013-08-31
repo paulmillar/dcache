@@ -106,7 +106,6 @@ public class JMSTunnel
         super(name, "System", new Args(""));
         _factory = factory;
         _nucleus = getNucleus();
-        doInit();
     }
 
     @Override

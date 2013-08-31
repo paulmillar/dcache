@@ -1146,14 +1146,18 @@ public abstract class AbstractFtpDoorV1
     public AbstractFtpDoorV1(String name, StreamEngine engine, Args args)
     {
         super(name, args);
+        _engine = engine;
+    }
 
+    @Override
+    public void start() throws Exception
+    {
         try {
-            _engine = engine;
-            doInit();
-            _workerThread.start();
-        } catch (InterruptedException | ExecutionException e) {
+            super.start();
+        } catch (Exception e) {
             reply("421 " + ftpDoorName + " door not ready");
             _shutdownGate.countDown();
+            throw e;
         }
     }
 
@@ -1221,6 +1225,7 @@ public abstract class AbstractFtpDoorV1
         useInterpreter(true);
 
         _workerThread = new Thread(this);
+        _workerThread.start();
     }
 
     /**

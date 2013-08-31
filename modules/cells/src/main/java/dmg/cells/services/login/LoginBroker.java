@@ -66,10 +66,14 @@ public class LoginBroker
   }
     public LoginBroker(String name, String argString)
     {
-        super(name, argString, false);
+        super(name, argString);
+    }
 
+    @Override
+    public void start() throws Exception
+    {
         getNucleus().newThread(this,"Cleaner").start();
-        start();
+        super.start();
     }
 
     public static final String hh_ls = "[-binary] [-protocol=<protocol_1,...,protocol_n>] [-time] [-all]";

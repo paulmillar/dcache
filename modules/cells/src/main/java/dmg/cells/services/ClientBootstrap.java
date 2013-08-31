@@ -1,5 +1,6 @@
 package dmg.cells.services ;
 
+import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,9 +62,8 @@ public class ClientBootstrap
       int         port    = new Integer(args.argv(1));
 
       _ClientBootstrap( cellName , address , port ) ;
-
-
    }
+
    public void _ClientBootstrap( String cellName , InetAddress address , int port )
    {
 
@@ -72,7 +72,11 @@ public class ClientBootstrap
 
        _nucleus = new CellNucleus( this , cellName ) ;
        _nucleus.addCellEventListener( this ) ;
+   }
 
+   @Override
+   public void start()
+   {
        _engine  = new StateThread( this ) ;
        _engine.start() ;
    }
@@ -110,7 +114,7 @@ public class ClientBootstrap
         return RST_CREATE_TUNNEL ;
 
         case RST_CREATE_TUNNEL :
-          new RetryTunnel( "tunnel*" , _address , _port ) ;
+          new RetryTunnel( "tunnel*" , _address , _port ).start();
           return RST_TUNNEL_READY ;
         case RST_TUNNEL_FAILED :
         case RST_MSG_SENT_FAILED :

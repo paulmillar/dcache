@@ -37,22 +37,23 @@ public class PnfsManagerBroker extends CellAdapter {
 
     public PnfsManagerBroker(String cellName, String args)
     {
-        super( cellName , PnfsManagerBroker.class.getName(), args , false ) ;
+        super( cellName , PnfsManagerBroker.class.getName(), args);
 
         _cellName = cellName ;
         _args     = getArgs() ;
         _nucleus  = getNucleus() ;
 
-
         _pnfsManagers.put("default", new WorkerInstance("default") );
-        _nucleus.newThread( new MessageWizard(_fifo, this) , "MessageWizard").start() ;
-
         useInterpreter( true ) ;
+        export();
+    }
 
-        //Make the cell name well-known
-        getNucleus().export();
-        start() ;
 
+    @Override
+    public void start() throws Exception
+    {
+        getNucleus().newThread(new MessageWizard(_fifo, this), "MessageWizard").start();
+        super.start();
     }
 
 

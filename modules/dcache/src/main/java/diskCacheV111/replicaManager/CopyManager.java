@@ -86,8 +86,6 @@ public class CopyManager extends CellAdapter {
    {
 
       super( cellName , args ) ;
-
-      start() ;
    }
 
    private void resetParameter( String from , String to , boolean precious ){

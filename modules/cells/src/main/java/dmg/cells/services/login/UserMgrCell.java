@@ -54,7 +54,7 @@ public class       UserMgrCell
   */
   public UserMgrCell( String name , String argString ) throws Exception {
 
-      super( name , argString , false ) ;
+      super(name, argString);
 
       _cellName      = name ;
 
@@ -82,14 +82,10 @@ public class       UserMgrCell
 //         setPrintoutLevel( 0xf ) ;
 
       }catch( Exception e ){
-         start() ;
-         kill() ;
-         throw e ;
+         throw selfDestructFrom(e);
       }
-
-      start() ;
-
   }
+
   private void createRootUser( UserDb db )throws Exception {
       UserHandle user = db.createUser( "root" ) ;
       user.open( CdbLockable.WRITE ) ;

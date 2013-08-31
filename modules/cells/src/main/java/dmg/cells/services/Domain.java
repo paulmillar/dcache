@@ -201,7 +201,7 @@ public class Domain {
                 v.add( "set printout default 3" ) ;
              }
              String [] commands = new String[v.size()] ;
-             new BatchCell( "debug" , v.toArray( commands ) ) ;
+             new BatchCell( "debug" , v.toArray( commands ) ).start();
 
          }
          if( ( tmp = argHash.get( "-cp" )) != null ){
@@ -222,12 +222,12 @@ public class Domain {
              v.add( "load cellprinter "+a );
 
              String [] commands = new String[v.size()] ;
-             new BatchCell( "cellprinter" , v.toArray( commands )  ) ;
+             new BatchCell( "cellprinter" , v.toArray( commands )  ).start();
 
          }
          if( argHash.get("-routed") != null ){
              _log.info( "Starting Routing Manager" ) ;
-             new RoutingManager( "RoutingMgr" , "up0" ) ;
+             new RoutingManager( "RoutingMgr" , "up0" ).start();
          }
 
          if( ( ( tmp = argHash.get( "-lm" )) != null ) &&
@@ -243,8 +243,8 @@ public class Domain {
              }
              String a = sb.toString() ;
              _log.info( "Installing LocationManager '"+a+"'") ;
-             new LocationManager( "lm" , a ) ;
-             new RoutingManager( "RoutingMgr" , "" ) ;
+             new LocationManager("lm", a).start();
+             new RoutingManager("RoutingMgr", "").start();
          }
 
          if( argHash.get( "-silent" ) != null ){
@@ -255,7 +255,7 @@ public class Domain {
              v.add( "set printout CellGlue none" ) ;
              v.add( "set printout default none" ) ;
              String [] commands = new String[v.size()] ;
-             new BatchCell( "silent" , v.toArray( commands )  ) ;
+             new BatchCell( "silent" , v.toArray( commands )  ).start();
 
          }
 
@@ -279,7 +279,7 @@ public class Domain {
              }
 
              _log.info( "Starting LoginManager (telnet) on "+sb.toString() ) ;
-             new LoginManager( "tlm" , sb.toString() ) ;
+             new LoginManager( "tlm" , sb.toString() ).start();
 
          }
          if( ( ( tmp = argHash.get( "-tunnel2" )) != null ) &&
@@ -301,7 +301,7 @@ public class Domain {
              }
 
              _log.info( "Starting RetryTunnel2 (raw) on "+sb.toString() ) ;
-             new LoginManager( "down" , sb.toString() ) ;
+             new LoginManager( "down" , sb.toString() ).start();
 
          }
          if( ( ( tmp = argHash.get( "-connect" )) != null ) &&
@@ -309,35 +309,32 @@ public class Domain {
 
 
              _log.info( "Starting RetryTunnel on "+tmp[1]+" "+tmp[2] ) ;
-             new RetryTunnel( "up0" , tmp[1]+" "+tmp[2] ) ;
-
+             new RetryTunnel( "up0" , tmp[1]+" "+tmp[2] ).start();
          }
          if( ( ( tmp = argHash.get( "-connect2" )) != null ) &&
              ( tmp.length > 2 ) ){
 
              _log.info( "Starting RetryTunnel2 on "+tmp[1]+" "+tmp[2] ) ;
-             new RetryTunnel2( "up0" , tmp[1]+" "+tmp[2] ) ;
-
+             new RetryTunnel2( "up0" , tmp[1]+" "+tmp[2] ).start();
          }
          if( ( ( tmp = argHash.get( "-connectDomain" )) != null ) &&
              ( tmp.length > 1 ) ){
 
              _log.info( "Starting LocationMgrTunnel on "+tmp[1] ) ;
-             new LocationManagerConnector("upD", "-lm=lm " + "-domain=" + tmp[1]);
+             new LocationManagerConnector("upD", "-lm=lm " + "-domain=" + tmp[1]).start();
          }
          if( ( ( tmp = argHash.get( "-acm" )) != null ) &&
              ( tmp.length > 1 ) ){
 
              _log.info( "Starting UserMgrCell on "+tmp[1] ) ;
-             new UserMgrCell( "acm" , tmp[1] ) ;
+             new UserMgrCell( "acm" , tmp[1] ).start();
 
          }
          if( ( ( tmp = argHash.get( "-tunnel" )) != null ) &&
              ( tmp.length > 1 ) ){
 
              _log.info( "Starting RetryTunnel on "+tmp[1] ) ;
-             new GNLCell( "down" , "dmg.cells.network.RetryTunnel "+tmp[1] ) ;
-
+             new GNLCell( "down" , "dmg.cells.network.RetryTunnel "+tmp[1] ).start();
          }
          if( ( ( tmp = argHash.get( "-accept" )) != null ) &&
              ( tmp.length > 0 ) ){
@@ -346,8 +343,7 @@ public class Domain {
              new LoginManager(
                    "downD" ,
                    "0 dmg.cells.network.LocationMgrTunnel "+
-                   "-prot=raw -lm=lm" ) ;
-
+                   "-prot=raw -lm=lm" ).start();
          }
          if( ( ( tmp = argHash.get( "-boot" )) != null ) &&
              ( tmp.length > 1 ) ){
@@ -363,7 +359,7 @@ public class Domain {
              v.add( "# exit" );
              String [] commands = new String[v.size()] ;
 
-             new BatchCell( "boot" , v.toArray( commands ) ) ;
+             new BatchCell( "boot" , v.toArray( commands ) ).start();
 
          }
          if( ( ( tmp = argHash.get( "-spy" )) != null ) &&
@@ -371,20 +367,19 @@ public class Domain {
 
 
              _log.info( "Starting TopologyManager " ) ;
-             new TopoCell( "topo" , "" ) ;
+             new TopoCell( "topo" , "" ).start();
              _log.info( "Starting Spy Listener on "+tmp[1] ) ;
              new LoginManager( "Spy" ,
                 tmp[1]+
                 " dmg.cells.services.ObjectLoginCell"+
-                " -prot=raw" ) ;
-
+                " -prot=raw" ).start();
          }
          if( ( ( tmp = argHash.get( "-batch" )) != null ) &&
              ( tmp.length > 1 ) ){
 
 
              _log.info( "Starting BatchCell on "+tmp[1] ) ;
-             new BatchCell( "batch" , tmp[1] ) ;
+             new BatchCell( "batch" , tmp[1] ).start();
 
          }
          if( ( ( tmp = argHash.get( "-ic" )) != null ) &&

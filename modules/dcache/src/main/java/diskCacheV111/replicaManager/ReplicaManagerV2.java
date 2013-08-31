@@ -420,16 +420,18 @@ public class ReplicaManagerV2 extends DCacheCoreControllerV2
     _dbThread  = getNucleus().newThread(_initDbRunnable,"RepMgr-initDB");
     _adjThread = getNucleus().newThread(_adj,           "RepMgr-Adjuster");
     _watchDog  = getNucleus().newThread(_watchPools,    "RepMgr-PoolWatchDog");
+  }
 
+  @Override
+  public void start() throws Exception
+  {
     _log.info("Start Init DB  thread");
     _dbThread.start();
 
     _log.info("Start Adjuster thread");
     _adjThread.start();
 
-    _log.info("Starting cell");
-    start();
-
+    super.start();
   }
 
   // methods from the cellEventListener Interface

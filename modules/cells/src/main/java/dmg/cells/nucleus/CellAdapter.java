@@ -87,42 +87,35 @@ public class   CellAdapter
 
     /**
      * Creates a Cell and the corresponding CellNucleus with the
-     * specified name. An extra boolean argument 'startNow'
-     * allows to delay the arrival of messages until the
-     * CellAdapter.start() method is called.
+     * specified name.
      *
      * @param cellName is the name of the newly created cell. The name
      *                 has to be unique within the context of this CellDomain.
      * @param args an arbitrary argument string with can be obtained
      *        by getArgs later on.
-     * @param startNow the arrival of messages is enabled.
      * @exception IllegalArgumentException is thrown if the name is
      *            not unique within this CellDomain.
      */
     public CellAdapter(String cellName,
-                       String args,
-                       boolean startNow) {
+                       String args) {
 
-        this(cellName,  new Args(args == null ? "" : args), startNow);
+        this(cellName,  new Args(args == null ? "" : args));
 
     }
     public CellAdapter(String cellName,
                        String cellType,
-                       String args,
-                       boolean startNow) {
+                       String args) {
 
-        this(cellName,  cellType, new Args(args == null ? "" : args), startNow);
+        this(cellName,  cellType, new Args(args == null ? "" : args));
 
     }
     public CellAdapter(String  cellName,
-                       Args    args,
-                       boolean startNow) {
-        this(cellName, "Generic", args, startNow);
+                       Args    args) {
+        this(cellName, "Generic", args);
     }
     public CellAdapter(String  cellName,
                        String  cellType,
-                       Args    args,
-                       boolean startNow) {
+                       Args    args) {
 
         _args      = args;
         _nucleus   = new CellNucleus(this, cellName, cellType);
@@ -167,10 +160,6 @@ public class   CellAdapter
         }
 
         addCommandListener(new FilterShell(_nucleus.getLoggingThresholds()));
-
-        if (startNow) {
-            start();
-        }
     }
 
     /**
@@ -182,10 +171,34 @@ public class   CellAdapter
      *  argument set to 'false'.
      *
      */
-    public void start() {
+    @Override
+    public void start() throws Exception {
         executeSetupContext();
         _startGate.open();
     }
+
+    /**
+     * Method to kill a partially initialised cell.  The intended use
+     * is when catching an exception in the cell's constructor or start
+     * method.  The supplied exception is returned.  This is to allow
+     * patterns like:
+     *
+     *     try {
+     *         // operation that might fail with IOException
+     *     } catch (IOException e) {
+     *         throw selfDestructFrom(e);
+     *     }
+     *
+     * This is necessary so that Java realises that some final field members
+     * are, indeed, always set.
+     */
+    protected <T extends Throwable> T selfDestructFrom(T e)
+    {
+        _startGate.open();
+        kill();
+        return e;
+    }
+
     /**
      *  Executes the ContextVariable :
      *  &lt;cellName&gt;Setup and "!&lt;setupContextName&gt;"
@@ -251,19 +264,7 @@ public class   CellAdapter
      *            not unique within this CellDomain.
      */
     public CellAdapter(String cellName) {
-        this(cellName, "", true);
-    }
-    /**
-     * Creates a Cell and the corresponding CellNucleus with the
-     * specified name and a set of arguments.
-     *
-     * @param cellName is the name of the newly created cell. The name
-     *                 has to be unique within the context of this CellDomain.
-     * @exception IllegalArgumentException is thrown if the name is
-     *            not unique within this CellDomain.
-     */
-    public CellAdapter(String cellName, String args) {
-        this(cellName, args, true);
+        this(cellName, "");
     }
     //
     // adapter to the nucleus

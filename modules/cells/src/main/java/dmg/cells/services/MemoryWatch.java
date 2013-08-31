@@ -32,7 +32,7 @@ public class MemoryWatch extends CellAdapter implements Runnable {
 
    public MemoryWatch( String name , String args ) throws Exception {
 
-      super( name , args , false ) ;
+      super(name, args);
       _nucleus  = getNucleus() ;
       try{
          _args     = getArgs() ;
@@ -70,18 +70,18 @@ public class MemoryWatch extends CellAdapter implements Runnable {
                 _outputFile = var;
             }
          }
-         //
-         // and  now the worker.
-         //
-         _queryThread = _nucleus.newThread( this , "queryThread" ) ;
-         _queryThread.start() ;
       }catch(Exception eex ){
-         start() ;
-         kill() ;
-         throw eex ;
+         throw selfDestructFrom(eex);
       }
-      start() ;
    }
+
+   @Override
+   public void start()
+   {
+      _queryThread = _nucleus.newThread( this , "queryThread" ) ;
+      _queryThread.start() ;
+   }
+
    public void say( String str ){
       if( _output ){
          if( _outputFile != null ){

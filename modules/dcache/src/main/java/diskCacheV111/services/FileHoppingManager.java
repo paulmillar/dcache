@@ -52,7 +52,7 @@ public class FileHoppingManager extends CellAdapter {
 
    public FileHoppingManager( String name , String args )throws Exception {
 
-      super( name , FileHoppingManager.class.getName(), args , false );
+      super(name, FileHoppingManager.class.getName(), args);
 
       _args    = getArgs() ;
       _nucleus = getNucleus() ;
@@ -87,18 +87,10 @@ public class FileHoppingManager extends CellAdapter {
 
       }catch(Exception ee){
          ee.printStackTrace();
-         start();
-         kill() ;
-         throw ee ;
+         throw selfDestructFrom(ee);
       }
-
-
       runSetupFile( _configFile ) ;
-
       _nucleus.export();
-
-      start() ;
-
    }
    private void runSetupFile( File setupFile ) throws Exception {
 

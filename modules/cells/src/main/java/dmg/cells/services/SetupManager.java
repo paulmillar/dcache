@@ -38,7 +38,7 @@ public class SetupManager extends CellAdapter {
    //
    public SetupManager( String cellName , String args ) throws Exception {
 
-      super( cellName , args , false ) ;
+      super(cellName , args);
 
       _cellName = cellName ;
       _args     = getArgs() ;
@@ -64,14 +64,11 @@ public class SetupManager extends CellAdapter {
 
 
       }catch(Exception ee ){
-         start() ;
-         kill() ;
-         throw ee ;
+         throw selfDestructFrom(ee);
       }
       useInterpreter( true ) ;
-      start() ;
-
    }
+
    private void getSetup( SetupInfoMessage info ) throws Exception {
       String className = info.getSetupClass() ;
       String name      = info.getSetupName() ;

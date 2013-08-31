@@ -127,7 +127,7 @@ import org.dcache.util.FireAndForgetTask;
   /** Reads input parametes from batch file and initializes thread pools. **/
   public ThreadManager( String name , String args )  throws Exception {
 
-    super( name , args , false ) ;
+    super(name, args);
 
     //useInterpreter( true ) ;
     //addCommandListener(this);
@@ -158,22 +158,22 @@ import org.dcache.util.FireAndForgetTask;
                                       new LinkedBlockingQueue<Runnable>(),
                                       this);
 
-      delaychecker =
-          Executors.newScheduledThreadPool(THREAD_COUNT, this);
-
-      start() ;
-
-      _log.info(this.toString() + " started");
-
     } catch( Exception iae ){
         _log.warn(this.toString() + " couldn't start due to " + iae, iae);
-      start() ;
-      kill() ;
-      throw iae ;
+        throw selfDestructFrom(iae);
     }
 
 	  _log.info(" Constructor finished" ) ;
    }
+
+  @Override
+  public void start() throws Exception
+  {
+      delaychecker =
+          Executors.newScheduledThreadPool(THREAD_COUNT, this);
+
+      super.start();
+  }
 
   public static ThreadManager getInstance() {
     return threadmanager;

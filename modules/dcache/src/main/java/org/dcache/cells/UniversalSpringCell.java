@@ -53,6 +53,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -158,27 +159,32 @@ public class UniversalSpringCell
     }
 
     @Override
-    public void setEnvironment(Map<String,Object> environment)
+    public void start() throws Exception
     {
-        _environment = environment;
+        // Indirectly calls executeInit and then starts the cell.
+        super.start();
 
-        try {
-            /* FIXME: The following is a bad hack to workaround a
-             * cells problem: There are no explicit lifecycle calls in
-             * cells and thus no other way to start the cell outside
-             * the constructor.
-             */
-            doInit();
-        } catch (InterruptedException e) {
-            throw Throwables.propagate(e);
-        } catch (ExecutionException e) {
-            throw Throwables.propagate(e.getCause());
-        }
+        // Run the final initialisation hooks.
+        callFromNucleusThread(new Callable<Void>() {
+            @Override
+            public Void call()
+            {
+                for (CellLifeCycleAware bean: _lifeCycleAware) {
+                    bean.afterStart();
+                }
+                return null;
+            }
+        });
     }
 
     @Override
-    protected void executeInit()
-        throws Exception
+    public void setEnvironment(Map<String,Object> environment)
+    {
+        _environment = environment;
+    }
+
+    @Override
+    protected void executeInit() throws Exception
     {
         /* Process command line arguments.
          */
@@ -246,17 +252,6 @@ public class UniversalSpringCell
          * controller cell.
          */
         executeSetup();
-
-        /* Now that everything is instantiated and configured, we can
-         * start the cell.
-         */
-        start();
-
-        /* Run the final initialisation hooks.
-         */
-        for (CellLifeCycleAware bean: _lifeCycleAware) {
-            bean.afterStart();
-        }
     }
 
     /**

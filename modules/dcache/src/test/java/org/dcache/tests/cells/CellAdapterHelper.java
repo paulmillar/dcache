@@ -13,9 +13,7 @@ public class CellAdapterHelper extends CellAdapter {
     private final static SystemCell _systemCell = new SystemCell("JUnitTestDomain");
 
     public CellAdapterHelper(String name, String args) {
-
-        super(name, args, true);
-
+        super(name, args);
     }
 
 

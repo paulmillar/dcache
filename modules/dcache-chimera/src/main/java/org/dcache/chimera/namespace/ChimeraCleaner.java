@@ -189,7 +189,6 @@ public class ChimeraCleaner extends AbstractCell implements Runnable
         throws InterruptedException, ExecutionException
     {
         super(cellName, args);
-        doInit();
     }
 
     @Override

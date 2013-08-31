@@ -27,7 +27,6 @@ public class HsmControlOsm extends CellAdapter implements Runnable {
     private final static Logger _log =
         LoggerFactory.getLogger(HsmControlOsm.class);
 
-    private CellNucleus _nucleus ;
     private Args        _args ;
     private int         _requests;
     private int         _failed;
@@ -38,8 +37,7 @@ public class HsmControlOsm extends CellAdapter implements Runnable {
          = new SimpleDateFormat ("MM.dd hh:mm:ss");
 
     public HsmControlOsm( String name , String  args ) throws Exception {
-       super( name , args , false ) ;
-       _nucleus = getNucleus() ;
+       super(name, args);
        _args    = getArgs() ;
        try{
           if( _args.argc() < 1 ) {
@@ -53,14 +51,17 @@ public class HsmControlOsm extends CellAdapter implements Runnable {
                       IllegalArgumentException("Not a directory : " + _database);
           }
        }catch(Exception e){
-          start() ;
-          kill() ;
-          throw e ;
+          throw selfDestructFrom(e);
        }
        useInterpreter( true );
-       _nucleus.newThread( this , "queueWatch").start() ;
-       start();
        export();
+    }
+
+    @Override
+    public void start() throws Exception
+    {
+        super.start();
+        getNucleus().newThread(this, "queueWatch").start();
     }
 
     @Override

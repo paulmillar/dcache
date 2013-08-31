@@ -67,8 +67,6 @@ public class DirectoryLookUpPool extends AbstractCell
 
         _poolName = poolName;
         _args = getArgs();
-
-        doInit();
     }
 
     @Override

@@ -61,7 +61,6 @@ public class CopyManager extends AbstractCell
         throws InterruptedException, ExecutionException
     {
         super(cellName, args);
-        doInit();
     }
 
     @Override

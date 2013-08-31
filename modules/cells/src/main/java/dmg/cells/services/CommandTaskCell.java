@@ -178,8 +178,14 @@ public class CommandTaskCell extends CellAdapter {
        private Thread _worker;
        private Scheduler()
        {
-          (_worker = _nucleus.newThread(this,"Scheduler") ).start() ;
+          _worker = _nucleus.newThread(this,"Scheduler");
        }
+
+       private void start()
+       {
+           _worker.start();
+       }
+
        @Override
        public void run(){
           _log.info("Scheduler worker started");
@@ -199,21 +205,20 @@ public class CommandTaskCell extends CellAdapter {
        }
    }
    public CommandTaskCell( String cellName , String args ) throws Exception {
-      super( cellName , args , false ) ;
+      super(cellName, args);
       _cellName = cellName ;
       _args     = getArgs() ;
       _nucleus  = getNucleus() ;
       useInterpreter( true ) ;
-
-      try{
-         new Scheduler();
-      }catch(Exception ee ){
-         start() ;
-         kill() ;
-         throw ee;
-      }
-      start() ;
    }
+
+   @Override
+   public void start() throws Exception
+   {
+        super.start();
+        new Scheduler().start();
+   }
+
    private void doTiming(){
       _nucleus.updateWaitQueue();
        List<CellCommandTaskCore> cores = new ArrayList<>(_cores.values());

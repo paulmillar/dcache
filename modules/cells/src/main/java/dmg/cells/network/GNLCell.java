@@ -87,7 +87,11 @@ public class GNLCell implements Cell, Runnable  {
        _cellName   = name ;
        _cellClass  = cellClass ;
        _listenPort = port ;
+  }
 
+  @Override
+  public void start() throws Exception
+  {
        try{
           _serverSocket  = new ServerSocket( _listenPort ) ;
        }catch( Exception e ){
@@ -95,8 +99,8 @@ public class GNLCell implements Cell, Runnable  {
        }
        _listenThread  = _nucleus.newThread( this , "Listener" ) ;
        _listenThread.start() ;
-
   }
+
   @Override
   public void run(){
     if( Thread.currentThread() == _listenThread ){

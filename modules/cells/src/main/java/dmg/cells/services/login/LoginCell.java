@@ -54,7 +54,7 @@ public class      LoginCell
 
   public LoginCell( String name , StreamEngine engine , Args args )
          throws Exception {
-     super( name , args , false ) ;
+     super( name , args);
      _engine  = engine ;
 
      try{
@@ -67,18 +67,20 @@ public class      LoginCell
          _loadShells( args ) ;
 
      }catch( Exception e ){
-        start() ;
-        kill() ;
-        throw e ;
+        throw selfDestructFrom(e);
      }
      useInterpreter(false) ;
      _prompt  = getCellName() ;
-     _workerThread = new Thread( this ) ;
-
-     _workerThread.start() ;
-
-     start() ;
   }
+
+  @Override
+  public void start() throws Exception
+  {
+     _workerThread = new Thread( this ) ;
+     _workerThread.start() ;
+     super.start();
+  }
+
   private final static Class<?>[][] _signature = {
      {
        String.class ,

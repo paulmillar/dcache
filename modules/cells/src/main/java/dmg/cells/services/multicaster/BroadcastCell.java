@@ -143,7 +143,7 @@ public class BroadcastCell extends CellAdapter {
 
     /** Creates a new instance of BroadcastCell */
     public BroadcastCell(String name , String args ) {
-        super( name , "System", args , false ) ;
+        super(name, "System", args);
         _args    = getArgs() ;
         _nucleus = getNucleus() ;
 
@@ -153,7 +153,6 @@ public class BroadcastCell extends CellAdapter {
             addCommandListener(_debugging);
         }
         export() ;
-        start() ;
     }
     public static final String hh_ls = "" ;
     public String ac_ls( Args args ){

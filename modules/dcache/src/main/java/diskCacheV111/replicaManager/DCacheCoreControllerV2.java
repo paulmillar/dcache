@@ -145,8 +145,7 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
 
    public DCacheCoreControllerV2( String cellName , String args )
    {
-
-      super( cellName , args , false ) ;
+      super(cellName, args);
 
       _cellName = cellName ;
       _args     = getArgs() ;
@@ -154,13 +153,17 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
       _msgFifo = new LinkedBlockingQueue<>() ;
 
       useInterpreter( true ) ;
+      export();
+   }
 
-      new MessageTimeoutThread();
-      new MessageProcessThread();
-
-      _nucleus.export() ;
-      _log.info("Starting");
-
+   @Override
+   public void start() throws Exception
+   {
+       super.start();
+       getNucleus().newThread(new MessageTimeoutThread(),
+               "DCacheCoreController-MessageTimeout").start();
+       getNucleus().newThread(new MessageProcessThread(),
+               "DCacheCoreController-MessageProcessing").start();
    }
 
    abstract protected
@@ -171,10 +174,6 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
    // Required for SpreadAndWait( nucleus, timeout ) to operate
 
    private class MessageTimeoutThread implements Runnable {
-     private String _threadName = "DCacheCoreController-MessageTimeout";
-       public MessageTimeoutThread(){
-           _nucleus.newThread( this , _threadName ).start() ;
-       }
        @Override
        public void run() {
            while (true){
@@ -182,23 +181,18 @@ abstract public class DCacheCoreControllerV2 extends CellAdapter {
                try {
                    Thread.currentThread().sleep( _TO_MessageQueueUpdate );
                } catch (InterruptedException e){
-                   _log.info( _threadName + " thread interrupted" ) ;
+                   _log.info(Thread.currentThread().getName() +
+                           " thread interrupted" ) ;
                    break ;
                }
            }
-           _log.info( _threadName + " thread finished" ) ;
+           _log.info(Thread.currentThread().getName() + " thread finished" ) ;
        }
    }
 
    // Thread to re-queue messages queue
 
    private class MessageProcessThread implements Runnable {
-     private final String _threadName = "DCacheCoreController-MessageProcessing";
-
-     public MessageProcessThread(){
-       _nucleus.newThread( this , _threadName ).start() ;
-     }
-
      @Override
      public void run() {
        _log.info("Thread <" + Thread.currentThread().getName() + "> started");

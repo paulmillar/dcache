@@ -28,7 +28,7 @@ public class DataProviderCell extends CellAdapter {
     private int         _requestCounter;
     private int         _errorCounter;
     public DataProviderCell( String cellName , String args ){
-        super( cellName , args ,false ) ;
+        super(cellName, args);
 
         _nucleus = getNucleus() ;
         _args    = getArgs() ;
@@ -43,17 +43,17 @@ public class DataProviderCell extends CellAdapter {
            if( ! _dir.isDirectory() ) {
                throw new IllegalArgumentException("Not a directory : " + _dir);
            }
-        }catch( Exception e ){
-           start() ;
-           kill() ;
-           if( e instanceof IllegalArgumentException ) {
-               throw (IllegalArgumentException) e;
-           }
-           throw new IllegalArgumentException( e.toString() ) ;
+        } catch(Exception cause){
+           IllegalArgumentException e =
+                   cause instanceof IllegalArgumentException ?
+                   (IllegalArgumentException) cause :
+                   new IllegalArgumentException(cause.toString());
+
+           throw selfDestructFrom(e);
         }
         useInterpreter( false ) ;
-        start() ;
    }
+
    @Override
    public void getInfo( PrintWriter pw ){
       pw.println( " Directory   : "+_dir ) ;

@@ -50,6 +50,13 @@ public class BootstrapStore implements Cell {
 
       _nucleus   = new CellNucleus( this , cellName ) ;
    }
+
+   @Override
+   public void start()
+   {
+       // Nothing needs starting
+   }
+
    public String toString(){
       return  _nucleus.getCellDomainName()+
               " StoreBase="+_storeBase+

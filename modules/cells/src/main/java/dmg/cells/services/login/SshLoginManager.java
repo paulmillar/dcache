@@ -70,7 +70,7 @@ public class       SshLoginManager
   */
   public SshLoginManager( String name , String argString ) throws Exception {
 
-      super( name , argString , false ) ;
+      super( name , argString);
 
       _cellName      = name ;
       try{
@@ -99,18 +99,18 @@ public class       SshLoginManager
 
          _nucleus       = getNucleus() ;
 
-         _listenThread  = new Thread( this , "listenThread" ) ;
-
-         _listenThread.start() ;
       }catch( Exception e ){
          _log.warn( "SshLoginManger >"+getCellName()+"< got exception : "+e ) ;
-         start() ;
-         kill() ;
-         throw e ;
+         throw selfDestructFrom(e);
       }
+  }
 
-      start() ;
-
+  @Override
+  public void start() throws Exception
+  {
+      _listenThread  = new Thread( this , "listenThread" ) ;
+      _listenThread.start() ;
+      super.start();
   }
   //
   // the cell implemetation

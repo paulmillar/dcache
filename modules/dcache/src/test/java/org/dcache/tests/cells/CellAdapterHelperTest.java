@@ -12,7 +12,7 @@ public class CellAdapterHelperTest {
     private CellAdapterHelper _sutCell;
 
     @Test
-    public void testArgs() {
+    public void testArgs() throws Exception {
 
         String args = "arg0" +
         		" -opt1=opt1-value" +
@@ -21,6 +21,7 @@ public class CellAdapterHelperTest {
         		" arg1";
 
         _sutCell = new CellAdapterHelper("testArgsCell", args );
+        _sutCell.start();
 
         Args cellArgs = _sutCell.getArgs();
         assertNotNull("Args is NULL", cellArgs);

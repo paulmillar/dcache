@@ -15,24 +15,25 @@ import dmg.cells.nucleus.SystemCell;
   */
 public class SmallestDomain {
 
-  public static void main( String [] args ){
+  public static void main( String [] args ) {
 
      if( args.length < 2 ){
         System.out.println( "USAGE : <domainName> <telnetListenPort> [<tunnelListenPort>]" ) ;
         System.out.println( "USAGE : <domainName> <regyHost> <regyPort>" ) ;
         System.exit(1);
       }
-      new  SystemCell( args[0] ) ;
       try{
+         new  SystemCell( args[0] ).start();
+
          if( args.length < 3 ){
-             new TelnetLoginManager( "tlm" , args[1] ) ;
+             new TelnetLoginManager( "tlm" , args[1] ).start();
          }else{
              try{
                 new Integer( args[2] ) ;
-                new TelnetLoginManager( "tlm" , args[1] ) ;
-                new GNLCell( "t0" , "dmg.cells.network.RetryTunnel "+args[2] ) ;
+                new TelnetLoginManager( "tlm" , args[1] ).start();
+                new GNLCell( "t0" , "dmg.cells.network.RetryTunnel "+args[2] ).start();
              }catch( Exception ee ){
-                new RetryTunnel( "t1" , args[1]+" "+args[2] ) ;
+                new RetryTunnel( "t1" , args[1]+" "+args[2] ).start();
              }
          }
       }catch( Exception e ){

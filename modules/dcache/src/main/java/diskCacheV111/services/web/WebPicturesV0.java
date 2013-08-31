@@ -67,7 +67,7 @@ public class WebPicturesV0 extends CellAdapter implements Runnable {
 
    public WebPicturesV0( String name , String args )throws Exception {
 
-      super( name , args , false ) ;
+      super(name, args);
       _log.info("WebPictures started");
       try{
          _args        = getArgs() ;
@@ -121,12 +121,8 @@ public class WebPicturesV0 extends CellAdapter implements Runnable {
          }
 
       }catch(Exception ee){
-         start();
-         kill() ;
-         throw ee ;
+         throw selfDestructFrom(ee);
       }
-      start() ;
-
    }
    public static final String hh_start = " # start worker thread";
    public String ac_start( Args args ){

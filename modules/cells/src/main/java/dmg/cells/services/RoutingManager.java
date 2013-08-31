@@ -63,12 +63,17 @@ public class RoutingManager
 
     public RoutingManager(String name, String arguments)
     {
-        super(name,"System", arguments, false);
+        super(name,"System", arguments);
         _nucleus = getNucleus();
-        _nucleus.addCellEventListener(this);
         Args args = getArgs();
         _watchCell = (args.argc() == 0) ? null : args.argv(0);
-        start();
+    }
+
+    @Override
+    public void start() throws Exception
+    {
+        _nucleus.addCellEventListener(this);
+        super.start();
     }
 
     @Override

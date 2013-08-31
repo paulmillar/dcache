@@ -46,7 +46,7 @@ public class       AclCell
   private Crypt            _crypt        = new Crypt() ;
   public AclCell( String name , String argString ) throws Throwable {
 
-      super( name , argString , false ) ;
+      super(name, argString);
 
       _cellName  = name ;
       _args      = getArgs() ;
@@ -87,13 +87,8 @@ public class       AclCell
           }
       }catch( Throwable e ){
          _log.warn( "Exception while <init> : "+e, e ) ;
-         start() ;
-         kill() ;
-         throw e ;
+         throw selfDestructFrom(e);
       }
-
-      start() ;
-
   }
   //
   // for now we also serve the password checking request

@@ -72,48 +72,52 @@ public class      RetryTunnel2
 
    public RetryTunnel2( String cellName , StreamEngine engine , Args args )
    {
-
-     super( cellName , "System" , args , true ) ;
+     super( cellName , "System" , args);
 
       _engine   = engine ;
       _mode     = "Accepted" ;
       _nucleus  = getNucleus() ;
 
       _ioThread = _nucleus.newThread( this , "IoThread" ) ;
-      _ioThread.start() ;
-
       _log.info( "Constructor : acceptor started" ) ;
 
       _status = "<connected>" ;
    }
+
+   @Override
+   public void start() throws Exception
+   {
+      super.start();
+      if (_ioThread != null) {
+         _ioThread.start() ;
+      }
+
+      if (_connectionThread != null) {
+         _connectionThread.start() ;
+      }
+   }
+
    public RetryTunnel2( String cellName , String argString )
    {
 
-      super( cellName , "System" , argString , false ) ;
+      super( cellName , "System" , argString);
       _log.info( "CellName : "+cellName+ " ; args : "+argString ) ;
 
       _args    = getArgs() ;
       _nucleus = getNucleus() ;
 
       if( _args.argc() < 2 ){
-          start() ;
-          kill() ;
-
-          throw new
-          IllegalArgumentException(
-            "Usage : ... <host> <port>" ) ;
+          throw selfDestructFrom(new IllegalArgumentException("Usage : ... <host> <port>" ));
       }
 
       _RetryTunnel2( cellName ,
                      _args.argv(0) ,
                      Integer.valueOf( _args.argv(1) ) ) ;
-
-      start() ;
    }
    public RetryTunnel2( String cellName , String host , int port )
    {
 
-      super( cellName , "System" ,  host+" "+port , true ) ;
+      super( cellName , "System" ,  host+" "+port);
       _args = getArgs() ;
       _RetryTunnel2( cellName , host , port ) ;
    }
@@ -127,9 +131,6 @@ public class      RetryTunnel2
       _port    = port ;
 
       _connectionThread = _nucleus.newThread(this,"Connection") ;
-      _connectionThread.start() ;
-
-
    }
    private void runConnection(){
       long    start = 0 ;

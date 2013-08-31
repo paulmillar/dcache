@@ -68,7 +68,7 @@ public class      DCapDoor
 	//
         // the cell stuff
         //
-        super( name , DCapDoor.class.getName(), args , false );
+        super(name , DCapDoor.class.getName(), args);
         _nucleus = getNucleus() ;
 
         try{
@@ -85,21 +85,20 @@ public class      DCapDoor
            _interpreter = new DCapDoorInterpreterV3(this, _out, _subject, engine.getInetAddress());
            addCommandListener(_interpreter);
         }catch(Exception ee ){
-           start() ;
-           kill() ;
-           throw ee ;
+           throw selfDestructFrom(ee);
         }
+    }
+
+    @Override
+    public void start() throws Exception
+    {
         //
         // we have to use CellAdapapter.newThread instead of
         // new Thread because we want to have the worker
         // thread to be a member of the cell ThreadGroup.
         //
-	_workerThread = _nucleus.newThread( this , "worker" );
+	_workerThread = _nucleus.newThread(this, "worker");
 	_workerThread.start();
-
-//        _anyThread = _nucleus.newThread( this , "anyThread" ) ;
-//        _anyThread.start() ;
-        start() ;
     }
 
     @Override

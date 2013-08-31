@@ -76,7 +76,7 @@ public class LocationMgrTunnel
     public LocationMgrTunnel(String cellName, StreamEngine engine, Args args)
         throws IOException
     {
-        super(cellName, "System", args, false);
+        super(cellName, "System", args);
 
         try {
             _nucleus = getNucleus();
@@ -86,11 +86,15 @@ public class LocationMgrTunnel
             _rawOut = new BufferedOutputStream(engine.getOutputStream());
             _rawIn = new BufferedInputStream(engine.getInputStream());
         } catch (IOException e) {
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
+    }
+
+    @Override
+    public void start() throws Exception
+    {
         getNucleus().newThread(this, "Tunnel").start();
+        super.start();
     }
 
     private void handshake() throws IOException
@@ -166,7 +170,6 @@ public class LocationMgrTunnel
 
         try {
             handshake();
-            start();
 
             _tunnels.add(this);
             try {
@@ -180,7 +183,6 @@ public class LocationMgrTunnel
         } catch (IOException e) {
             _log.warn("Error while reading from tunnel: " + e.getMessage());
         } finally {
-            start();
             kill();
         }
     }

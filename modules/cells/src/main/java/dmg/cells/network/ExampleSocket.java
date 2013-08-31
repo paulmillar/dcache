@@ -41,9 +41,6 @@ public class ExampleSocket implements Cell, Runnable {
       _nucleus = new CellNucleus( this , cellName ) ;
       _nucleus.export() ;
 
-      _worker = _nucleus.newThread( this , "I/O Engine" ) ;
-      _worker.start() ;
-
       _socket  = socket ;
       try{
          _input   = _socket.getInputStream() ;
@@ -60,8 +57,15 @@ public class ExampleSocket implements Cell, Runnable {
          _log.info( " Problem _input is null " ) ;
          throw new IllegalArgumentException( " output is null" ) ;
       }
-
    }
+
+   @Override
+   public void start() throws Exception
+   {
+      _worker = _nucleus.newThread( this , "I/O Engine" ) ;
+      _worker.start();
+   }
+
    @Override
    public void run(){
       if( Thread.currentThread() == _worker ){
@@ -84,9 +88,7 @@ public class ExampleSocket implements Cell, Runnable {
                _log.info( " Problem in i/o : "+nsea ) ;
          }
          _nucleus.kill();
-
       }
-
    }
    @Override
    public String getInfo(){

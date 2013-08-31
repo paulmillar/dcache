@@ -37,9 +37,13 @@ public class ReflectionTunnel implements Cell,
 
    public ReflectionTunnel( String cellName , String socket )
    {
+      _nucleus  = new CellNucleus( this , cellName );
+   }
 
-      _nucleus  = new CellNucleus( this , cellName ) ;
-
+   @Override
+   public void start()
+   {
+       // Nothing to start
    }
 
    @Override

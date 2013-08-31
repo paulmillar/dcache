@@ -922,12 +922,19 @@ public class LocationManager extends CellAdapter {
          }
 
          _lmHandler = new LocationManagerHandler(clientPort, address, port);
-         _lmHandler.start() ;
 
          if( !args.hasOption("noboot") ){
            _whatToDo = _nucleus.newThread(this,"WhatToDo");
-           _whatToDo.start() ;
          }
+      }
+
+      public void start()
+      {
+          _lmHandler.start();
+
+          if (_whatToDo != null) {
+              _whatToDo.start();
+          }
       }
 
       public void getInfo( PrintWriter pw ){
@@ -1219,7 +1226,7 @@ public class LocationManager extends CellAdapter {
      *
      */
    public LocationManager( String name , String args )throws Exception {
-       super( name , "System", args , false ) ;
+       super(name, "System", args);
        _args      = getArgs() ;
        _nucleus   = getNucleus() ;
        try{
@@ -1244,22 +1251,27 @@ public class LocationManager extends CellAdapter {
            }
            if( !_args.hasOption("noclient") ){
               _client = new Client( host , port , _args ) ;
-              _log.info("Client started");
            }
        } catch(IOException | IllegalArgumentException e) {
-           start();
-           kill();
-           throw e;
+           throw selfDestructFrom(e);
        } catch(RuntimeException e){
            _log.warn(e.toString(), e) ;
-           start();
-           kill();
-           throw e;
+           throw selfDestructFrom(e);
        }
-       start() ;
+   }
+
+   @Override
+   public void start() throws Exception
+   {
+       super.start();
 
        if(_server != null) {
            _server.start();
+       }
+
+       if (_client != null) {
+           _client.start();
+           _log.info("Client started");
        }
    }
 

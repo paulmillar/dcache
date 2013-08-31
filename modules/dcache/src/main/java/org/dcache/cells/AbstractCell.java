@@ -242,7 +242,7 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
      */
     public AbstractCell(String cellName, String cellType, Args arguments)
     {
-        super(cellName, cellType, stripDefinedSetup(arguments), false);
+        super(cellName, cellType, stripDefinedSetup(arguments));
 
         _logger = LoggerFactory.getLogger(getClass());
         _definedSetup = getDefinedSetup(arguments);
@@ -263,15 +263,15 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
      * Performs cell initialisation and starts cell message delivery.
      *
      * Initialisation is delegated to the <code>init</code> method,
-     * and subclasses should perform initilisation by overriding
+     * and subclasses should perform initialisation by overriding
      * <code>init</code>. If the <code>init</code> method throws an
      * exception, then the cell is immediately killed.
      *
      * @throws InterruptedException if the thread was interrupted
      * @throws ExecutionException if init threw an exception
      */
-    final protected void doInit()
-        throws InterruptedException, ExecutionException
+    @Override
+    public void start() throws Exception
     {
         try {
             parseOptions();
@@ -290,22 +290,19 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
             /* Execute initialisation in a different thread allocated
              * from the correct thread group.
              */
-            FutureTask<Object> task = new FutureTask<>(new Callable<Object>() {
-                    @Override
-                    public Object call() throws Exception {
-                        AbstractCell.this.executeInit();
-                        return null;
-                    }
-                });
-            getNucleus().newThread(task, "init").start();
-            task.get();
+            callFromNucleusThread(new Callable<Void>() {
+                @Override
+                public Void call() throws Exception
+                {
+                    AbstractCell.this.executeInit();
+                    return null;
+                }
+            });
 
-            start();
+            super.start();
         } catch (InterruptedException e) {
             _logger.info("Cell initialisation was interrupted.");
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         } catch (ExecutionException e) {
             Throwable t = e.getCause();
 
@@ -313,15 +310,19 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
             if(t instanceof RuntimeException) {
                 _logger.error("Failed to initialise cell: " + t.getMessage(), t);
             }
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         } catch (RuntimeException e) {
             _logger.error("Failed to initialise cell: " + e.getMessage(), e);
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
+    }
+
+    protected <V> V callFromNucleusThread(final Callable<V> inner)
+                throws InterruptedException, ExecutionException
+    {
+        FutureTask<V> task = new FutureTask<>(inner);
+        getNucleus().newThread(task, "init").start();
+        return task.get();
     }
 
     /**

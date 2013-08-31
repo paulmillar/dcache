@@ -172,7 +172,7 @@ public class PoolStatisticsV0 extends CellAdapter implements CellCron.TaskRunnab
    private static String  _bodyString           = "<body bgcolor=white>" ;
 
    public PoolStatisticsV0( String name , String args )throws Exception {
-      super( name , args , false ) ;
+      super(name, args);
       _args    = getArgs() ;
       _nucleus = getNucleus() ;
 
@@ -216,21 +216,23 @@ public class PoolStatisticsV0 extends CellAdapter implements CellCron.TaskRunnab
                 throw new
                         IllegalArgumentException("Either <baseDirectory> or <htmlBase> doesn't exist");
             }
-
          }
-         _cronTimer = _nucleus.newThread( _cron , "Cron" ) ;
-         _cronTimer.start() ;
-
-         _hourly = _cron.add( 55 , this , "Hour" ) ;
-
       }catch(Exception ee){
-         start();
-         kill() ;
-         throw ee ;
+         throw selfDestructFrom(ee);
       }
-      start() ;
-
    }
+
+   @Override
+   public void start() throws Exception
+   {
+        _cronTimer = _nucleus.newThread(_cron, "Cron");
+        _cronTimer.start() ;
+
+        _hourly = _cron.add(55, this, "Hour");
+
+        super.start();
+   }
+
    @Override
    public void getInfo( PrintWriter pw ){
        pw.println("   Cell Name : "+getCellName());

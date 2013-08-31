@@ -34,7 +34,7 @@ public class TopoCell extends CellAdapter implements Runnable  {
    private CellDomainNode [] _infoMap;
 
    public TopoCell( String cellName , String cellArgs ){
-      super( cellName , cellArgs , true ) ;
+      super(cellName , cellArgs);
 
       String wait = getArgs().getOpt("update") ;
 
@@ -43,7 +43,12 @@ public class TopoCell extends CellAdapter implements Runnable  {
       }catch(NumberFormatException ee){ /* bad values ignored */}
       _log.info("Update set to "+_waitTime+" millis");
       _worker = getNucleus().newThread( this ) ;
-      _worker.start() ;
+   }
+
+   @Override
+   public void start()
+   {
+      _worker.start();
    }
 
    @Override

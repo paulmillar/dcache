@@ -65,7 +65,7 @@ public class      SshKeyManager
     private final Map<String,Object> _cellContext;
 
    public SshKeyManager( String name , String args ){
-       super(  name , args , false ) ;
+       super(name, args);
 
        _nucleus     = getNucleus() ;
        _cellContext = _nucleus.getDomainContext() ;
@@ -93,12 +93,17 @@ public class      SshKeyManager
        _sshContext = CollectionFactory.newConcurrentHashMap();
 
        _cellContext.put( "Ssh" , _sshContext ) ;
+   }
 
+   @Override
+   public void start() throws Exception
+   {
        _updateThread  = _nucleus.newThread( this , "update") ;
        _updateThread.start() ;
 
-       start() ;
+       super.start();
    }
+
    public String ac_set_hostKeyFile_$_1( Args args ){
        _hostIdentity = args.argv(0) ;
        _hostIdentityUpdate = 0 ;

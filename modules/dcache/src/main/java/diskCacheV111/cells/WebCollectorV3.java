@@ -182,7 +182,7 @@ public class WebCollectorV3 extends CellAdapter implements Runnable
 
     public WebCollectorV3(String name, String args) throws Exception
     {
-        super(name, WebCollectorV3.class.getName(), args, false);
+        super(name, WebCollectorV3.class.getName(), args);
         _args    = getArgs();
         _nucleus = getNucleus();
         try {
@@ -221,18 +221,22 @@ public class WebCollectorV3 extends CellAdapter implements Runnable
                     addQuery(address);
                 }
             }
-            (_senderThread  = _nucleus.newThread(this, "sender")).start();
-            _log.info("Sender started");
-            _log.info("Collector will be started a bit delayed");
-            _collectThread = _nucleus.newThread(WebCollectorV3.this, "collector");
-            _collectThread.start();
         } catch (Exception e) {
             _log.warn("<init> of WebCollector reports : " + e.getMessage(), e);
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
-        start();
+    }
+
+    @Override
+    public void start() throws Exception
+    {
+        _senderThread  = _nucleus.newThread(this, "sender");
+        _senderThread.start();
+        _log.info("Sender started");
+        _log.info("Collector will be started a bit delayed");
+        _collectThread = _nucleus.newThread(WebCollectorV3.this, "collector");
+        _collectThread.start();
+        super.start();
     }
 
     private synchronized boolean addQuery(CellAddressCore address)

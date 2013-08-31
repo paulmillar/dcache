@@ -249,7 +249,7 @@ public class TransferObserverV1
 
     public TransferObserverV1(String name, String  args) throws Exception
     {
-        super(name, TransferObserverV1.class.getName(), args, false);
+        super(name, TransferObserverV1.class.getName(), args);
 
         _nucleus = getNucleus();
         _args    = getArgs();
@@ -293,12 +293,9 @@ public class TransferObserverV1
             _nucleus.newThread(this, "worker").start();
             //
         } catch (Exception e) {
-            start();
-            kill();
-            throw e;
+            throw selfDestructFrom(e);
         }
         useInterpreter(true);
-        start();
         export();
     }
 

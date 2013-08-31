@@ -93,9 +93,9 @@ public class Domain
 
         String domainName = getName();
         CDC.reset(SYSTEM_CELL_NAME, domainName);
-        SystemCell systemCell = new SystemCell(domainName);
         _log.info("Starting " + domainName);
 
+        SystemCell systemCell = startSystemCell(domainName);
         executePreload(systemCell);
         for (ConfigurationProperties serviceConfig: _services) {
             executeService(systemCell, serviceConfig);
@@ -103,6 +103,22 @@ public class Domain
 
         if (_services.isEmpty()) {
             _log.warn("No services found. Domain appears to be empty.");
+        }
+    }
+
+    private static SystemCell startSystemCell(String domainName)
+            throws CommandException
+    {
+        try {
+            SystemCell cell = new SystemCell(domainName);
+            cell.start();
+            return cell;
+        } catch (Exception cause) {
+            CommandException e = cause instanceof CommandException ?
+                    (CommandException) cause :
+                    new CommandException(0, cause.toString(), cause);
+
+            throw e;
         }
     }
 

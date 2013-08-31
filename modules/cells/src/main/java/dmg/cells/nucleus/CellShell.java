@@ -815,6 +815,12 @@ public class      CellShell
                 ((EnvironmentAware) cell).setEnvironment(Collections.unmodifiableMap(_environment));
             }
 
+            try {
+                cell.start();
+            } catch (Exception e) {
+                throw new CommandThrowableException(e.getMessage(), e);
+            }
+
             return "created : " + cell;
         } catch (InvocationTargetException e) {
             throw new CommandThrowableException(e.getTargetException().getMessage(), e.getTargetException());
