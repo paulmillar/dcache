@@ -1,5 +1,6 @@
 package org.dcache.util;
 
+import com.google.common.base.Throwables;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -22,7 +23,7 @@ public class SDCTests
     }
 
     @Test
-    public void shouldHaveNewValue()
+    public void shouldSeeNewValue()
     {
         SDC.put("key", "value");
 
@@ -30,7 +31,7 @@ public class SDCTests
     }
 
     @Test
-    public void shouldBeAbleToRemoveKey()
+    public void shouldSeeNullAfterRemoving()
     {
         SDC.put("key", "value");
         SDC.remove("key");
@@ -39,7 +40,7 @@ public class SDCTests
     }
 
     @Test
-    public void shouldRemoveWhenUpdatingWithNullValue()
+    public void shouldSeeNullAfterUpdatingWithNullValue()
     {
         SDC.put("key", "value");
         SDC.put("key", null);
@@ -48,11 +49,41 @@ public class SDCTests
     }
 
     @Test
-    public void shouldHaveUpdatedValue()
+    public void shouldSeeUpdatedValue()
     {
         SDC.put("key", "value");
         SDC.put("key", "new-value");
         assertThat(SDC.get("key"), is(equalTo("new-value")));
+    }
+
+    @Test
+    public void shouldBeIndependentFromOtherThreadInitialValue() throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                assertThat(SDC.get("key"), is(nullValue()));
+            }
+        });
+    }
+
+    @Test
+    public void shouldBeIndependentFromOtherThreadsUpdates() throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is("value"));
     }
 
     @Test
@@ -74,42 +105,61 @@ public class SDCTests
     }
 
     @Test(expected=IllegalStateException.class)
-    public void shouldThrowExceptionWhenEnactTwice()
+    public void shouldThrowExceptionWhenAdoptedTwice() throws InterruptedException
     {
         SDC captured = new SDC();
-        captured.enact();
-        captured.enact();
+        captured.adopt();
+        captured.adopt();
     }
 
     @Test
-    public void shouldHaveSameValueInAnotherThreadWhenShared()
+    public void shouldSeeSameValueInAnotherThreadWhenShared()
             throws InterruptedException
     {
         SDC.put("key", "value");
+
         final SDC captured = new SDC();
 
         run( new Runnable() {
             @Override
             public void run()
             {
-                captured.enact();
+                adopt(captured);
                 assertThat(SDC.get("key"), is(equalTo("value")));
             }
         });
     }
 
     @Test
-    public void shouldHaveSameValueInAnotherThreadWhenSharedAfterCapture()
+    public void shouldSeeNullAfterAdopt()
             throws InterruptedException
     {
         final SDC captured = new SDC();
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                SDC.put("key", "value");
+                adopt(captured);
+                assertThat(SDC.get("key"), is(nullValue()));
+            }
+        });
+    }
+
+    @Test
+    public void shouldSeeSameValueInAnotherThreadWhenSharedAndUpdatedAfterCapture()
+            throws InterruptedException
+    {
+        final SDC captured = new SDC();
+
         SDC.put("key", "value");
 
         run( new Runnable() {
             @Override
             public void run()
             {
-                captured.enact();
+                adopt(captured);
                 assertThat(SDC.get("key"), is(equalTo("value")));
             }
         });
@@ -125,12 +175,153 @@ public class SDCTests
             @Override
             public void run()
             {
-                captured.enact();
+                adopt(captured);
                 SDC.put("key", "value");
             }
         });
 
         assertThat(SDC.get("key"), is(equalTo("value")));
+    }
+
+    @Test
+    public void shouldSeeNullWhenAnotherThreadPutsNullFromSharedContext()
+            throws InterruptedException
+    {
+        final SDC captured = new SDC();
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.put("key", null);
+            }
+        });
+
+        assertThat(SDC.get("key"), is(nullValue()));
+    }
+
+    @Test
+    public void shouldSeeUpdatedValueWhenAnotherThreadUpdatesSharedContextUpdateAfterCature()
+            throws InterruptedException
+    {
+        final SDC captured = new SDC();
+
+        SDC.put("key", "value");
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is(equalTo("new-value")));
+    }
+
+
+    @Test
+    public void shouldSeeNullWhenAnotherThreadRemovesFromSharedContextUpdateAfterCature()
+            throws InterruptedException
+    {
+        final SDC captured = new SDC();
+
+        SDC.put("key", "value");
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.remove("key");
+            }
+        });
+
+        assertThat(SDC.get("key"), is(nullValue()));
+    }
+
+
+    @Test
+    public void shouldSeeNullWhenAnotherThreadPutsNullIntoSharedContextUpdateAfterCature()
+            throws InterruptedException
+    {
+        final SDC captured = new SDC();
+
+        SDC.put("key", "value");
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.put("key", null);
+            }
+        });
+
+        assertThat(SDC.get("key"), is(nullValue()));
+    }
+
+
+    @Test
+    public void shouldSeeUpdatedValueWhenAnotherThreadUpdatesSharedContext()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC captured = new SDC();
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is(equalTo("new-value")));
+    }
+
+    @Test
+    public void shouldSeeNullWhenAnotherThreadRemovesFromSharedContext()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC captured = new SDC();
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.remove("key");
+            }
+        });
+
+        assertThat(SDC.get("key"), is(nullValue()));
+    }
+
+    @Test
+    public void shouldSeeNullWhenAnotherThreadPutsNullIntoSharedContext()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC captured = new SDC();
+
+        run( new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(captured);
+                SDC.put("key", null);
+            }
+        });
+
+        assertThat(SDC.get("key"), is(nullValue()));
     }
 
 
@@ -138,39 +329,415 @@ public class SDCTests
     public void shouldSeeUpdateValueAfterRollback()
             throws InterruptedException
     {
-        final SDC captured1 = new SDC();
-        final SDC captured2 = new SDC();
+        SDC.put("key", "value");
+
+        final SDC captureForSharing = new SDC();
+
+        final SDC captureForRollingBack = new SDC();
+
+        SDC.put("key", "value to be rolled back");
 
         run(new Runnable() {
             @Override
             public void run()
             {
-                captured1.enact();
-                SDC.put("key", "value");
+                adopt(captureForSharing);
+                SDC.put("key", "new-value");
             }
         });
 
-        captured2.rollback();
+        captureForRollingBack.rollback();
 
-        assertThat(SDC.get("key"), is(equalTo("value")));
+        assertThat(SDC.get("key"), is(equalTo("new-value")));
     }
 
     @Test
-    public void should()
+    public void shouldSeeUpdateValueInThreadThatSharesTemporally()
             throws InterruptedException
     {
-        final SDC captured = new SDC();
+        SDC.put("key", "value");
+
+        final SDC captureForSharing = new SDC();
 
         run(new Runnable() {
             @Override
             public void run()
             {
-                captured.enact();
-                SDC.put("key", "value");
+                SDC captureForRollingBack = new SDC();
+                adopt(captureForSharing);
+
+                SDC.put("key", "new-value");
+
+                captureForRollingBack.rollback();
             }
         });
 
-        assertThat(SDC.get("key"), is(equalTo("value")));
+        assertThat(SDC.get("key"), is(equalTo("new-value")));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare() throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShareFirstUpdates() throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("new-value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShareSecondUpdates() throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare2() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+
+        SDC.put("key", "value");
+
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare2FirstUpdates() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+
+        SDC.put("key", "value");
+
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("new-value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare2SecondUpdates() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+
+        SDC.put("key", "value");
+
+        final SDC capture2 = new SDC();
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare3() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        SDC.put("key", "value");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare3FirstUpdates() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        SDC.put("key", "value");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                assertThat(SDC.get("key"), is("new-value"));
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldAllSeeSharedValueAfterTripleShare3SecondUpdates() throws InterruptedException
+    {
+        final SDC capture1 = new SDC();
+        final SDC capture2 = new SDC();
+
+        SDC.put("key", "value");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture1);
+                assertThat(SDC.get("key"), is("value"));
+            }
+        });
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                adopt(capture2);
+                SDC.put("key", "new-value");
+            }
+        });
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldNotSeeCaptureUpdatedValue()
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localPut("key", "new-value");
+
+        assertThat(SDC.get("key"), is("value"));
+
+        capture.rollback(); // prevent being reported as a bug
+    }
+
+    @Test
+    public void shouldNotSeeCaptureUpdatedValueAfterRollback()
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localPut("key", "new-value");
+
+        capture.rollback();
+
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void shouldSeeCaptureUpdatedValueAfterAdopt()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localPut("key", "new-value");
+
+        capture.adopt();
+
+        assertThat(SDC.get("key"), is("new-value"));
+    }
+
+    @Test
+    public void shouldSeeOriginalValueWhenPutNullIntoCaptured()
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localPut("key", null);
+
+        assertThat(SDC.get("key"), is("value"));
+
+        capture.rollback(); // prevent being reported as a bug
+    }
+
+    @Test
+    public void shouldSeeNullWhenPutNullIntoCapturedAfterAdopt()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localPut("key", null);
+
+        capture.adopt();
+
+        assertThat(SDC.get("key"), is(nullValue()));
+    }
+
+    @Test
+    public void shouldSeeOriginalValueWhenRemoveFromCaptured()
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localRemove("key");
+
+        assertThat(SDC.get("key"), is("value"));
+
+        capture.rollback(); // prevent being reported as a bug
+    }
+
+    @Test
+    public void shouldSeeNullWhenRemoveFromCapturedAfterAdopt()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        capture.localRemove("key");
+
+        capture.adopt();
+
+        assertThat(SDC.get("key"), is(nullValue()));
     }
 
     private static void run(Runnable task) throws InterruptedException
@@ -178,5 +745,14 @@ public class SDCTests
         Thread t = new Thread(task);
         t.start();
         t.join();
+    }
+
+    private static void adopt(SDC captured)
+    {
+        try {
+            captured.adopt();
+        } catch (InterruptedException e) {
+            Throwables.propagate(e);
+        }
     }
 }
