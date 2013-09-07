@@ -4,12 +4,18 @@ import com.google.common.base.Throwables;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import static org.hamcrest.Matchers.*;
 
 import static org.junit.Assert.assertThat;
 
 public class SDCTests
 {
+    final ExecutorService _executor = Executors.newSingleThreadExecutor();
+
     @Before
     public void setup()
     {
@@ -20,6 +26,7 @@ public class SDCTests
     public void shouldBeInitiallyNull()
     {
         assertThat(SDC.get("key"), is(nullValue()));
+        assertThat(SDC.isSet("key"), is(equalTo(false)));
     }
 
     @Test
@@ -28,6 +35,7 @@ public class SDCTests
         SDC.put("key", "value");
 
         assertThat(SDC.get("key"), is(equalTo("value")));
+        assertThat(SDC.isSet("key"), is(equalTo(true)));
     }
 
     @Test
@@ -37,6 +45,7 @@ public class SDCTests
         SDC.remove("key");
 
         assertThat(SDC.get("key"), is(nullValue()));
+        assertThat(SDC.isSet("key"), is(equalTo(false)));
     }
 
     @Test
@@ -46,6 +55,7 @@ public class SDCTests
         SDC.put("key", null);
 
         assertThat(SDC.get("key"), is(nullValue()));
+        assertThat(SDC.isSet("key"), is(equalTo(false)));
     }
 
     @Test
@@ -54,6 +64,7 @@ public class SDCTests
         SDC.put("key", "value");
         SDC.put("key", "new-value");
         assertThat(SDC.get("key"), is(equalTo("new-value")));
+        assertThat(SDC.isSet("key"), is(equalTo(true)));
     }
 
     @Test
@@ -124,7 +135,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 assertThat(SDC.get("key"), is(equalTo("value")));
             }
         });
@@ -141,7 +152,7 @@ public class SDCTests
             public void run()
             {
                 SDC.put("key", "value");
-                adopt(captured);
+                captured.adopt();
                 assertThat(SDC.get("key"), is(nullValue()));
             }
         });
@@ -159,7 +170,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 assertThat(SDC.get("key"), is(equalTo("value")));
             }
         });
@@ -175,7 +186,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", "value");
             }
         });
@@ -193,7 +204,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", null);
             }
         });
@@ -213,7 +224,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -234,7 +245,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.remove("key");
             }
         });
@@ -255,7 +266,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", null);
             }
         });
@@ -276,7 +287,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -296,7 +307,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.remove("key");
             }
         });
@@ -316,7 +327,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captured);
+                captured.adopt();
                 SDC.put("key", null);
             }
         });
@@ -341,7 +352,33 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(captureForSharing);
+                captureForSharing.adopt();
+                SDC.put("key", "new-value");
+            }
+        });
+
+        captureForRollingBack.rollback();
+
+        assertThat(SDC.get("key"), is(equalTo("new-value")));
+    }
+
+    @Test
+    public void shouldSeeUpdateValueAfterRollbackBeforeSharing()
+            throws InterruptedException
+    {
+        SDC.put("key", "value");
+
+        final SDC captureForRollingBack = new SDC();
+
+        final SDC captureForSharing = new SDC();
+
+        SDC.put("key", "value to be rolled back");
+
+        run(new Runnable() {
+            @Override
+            public void run()
+            {
+                captureForSharing.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -364,7 +401,7 @@ public class SDCTests
             public void run()
             {
                 SDC captureForRollingBack = new SDC();
-                adopt(captureForSharing);
+                captureForSharing.adopt();
 
                 SDC.put("key", "new-value");
 
@@ -387,7 +424,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -396,7 +433,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -416,7 +453,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -425,7 +462,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("new-value"));
             }
         });
@@ -445,7 +482,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -454,7 +491,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -475,7 +512,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -484,7 +521,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -505,7 +542,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -514,7 +551,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("new-value"));
             }
         });
@@ -535,7 +572,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -544,7 +581,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -564,7 +601,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -573,7 +610,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -593,7 +630,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -602,7 +639,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 assertThat(SDC.get("key"), is("new-value"));
             }
         });
@@ -622,7 +659,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture1);
+                capture1.adopt();
                 assertThat(SDC.get("key"), is("value"));
             }
         });
@@ -631,7 +668,7 @@ public class SDCTests
             @Override
             public void run()
             {
-                adopt(capture2);
+                capture2.adopt();
                 SDC.put("key", "new-value");
             }
         });
@@ -649,8 +686,6 @@ public class SDCTests
         capture.localPut("key", "new-value");
 
         assertThat(SDC.get("key"), is("value"));
-
-        capture.rollback(); // prevent being reported as a bug
     }
 
     @Test
@@ -692,8 +727,6 @@ public class SDCTests
         capture.localPut("key", null);
 
         assertThat(SDC.get("key"), is("value"));
-
-        capture.rollback(); // prevent being reported as a bug
     }
 
     @Test
@@ -711,48 +744,78 @@ public class SDCTests
         assertThat(SDC.get("key"), is(nullValue()));
     }
 
+
+    /**
+     * This test is potentially dodgy.  It relies on the behaviour of gc and
+     * runFinalization.
+     */
     @Test
-    public void shouldSeeOriginalValueWhenRemoveFromCaptured()
+    public void shouldSeeCaptureRemoved() throws InterruptedException
     {
+        assertThat(SDC.countActiveCaptures(), is(0));
+
         SDC.put("key", "value");
 
-        SDC capture = new SDC();
+        assertThat(SDC.countActiveCaptures(), is(0));
 
-        capture.localRemove("key");
 
-        assertThat(SDC.get("key"), is("value"));
+        final SDC capture = new SDC();
 
-        capture.rollback(); // prevent being reported as a bug
+        assertThat(SDC.countActiveCaptures(), is(1));
+
+        run(new Runnable(){
+            @Override
+            public void run()
+            {
+                assertThat(SDC.countActiveCaptures(), is(0));
+                capture.adopt();
+                assertThat(SDC.countActiveCaptures(), is(0));
+                new SDC();
+                assertThat(SDC.countActiveCaptures(), is(1));
+                SDC.put("key", "new-value");
+                assertThat(SDC.countActiveCaptures(), is(1));
+            }
+        });
+        assertThat(SDC.countActiveCaptures(), is(1));
+        assertThat(SDC.get("key"), is("new-value"));
+
+        /*
+         * This part is dodgy.  System.gc and System.runFinalization provide
+         * the JVM with hints: it can ignore both calls.  The Thread.yield is
+         * to allow the finalizing thread a chance to continue, assuming it will
+         * finish the finalize method before returning here.
+         *
+         * In practise, this seems to work reliably for OpenJDK on my laptop.
+         */
+        System.gc();
+        System.runFinalization();
+        Thread.yield();
+
+        //  The following test is potentially dodgy; in practice, it seems fine.
+        assertThat(SDC.countActiveCaptures(), is(0));
+        assertThat(SDC.get("key"), is("new-value"));
     }
 
-    @Test
-    public void shouldSeeNullWhenRemoveFromCapturedAfterAdopt()
-            throws InterruptedException
+    /**
+     * Run some task in another thread.  The calling thread waits until
+     * the task is finished.  The SDC is reset before running the task.  Any
+     * AssertionError in the other thread is propagated.
+     */
+    private void run(final Runnable task) throws InterruptedException
     {
-        SDC.put("key", "value");
-
-        SDC capture = new SDC();
-
-        capture.localRemove("key");
-
-        capture.adopt();
-
-        assertThat(SDC.get("key"), is(nullValue()));
-    }
-
-    private static void run(Runnable task) throws InterruptedException
-    {
-        Thread t = new Thread(task);
-        t.start();
-        t.join();
-    }
-
-    private static void adopt(SDC captured)
-    {
+        Future f = _executor.submit(new Runnable(){
+            @Override
+            public void run()
+            {
+                SDC.reset(); // Provide a clean environment for task
+                task.run();
+                SDC.reset(); // Remove reference to the current capture
+            }
+        }, null);
         try {
-            captured.adopt();
-        } catch (InterruptedException e) {
-            Throwables.propagate(e);
+            f.get();
+        } catch (ExecutionException e) {
+            Throwables.propagate(e.getCause());
         }
     }
 }

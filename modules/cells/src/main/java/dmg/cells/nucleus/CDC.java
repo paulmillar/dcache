@@ -5,6 +5,7 @@ import org.slf4j.MDC;
 import dmg.util.TimebasedCounter;
 
 import org.dcache.commons.util.NDC;
+import org.dcache.util.SDC;
 
 /**
  * The Cell Diagnostic Context, a utility class for working with the
@@ -45,55 +46,17 @@ public class CDC implements AutoCloseable
     public final static String MDC_DOMAIN = "cells.domain";
     public final static String MDC_CELL = "cells.cell";
     public final static String MDC_SESSION = "cells.session";
+    public final static String SDC_DIAGNOSE = "cells.diagnose";
 
     private final static TimebasedCounter _sessionCounter =
         new TimebasedCounter();
 
     private final NDC _ndc;
+    private final SDC _sdc;
     private final String _session;
     private final String _cell;
     private final String _domain;
-    private final DiagnoseStatus _originalDiagnoseStatus;
-    private final DiagnoseStatus _activeDiagnoseStatus;
 
-    private static class DiagnoseStatus
-    {
-        private volatile boolean _isEnabled;
-
-        public DiagnoseStatus(boolean initialState)
-        {
-            _isEnabled = initialState;
-        }
-
-        public boolean isEnabled()
-        {
-            return _isEnabled;
-        }
-
-        public void setEnabled(boolean isEnabled)
-        {
-            _isEnabled = isEnabled;
-        }
-
-        @Override
-        public DiagnoseStatus clone()
-        {
-            return new DiagnoseStatus(_isEnabled);
-        }
-    }
-
-    /**
-     * Thread-local storage of a DiagnoseStatus object.  Child threads inherit
-     * their parent object when created.  The thread-local storage may have an
-     * alternative DiagnoseStatus object later on.
-     */
-    private static ThreadLocal<DiagnoseStatus> _diagnoseStorage =
-            new ThreadLocal<DiagnoseStatus>() {
-        @Override
-        protected DiagnoseStatus initialValue() {
-            return new DiagnoseStatus(false);
-        }
-    };
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -129,11 +92,7 @@ public class CDC implements AutoCloseable
         _session = MDC.get(MDC_SESSION);
         _cell = MDC.get(MDC_CELL);
         _domain = MDC.get(MDC_DOMAIN);
-
-        _originalDiagnoseStatus = _diagnoseStorage.get();
-        _activeDiagnoseStatus = _originalDiagnoseStatus.clone();
-        _diagnoseStorage.set(_activeDiagnoseStatus);
-
+        _sdc = new SDC();
         _ndc = NDC.cloneNdc();
     }
 
@@ -151,12 +110,11 @@ public class CDC implements AutoCloseable
         }
     }
 
-    private void apply(DiagnoseStatus diagnose)
+    private void apply()
     {
         setMdc(MDC_DOMAIN, _domain);
         setMdc(MDC_CELL, _cell);
         setMdc(MDC_SESSION, _session);
-        _diagnoseStorage.set(diagnose);
         if (_ndc == null) {
             NDC.clear();
         } else {
@@ -167,7 +125,8 @@ public class CDC implements AutoCloseable
     @Override
     public void close()
     {
-        apply(_originalDiagnoseStatus);
+        apply();
+        _sdc.rollback();
     }
 
     /**
@@ -177,7 +136,8 @@ public class CDC implements AutoCloseable
     public CDC restore()
     {
         CDC cdc = new CDC();
-        apply(_activeDiagnoseStatus);
+        apply();
+        _sdc.adopt();
         return cdc;
     }
 
@@ -357,22 +317,22 @@ public class CDC implements AutoCloseable
     public void updateStoredDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {
-            _activeDiagnoseStatus.setEnabled(true);
+            _sdc.localPut(SDC_DIAGNOSE, "enabled");
         }
     }
 
     public static boolean isDiagnoseEnabled()
     {
-        return _diagnoseStorage.get().isEnabled();
+        return SDC.get(SDC_DIAGNOSE) != null;
     }
 
     public static void setDiagnoseEnabled(boolean isEnabled)
     {
-        _diagnoseStorage.get().setEnabled(isEnabled);
+        SDC.put(SDC_DIAGNOSE, isEnabled ? "enabled" : null);
     }
 
     static void resetDiagnose()
     {
-        _diagnoseStorage.set(new DiagnoseStatus(false));
+        SDC.put(SDC_DIAGNOSE, null);
     }
 }
