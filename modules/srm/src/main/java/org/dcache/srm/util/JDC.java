@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.dcache.commons.util.NDC;
+import org.dcache.util.SDC;
 
 import static com.google.common.base.Strings.nullToEmpty;
 import static diskCacheV111.util.Base64.byteArrayToBase64;
@@ -49,19 +50,17 @@ import static diskCacheV111.util.Base64.byteArrayToBase64;
  */
 public class JDC implements AutoCloseable
 {
-    // FIXME this value must be the same as dmg.cells.nucleus.CDC.MDC_SESSION
+    // FIXME these values must be the same as dmg.cells.nucleus.CDC.MDC_SESSION
     // as the mapping JDC --> CDC currently requires this coincidence.
     public final static String MDC_SESSION = "cells.session";
-
-    // FIXME: this doesn't communicate with CDC any more
-    public final static String MDC_DIAGNOSE = "cells.diagnose";
+    public final static String SDC_DIAGNOSE = "cells.diagnose";
 
     private static final String _epoc = createEpocString() + ":";
     private static final AtomicLong _id = new AtomicLong();
 
     private final NDC _ndc;
     private final String _session;
-    private final String _diagnose;
+    private final SDC _sdc;
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -70,7 +69,7 @@ public class JDC implements AutoCloseable
     {
         _session = getSession();
         _ndc = NDC.cloneNdc();
-        _diagnose = MDC.get(MDC_DIAGNOSE);
+        _sdc = new SDC();
     }
 
     /**
@@ -91,7 +90,8 @@ public class JDC implements AutoCloseable
     @Override
     public void close()
     {
-        apply();
+        adopt();
+        _sdc.rollback();
     }
 
     /**
@@ -100,20 +100,25 @@ public class JDC implements AutoCloseable
     public JDC apply()
     {
         JDC jdc = new JDC();
-        setMdc(MDC_SESSION, _session);
-        setMdc(MDC_DIAGNOSE, _diagnose);
-        NDC.set(_ndc);
+        adopt();
+        _sdc.adopt();
         return jdc;
     }
 
-    static public void setDiagnoseEnabled(boolean enabled)
+    private void adopt()
     {
-        setMdc(MDC_DIAGNOSE, enabled ? "enabled" : null);
+        setMdc(MDC_SESSION, _session);
+        NDC.set(_ndc);
+    }
+
+    static public void setDiagnoseEnabled(boolean isEnabled)
+    {
+        SDC.put(SDC_DIAGNOSE, isEnabled ? "enabled" : null);
     }
 
     static public boolean isDiagnoseEnabled()
     {
-        return MDC.get(MDC_DIAGNOSE) != null;
+        return SDC.get(SDC_DIAGNOSE) != null;
     }
 
     /**
