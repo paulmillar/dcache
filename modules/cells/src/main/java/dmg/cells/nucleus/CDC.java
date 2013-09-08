@@ -235,7 +235,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_CELL, cellName);
         setMdc(MDC_DOMAIN, domainName);
         MDC.remove(MDC_SESSION);
-        resetDiagnose();
+        SDC.reset();
         NDC.clear();
         return cdc;
     }
