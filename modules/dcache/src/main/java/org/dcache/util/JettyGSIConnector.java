@@ -35,7 +35,10 @@ import java.security.cert.X509Certificate;
 import java.util.concurrent.TimeUnit;
 
 import dmg.cells.nucleus.CDC;
+import dmg.cells.nucleus.CellEndpoint;
+import dmg.cells.nucleus.CellInfo;
 
+import org.dcache.cells.CellMessageSender;
 import org.dcache.commons.util.NDC;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -57,7 +60,7 @@ import static org.globus.axis.gsi.GSIConstants.*;
  *
  */
 public class JettyGSIConnector
-    extends SocketConnector
+    extends SocketConnector implements CellMessageSender
 {
     private static final Logger _log =
         LoggerFactory.getLogger(JettyGSIConnector.class);
@@ -88,6 +91,7 @@ public class JettyGSIConnector
     private TimeUnit _trustAnchorRefreshIntervalUnit = HOURS;
     private long _hostCertRefreshTimestamp = 0;
     private long _trustAnchorRefreshTimestamp = 0;
+    private CellInfo _cellInfo;
 
     private volatile boolean _autoFlush;
     private volatile boolean _requireClientAuth = true;
@@ -186,6 +190,13 @@ public class JettyGSIConnector
         checkDirectory(caCertDir);
         _caCertDir = caCertDir;
     }
+
+    @Override
+    public void setCellEndpoint(CellEndpoint endpoint)
+    {
+        _cellInfo = endpoint.getCellInfo();
+    }
+
 
     public boolean getEncrypt()
     {
@@ -395,7 +406,7 @@ public class JettyGSIConnector
     {
         Socket socket = _serverSocket.accept();
 
-        try (CDC ignored = new CDC()) {
+        try (CDC ignored = CDC.reset(_cellInfo.getCellName(), _cellInfo.getDomainName())) {
             NDC.push(socket.getInetAddress().getHostAddress() + ":" +
                     socket.getPort());
 
