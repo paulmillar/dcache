@@ -1,5 +1,7 @@
 package org.dcache.util;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.google.common.base.Throwables;
 import org.junit.Before;
 import org.junit.Test;
@@ -8,9 +10,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
 import static org.hamcrest.Matchers.*;
 
 import static org.junit.Assert.assertThat;
+import static org.slf4j.Logger.ROOT_LOGGER_NAME;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class SDCTests
 {
@@ -19,6 +24,7 @@ public class SDCTests
     @Before
     public void setup()
     {
+        setLoggingLevel(Level.INFO);
         SDC.reset();
     }
 
@@ -110,17 +116,25 @@ public class SDCTests
     @Test(expected=IllegalStateException.class)
     public void shouldThrowExceptionWhenRollbackTwice()
     {
+        setLoggingLevel(Level.OFF);
         SDC captured = new SDC();
         captured.rollback();
         captured.rollback();
     }
 
-    @Test(expected=IllegalStateException.class)
-    public void shouldThrowExceptionWhenAdoptedTwice() throws InterruptedException
+    @Test
+    public void shouldSupportCallingAdoptTwice() throws InterruptedException
     {
+        SDC.put("key", "value");
         SDC captured = new SDC();
+
+        SDC.reset();
         captured.adopt();
+        assertThat(SDC.get("key"), is(equalTo("value")));
+
+        SDC.reset();
         captured.adopt();
+        assertThat(SDC.get("key"), is(equalTo("value")));
     }
 
     @Test
@@ -789,7 +803,13 @@ public class SDCTests
          */
         System.gc();
         System.runFinalization();
+        // There is a race between this thread counting the number of shared
+        // contexts and the finalizing thread removing the context.  Normally
+        // Thread.yield is sufficient to allow the finalizing thread to win the
+        // race, but we give it a head start to make this more likely.
+        Thread.sleep(10);
         Thread.yield();
+        Thread.sleep(10);
 
         //  The following test is potentially dodgy; in practice, it seems fine.
         assertThat(SDC.countActiveCaptures(), is(0));
@@ -817,5 +837,11 @@ public class SDCTests
         } catch (ExecutionException e) {
             Throwables.propagate(e.getCause());
         }
+    }
+
+    public static void setLoggingLevel(Level level)
+    {
+        Logger root = (ch.qos.logback.classic.Logger) getLogger(ROOT_LOGGER_NAME);
+        root.setLevel(level);
     }
 }
