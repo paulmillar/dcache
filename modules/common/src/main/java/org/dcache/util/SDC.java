@@ -1,5 +1,6 @@
 package org.dcache.util;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +53,8 @@ import static com.google.common.base.Preconditions.checkState;
 public class SDC
 {
     private static final Logger LOG  = LoggerFactory.getLogger(SDC.class);
+
+    private static final Joiner WITH_NEWLINES = Joiner.on("\n        ");
 
     /**
      * The WeakReference supplied by Java does not have an equals method.  This
@@ -411,7 +414,8 @@ public class SDC
         public String toString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.append("MainContext: changes=").append(_aggregatedChanges);
+            sb.append("MainContext(").append(Integer.toHexString(hashCode())).
+                    append("): changes=").append(_aggregatedChanges);
             for (WeakReferenceWithEquals<CapturedContext> captureRef : _activeCaptures) {
                 CapturedContext capture = captureRef.get();
                 if (capture != null) {
@@ -463,6 +467,9 @@ public class SDC
 
         private final AtomicBoolean _hasBeenUsed = new AtomicBoolean();
 
+        private final StackTraceElement[] _creationStacktrace;
+        private StackTraceElement[] _usageStacktrace;
+
         public CapturedContext(MainContext<K,V> main, SimpleMap storage,
                 DelayedSimpleMap aggregation)
         {
@@ -471,6 +478,7 @@ public class SDC
             _pending = new MaintainingSimpleMap(storage, aggregation);
             _pending.describeInnerAs("<MainContext>");
             _staged = new DelayedSimpleMap(_pending);
+            _creationStacktrace = Thread.currentThread().getStackTrace();
         }
 
         public MainContext<K,V> getMainContext()
@@ -502,8 +510,7 @@ public class SDC
 
         public void stagedPut(K key, V value)
         {
-            checkState(!_hasBeenUsed.get(), "putGlobal not allowed after " +
-                    "adopt or rollback");
+            failUnless(!_hasBeenUsed.get());
             _staged.put(key, value);
         }
 
@@ -530,18 +537,42 @@ public class SDC
 
         public void removeCapture()
         {
-            checkState(!_hasBeenUsed.getAndSet(true), "removeCapture not " +
-                    "allowed after adopt or rollback");
+            failUnless(!_hasBeenUsed.getAndSet(true));
+            rememberUsage();
             _main.removeCapture(this);
         }
 
         public void applyCapture()
         {
-            checkState(!_hasBeenUsed.getAndSet(true), "applyCapture not " +
-                    "allowed after adopt or rollback");
-            _staged.commit();  // Write _staged into _pending
-            _pending.commit(); // Write _pending into underlying storage
-            _main.removeCapture(this);
+            if (!_hasBeenUsed.getAndSet(true)) {
+                _staged.commit();  // Update pending with localPut values
+                _pending.commit(); // Write pending into main storage
+                _main.removeCapture(this);
+            }
+        }
+
+        /**
+         * Custom version of Guava's checkState.
+         */
+        private void failUnless(boolean isValidState)
+        {
+            if (!isValidState) {
+                LOG.error("Cannot use context after adopt or rollback.  " +
+                        "Context captured:\n        {}" +
+                        "\nCaptured context used:\n        {}" +
+                        "\nAttempted second use:\n        {}",
+                        WITH_NEWLINES.join(_creationStacktrace),
+                        WITH_NEWLINES.join(_usageStacktrace),
+                        WITH_NEWLINES.join(Thread.currentThread().getStackTrace()));
+
+                throw new IllegalStateException("SDC captured context " +
+                        "cannot be used after adopt or rollback");
+            }
+        }
+
+        private void rememberUsage()
+        {
+            _usageStacktrace = Thread.currentThread().getStackTrace();
         }
 
         public void updateAggregation()
