@@ -155,6 +155,11 @@ public class Gplazma2LoginStrategy
         WARN
     }
 
+    private void printLoginResult(LoginResult result)
+    {
+        printLoginResult(result, EnumSet.noneOf(PrintFeatures.class));
+    }
+
     private void printLoginResult(LoginResult result,
             EnumSet<PrintFeatures> features)
     {
@@ -182,7 +187,7 @@ public class Gplazma2LoginStrategy
             _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
 
             if(_log.isDebugEnabled()) {
-                printLoginResult(result, EnumSet.noneOf(PrintFeatures.class));
+                printLoginResult(result);
             }
             _failedLogins.remove(subject);
 
@@ -190,17 +195,14 @@ public class Gplazma2LoginStrategy
         } catch (AuthenticationException e) {
             _diagnosePrincipals.acceptAll(result.allObservedPrincipals());
 
-            if(!_failedLogins.has(subject)) {
-                _failedLogins.add(subject);
-
+            if (isResultPrintWorthy(subject)) {
                 if (result.hasStarted()) {
-                    _log.warn("Login attempt failed; " +
-                            "detailed explanation follows:");
+                    _log.warn("Login attempt failed;  detailed explanation " +
+                            "follows:");
                     printLoginResult(result, EnumSet.of(PrintFeatures.WARN));
                 } else {
                     _log.warn("Login attempt failed: {}", e.getMessage());
                 }
-
             }
 
             // We deliberately hide the reason why the login failed from the
@@ -208,6 +210,18 @@ public class Gplazma2LoginStrategy
             // discovering whether certain user accounts exist.
             throw new PermissionDeniedCacheException("login failed");
         }
+    }
+
+    private boolean isResultPrintWorthy(Subject subject)
+    {
+        boolean worthy = _log.isDebugEnabled();
+
+        if(!_failedLogins.has(subject)) {
+            _failedLogins.add(subject);
+            worthy = true;
+        }
+
+        return worthy;
     }
 
     @Override
