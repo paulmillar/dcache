@@ -346,6 +346,9 @@ public abstract class AbstractFtpDoorV1
      */
     protected StreamEngine _engine;
 
+
+    private final CDC _constructorCdc;
+
     /**
      * Writer for control channel.
      */
@@ -1146,6 +1149,7 @@ public abstract class AbstractFtpDoorV1
     public AbstractFtpDoorV1(String name, StreamEngine engine, Args args)
     {
         super(name, args);
+        _constructorCdc = new CDC();
 
         try {
             _engine = engine;
@@ -1431,6 +1435,7 @@ public abstract class AbstractFtpDoorV1
     @Override
     public void run()
     {
+        _constructorCdc.restore();
         try {
             try {
                 /* Notice that we do not close the input stream, as
