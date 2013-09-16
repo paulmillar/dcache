@@ -1410,30 +1410,29 @@ public class PnfsManagerV3
                     continue;
                 }
 
-                CDC.setMessageContext(message);
-                try {
-                    /* Discard messages if we are close to their
-                     * timeout (within 10% of the TTL or 10 seconds,
-                     * whatever is smaller)
-                     */
-                    PnfsMessage pnfs =
-                        (PnfsMessage)message.getMessageObject();
-                    if (message.getLocalAge() > getAdjustedTtl(message)
-                        && useEarlyDiscard(pnfs)) {
-                        _log.warn("Discarding " + pnfs.getClass().getSimpleName() +
-                                  " because its time to live has been exceeded.");
-                        sendTimeout(message, "TTL exceeded");
-                        continue;
-                    }
+                try (CDC ignored = CDC.setMessageContext(message)) {
+                    try {
+                        /* Discard messages if we are close to their
+                         * timeout (within 10% of the TTL or 10 seconds,
+                         * whatever is smaller)
+                         */
+                        PnfsMessage pnfs =
+                            (PnfsMessage)message.getMessageObject();
+                        if (message.getLocalAge() > getAdjustedTtl(message)
+                            && useEarlyDiscard(pnfs)) {
+                            _log.warn("Discarding " + pnfs.getClass().getSimpleName() +
+                                      " because its time to live has been exceeded.");
+                            sendTimeout(message, "TTL exceeded");
+                            continue;
+                        }
 
-                    processPnfsMessage(message, pnfs);
-                    fold(pnfs);
-                } catch(Throwable processException) {
-                    _log.warn( "processPnfsMessage : "+
-                               Thread.currentThread().getName()+" : "+
-                               processException );
-                } finally {
-                    CDC.clearMessageContext();
+                        processPnfsMessage(message, pnfs);
+                        fold(pnfs);
+                    } catch(Throwable processException) {
+                        _log.warn( "processPnfsMessage : "+
+                                   Thread.currentThread().getName()+" : "+
+                                   processException );
+                    }
                 }
             }
             _log.info("Thread <"+Thread.currentThread().getName()+"> finished");

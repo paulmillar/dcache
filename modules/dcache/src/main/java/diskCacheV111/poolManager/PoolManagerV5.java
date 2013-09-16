@@ -63,6 +63,7 @@ import org.dcache.poolmanager.PoolInfo;
 import org.dcache.poolmanager.PoolMonitor;
 import org.dcache.poolmanager.PoolSelector;
 import org.dcache.poolmanager.Utils;
+import org.dcache.util.SDC;
 import org.dcache.util.Version;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.vehicles.PoolManagerSelectLinkGroupForWriteMessage;
@@ -773,6 +774,7 @@ public class PoolManagerV5
         private CellMessage _envelope;
         private PoolMgrSelectWritePoolMsg _request;
         private PnfsId _pnfsId;
+        private final CDC _cdc;
 
         public WriteRequestHandler(CellMessage envelope,
                                    PoolMgrSelectWritePoolMsg msg)
@@ -780,11 +782,17 @@ public class PoolManagerV5
             _envelope = envelope;
             _request = msg;
             _pnfsId = _request.getPnfsId();
+           _log.error("Diagnose (main: initial): {} {}", CDC.isDiagnoseEnabled(), SDC.describe());
+            _cdc = new CDC();
+           _log.error("Diagnose (main: after capture): {} {}", CDC.isDiagnoseEnabled(), SDC.describe());
             new Thread(this, "writeHandler").start();
+            _log.error("Diagnose (main: after restore): {} {}", CDC.isDiagnoseEnabled(), SDC.describe());
         }
 
        @Override
        public void run(){
+           _cdc.restore();
+           _log.error("Diagnose (writeHandler: after restore): {} {}", CDC.isDiagnoseEnabled(), SDC.describe());
            FileAttributes fileAttributes = _request.getFileAttributes();
            StorageInfo storageInfo = fileAttributes.getStorageInfo();
            ProtocolInfo protocolInfo = _request.getProtocolInfo();

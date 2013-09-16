@@ -262,6 +262,7 @@ function exercise() # $1 protocol
 
     START=$(wc -l $base/var/log/dCacheDomain.log | awk '{print $1}')
     echo "##  exercise $1 ($label)"
+    echo "exercise $1 ($label)" >&3
     case $1 in
 	SRM)	
 	    srmLs localhost 8443 /
@@ -306,6 +307,14 @@ function exercise() # $1 protocol
 	    curl -so/dev/null -l -u admin:dickerelch ftp://localhost:22126/
 	    ;;
 
+        gsiftp)
+	    buildURI gsiftp
+            globus-url-copy file:///bin/bash $URI
+            # globus-url-copy just disconnects after the transfer, which
+            # causes a problem in a few seconds.
+            sleep 4
+            ;;
+
 	*)
 	    echo ERROR: unknown protocol $1
 	    ;;
@@ -349,13 +358,17 @@ host=$(uname -n)
 
 ensureDcacheRunning
 
-testProtocol SRM          SRM-$host      "dn:$DN"
-testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
-testProtocol dcap         DCap-$host
-testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
-testProtocol webdav       WebDAV-$host
-testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
-testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
+echo Output saved as testing-diagnose.out
+exec 3>&1 >testing-diagnose.out 2>&1
+
+#testProtocol SRM          SRM-$host      "dn:$DN"
+#testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
+#testProtocol dcap         DCap-$host
+#testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
+#testProtocol webdav       WebDAV-$host
+#testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
+#testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
+testProtocol gsiftp       GFTP-$host
 
 #  TODO
 #

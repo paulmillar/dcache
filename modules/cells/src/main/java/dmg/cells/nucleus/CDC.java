@@ -268,32 +268,19 @@ public class CDC implements AutoCloseable
     /**
      * Setup message related diagnostic context for the calling
      * thread. Adds information about a message to the MDC and NDC.
-     *
-     * @see clearMessageContext
+     * The CDC is captured before any changes are made and returned.  This
+     * allows the caller to revert to the previous CDC state
      */
-    static public void setMessageContext(CellMessage envelope)
+    static public CDC setMessageContext(CellMessage envelope)
     {
+        CDC cdc = new CDC();
         Object session = envelope.getSession();
         NDC.push(getMessageContext(envelope));
         setMdc(MDC_SESSION, (session == null) ? null : session.toString());
         if (envelope.isDiagnoseEnabled()) {
             setDiagnoseEnabled(true);
         }
-    }
-
-    /**
-     * Clears the diagnostic context entries added by
-     * <code>setMessageContext</code>.  For this to work, the NDC has
-     * to be in the same state as when <code>setMessageContext</code>
-     * returned.
-     *
-     * @see setMessageContext
-     */
-    static public void clearMessageContext()
-    {
-        MDC.remove(MDC_SESSION);
-        resetDiagnose();
-        NDC.pop();
+        return cdc;
     }
 
     /**

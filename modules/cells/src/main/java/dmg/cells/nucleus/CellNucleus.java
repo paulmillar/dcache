@@ -1029,24 +1029,26 @@ public class CellNucleus implements ThreadFactory
                     return;
                 }
 
-                CDC.setMessageContext(msg);
-                try {
-                    LOGGER.trace("messageThread : delivering message: {}", msg);
-                    _cell.messageArrived(new MessageEvent(msg));
-                    LOGGER.trace("messageThread : delivering message done: {}", msg);
-                } catch (RuntimeException e) {
-                    if (!msg.isReply()) {
-                        try {
-                            msg.revertDirection();
-                            msg.setMessageObject(e);
-                            sendMessage(msg);
-                        } catch (NoRouteToCellException f) {
-                            LOGGER.error("PANIC : Problem returning answer: {}", f);
+                try (CDC ignored = CDC.setMessageContext(msg)) {
+                    try {
+                        LOGGER.trace("messageThread : delivering message: {}",
+                                msg);
+                        _cell.messageArrived(new MessageEvent(msg));
+                        LOGGER.trace("messageThread : delivering message " +
+                                "done: {}", msg);
+                    } catch (RuntimeException e) {
+                        if (!msg.isReply()) {
+                            try {
+                                msg.revertDirection();
+                                msg.setMessageObject(e);
+                                sendMessage(msg);
+                            } catch (NoRouteToCellException f) {
+                                LOGGER.error("PANIC : Problem returning " +
+                                        "answer: {}", f);
+                            }
                         }
+                        throw e;
                     }
-                    throw e;
-                } finally {
-                    CDC.clearMessageContext();
                 }
             }
         }

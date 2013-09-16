@@ -27,6 +27,7 @@ public class DelayedReply implements Reply
 
     public synchronized void reply(Serializable msg)
     {
+        // FIXME: Save whether diagnose is enabled
         _msg = msg;
         if (_envelope != null) {
             send();
@@ -36,6 +37,7 @@ public class DelayedReply implements Reply
     protected synchronized void send()
     {
         try {
+            // FIXME: Save apply whether diagnose is enabled
             _envelope.setMessageObject(_msg);
             _endpoint.sendMessage(_envelope);
         } catch (NoRouteToCellException e) {

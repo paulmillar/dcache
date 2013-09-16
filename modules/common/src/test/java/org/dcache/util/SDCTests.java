@@ -6,13 +6,17 @@ import com.google.common.base.Throwables;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.ref.ReferenceQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.hamcrest.Matchers.*;
-
 import static org.junit.Assert.assertThat;
 import static org.slf4j.Logger.ROOT_LOGGER_NAME;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -20,6 +24,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class SDCTests
 {
     final ExecutorService _executor = Executors.newSingleThreadExecutor();
+    private static final AssertionError PLACEHOLDER = new AssertionError();
 
     @Before
     public void setup()
@@ -766,54 +771,130 @@ public class SDCTests
     @Test
     public void shouldSeeCaptureRemoved() throws InterruptedException
     {
-        assertThat(SDC.countActiveCaptures(), is(0));
+        assertThat(SDC.countCaptures(), is(0));
 
         SDC.put("key", "value");
 
-        assertThat(SDC.countActiveCaptures(), is(0));
-
+        assertThat(SDC.countCaptures(), is(0));
 
         final SDC capture = new SDC();
 
-        assertThat(SDC.countActiveCaptures(), is(1));
+        assertThat(SDC.countCaptures(), is(1));
+
+        final ReferenceQueue queue = new ReferenceQueue();
 
         run(new Runnable(){
             @Override
             public void run()
             {
-                assertThat(SDC.countActiveCaptures(), is(0));
+                // Thread is initially unconnected
+                assertThat(SDC.countCaptures(), is(0));
+
                 capture.adopt();
-                assertThat(SDC.countActiveCaptures(), is(0));
-                new SDC();
-                assertThat(SDC.countActiveCaptures(), is(1));
+                assertThat(SDC.countCaptures(), is(0));
+
+                new SDC().addPhantomToQueue(queue);
+
+                assertThat(SDC.countCaptures(), is(1));
                 SDC.put("key", "new-value");
-                assertThat(SDC.countActiveCaptures(), is(1));
+                assertThat(SDC.countCaptures(), is(1));
             }
         });
-        assertThat(SDC.countActiveCaptures(), is(1));
+        assertThat(SDC.countCaptures(), is(1));
         assertThat(SDC.get("key"), is("new-value"));
 
         /*
          * This part is dodgy.  System.gc and System.runFinalization provide
-         * the JVM with hints: it can ignore both calls.  The Thread.yield is
-         * to allow the finalizing thread a chance to continue, assuming it will
-         * finish the finalize method before returning here.
-         *
-         * In practise, this seems to work reliably for OpenJDK on my laptop.
+         * the JVM with hints: it can ignore both calls.  In practise, this
+         * seems to work OK for OpenJDK on my laptop provided we give the
+         * finalizer the opportunity to do its job.
          */
         System.gc();
         System.runFinalization();
-        // There is a race between this thread counting the number of shared
-        // contexts and the finalizing thread removing the context.  Normally
-        // Thread.yield is sufficient to allow the finalizing thread to win the
-        // race, but we give it a head start to make this more likely.
+
+        /* This doesn't work, for some reason ...
+        Reference r = queue.remove(5000);
+        assertThat(r, is(not(nullValue())));
+        */
+
+        // Ugly hack since waiting for the PhantomReference to be enqueued
+        // doesn't seem to work.
         Thread.sleep(10);
         Thread.yield();
         Thread.sleep(10);
 
-        //  The following test is potentially dodgy; in practice, it seems fine.
-        assertThat(SDC.countActiveCaptures(), is(0));
+        assertThat(SDC.countCaptures(), is(0));
         assertThat(SDC.get("key"), is("new-value"));
+    }
+
+
+    @Test
+    public void shouldShowValueStoredAfterCaptureForRollback()
+    {
+        SDC captureForRevert = new SDC();
+
+        SDC.put("key", "value");
+
+        SDC capture = new SDC();
+
+        captureForRevert.rollback();
+
+        assertThat(SDC.get("key"), is(nullValue()));
+
+        capture.adopt();
+
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void shouldSeeValueSetAfterFirstCaptureAndAfterSecondCapture()
+    {
+        SDC capture = new SDC();
+        SDC.put("key", "value");
+        SDC capture2 = new SDC();
+        assertThat(SDC.get("key"), is("value"));
+    }
+
+    @Test
+    public void should() throws InterruptedException, ExecutionException
+    {
+        SDC capture = new SDC();
+        SDC.put("key", "value");
+        final SDC capture2 = new SDC();
+        Future f;
+
+        synchronized(capture2) {
+            f = runInThread(new Callable<Void>() {
+                @Override
+                public Void call() throws InterruptedException
+                {
+                    synchronized(capture2) {
+                        capture2.adopt();
+                        System.out.println("thread (after adopt) : " + SDC.describe());
+                        assertThat(SDC.get("key"), is("value"));
+
+
+                        capture2.notify();
+                        capture2.wait();
+
+                        System.out.println("thread (after rollback) : " + SDC.describe());
+                        assertThat(SDC.get("key"), is("value"));
+                    }
+
+                    return null;
+                }
+            });
+
+            capture2.wait();
+
+            System.out.println("main (before rollback) : " + SDC.describe());
+            capture.rollback();
+            System.out.println("main (after rollback) : " + SDC.describe());
+
+            capture2.notify();
+        }
+
+        f.get();
     }
 
     /**
@@ -837,6 +918,83 @@ public class SDCTests
         } catch (ExecutionException e) {
             Throwables.propagate(e.getCause());
         }
+    }
+
+    private Future runInThread(final Callable<Void> task)
+    {
+        final LinkedBlockingQueue<Throwable> queue =
+                new LinkedBlockingQueue();
+
+        final Thread thread = new Thread(new Runnable(){
+                @Override
+                public void run()
+                {
+                    try {
+                        try {
+                            task.call();
+                            queue.put(PLACEHOLDER);
+                        } catch (AssertionError e) {
+                            queue.put(e);
+                        }
+                    } catch (Exception e) {
+                        try {
+                            queue.put(e);
+                        } catch (InterruptedException ex) {
+                            // bad luck
+                        }
+                    }
+                }
+            });
+
+        thread.start();
+
+        return new Future() {
+            private volatile boolean _isDone;
+
+            @Override
+            public boolean cancel(boolean mayInterruptIfRunning)
+            {
+                if (mayInterruptIfRunning && !_isDone) {
+                    thread.interrupt();
+                }
+
+                return false;
+            }
+
+            @Override
+            public boolean isCancelled()
+            {
+                return false;
+            }
+
+            @Override
+            public boolean isDone()
+            {
+                return _isDone;
+            }
+
+            @Override
+            public Object get() throws InterruptedException, ExecutionException
+            {
+                Throwable t = queue.take();
+                _isDone = true;
+                if (t == PLACEHOLDER) {
+                    return null;
+                } else if (t instanceof InterruptedException) {
+                    throw (InterruptedException) t;
+                } else if (t instanceof Error) {
+                    throw (Error) t;
+                } else {
+                    throw new ExecutionException(t.getMessage(), t);
+                }
+            }
+
+            @Override
+            public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+        };
     }
 
     public static void setLoggingLevel(Level level)
