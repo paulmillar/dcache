@@ -6,6 +6,7 @@ import com.google.common.base.Throwables;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -382,14 +383,14 @@ public class SDCTests
     }
 
     @Test
-    public void shouldSeeUpdateValueAfterRollbackBeforeSharing()
+    public void shouldSeeFirstValueAfterRollbackBeforeSharing()
             throws InterruptedException
     {
         SDC.put("key", "value");
 
-        final SDC captureForRollingBack = new SDC();
+        final SDC captureForRollback = new SDC();
 
-        final SDC captureForSharing = new SDC();
+        final SDC captureForAdopt = new SDC();
 
         SDC.put("key", "value to be rolled back");
 
@@ -397,14 +398,14 @@ public class SDCTests
             @Override
             public void run()
             {
-                captureForSharing.adopt();
+                captureForAdopt.adopt();
                 SDC.put("key", "new-value");
             }
         });
 
-        captureForRollingBack.rollback();
+        captureForRollback.rollback();
 
-        assertThat(SDC.get("key"), is(equalTo("new-value")));
+        assertThat(SDC.get("key"), is(equalTo("value")));
     }
 
     @Test
@@ -777,7 +778,7 @@ public class SDCTests
 
         assertThat(SDC.countCaptures(), is(0));
 
-        final SDC capture = new SDC();
+        final SDC captureForAdopt = new SDC();
 
         assertThat(SDC.countCaptures(), is(1));
 
@@ -790,10 +791,12 @@ public class SDCTests
                 // Thread is initially unconnected
                 assertThat(SDC.countCaptures(), is(0));
 
-                capture.adopt();
+                captureForAdopt.adopt();
                 assertThat(SDC.countCaptures(), is(0));
 
-                new SDC().addPhantomToQueue(queue);
+                SDC captureForGC = new SDC();
+
+                captureForGC.addPhantomToQueue(queue);
 
                 assertThat(SDC.countCaptures(), is(1));
                 SDC.put("key", "new-value");
@@ -812,16 +815,14 @@ public class SDCTests
         System.gc();
         System.runFinalization();
 
-        /* This doesn't work, for some reason ...
-        Reference r = queue.remove(5000);
-        assertThat(r, is(not(nullValue())));
-        */
+        //Reference r = queue.remove(5000);
+        //assertThat(r, is(not(nullValue())));
 
         // Ugly hack since waiting for the PhantomReference to be enqueued
         // doesn't seem to work.
-        Thread.sleep(10);
+        Thread.sleep(100);
         Thread.yield();
-        Thread.sleep(10);
+        Thread.sleep(100);
 
         assertThat(SDC.countCaptures(), is(0));
         assertThat(SDC.get("key"), is("new-value"));
@@ -856,28 +857,28 @@ public class SDCTests
     }
 
     @Test
-    public void should() throws InterruptedException, ExecutionException
+    public void shouldSplitOffCaptureWhenRollbackOfEarlierCapture() throws InterruptedException, ExecutionException
     {
-        SDC capture = new SDC();
+        SDC captureForRollback = new SDC();
         SDC.put("key", "value");
-        final SDC capture2 = new SDC();
-        Future f;
+        final SDC captureForAdopt = new SDC();
 
-        synchronized(capture2) {
-            f = runInThread(new Callable<Void>() {
+        Future f;
+        synchronized(captureForAdopt) {
+            f = runParallel(new Callable<Void>() {
                 @Override
                 public Void call() throws InterruptedException
                 {
-                    synchronized(capture2) {
-                        capture2.adopt();
-                        System.out.println("thread (after adopt) : " + SDC.describe());
-                        assertThat(SDC.get("key"), is("value"));
+                    synchronized(captureForAdopt) {
+                        try {
+                            captureForAdopt.adopt();
+                            assertThat(SDC.get("key"), is("value"));
+                        } finally {
+                            captureForAdopt.notify();
+                        }
 
+                        captureForAdopt.wait(); // wait for rollback
 
-                        capture2.notify();
-                        capture2.wait();
-
-                        System.out.println("thread (after rollback) : " + SDC.describe());
                         assertThat(SDC.get("key"), is("value"));
                     }
 
@@ -885,13 +886,13 @@ public class SDCTests
                 }
             });
 
-            capture2.wait();
+            captureForAdopt.wait(); // wait for adopt
 
-            System.out.println("main (before rollback) : " + SDC.describe());
-            capture.rollback();
-            System.out.println("main (after rollback) : " + SDC.describe());
+            captureForRollback.rollback();
 
-            capture2.notify();
+            assertThat(SDC.get("key"), is(nullValue()));
+
+            captureForAdopt.notify();
         }
 
         f.get();
@@ -920,7 +921,7 @@ public class SDCTests
         }
     }
 
-    private Future runInThread(final Callable<Void> task)
+    private Future runParallel(final Callable<Void> task)
     {
         final LinkedBlockingQueue<Throwable> queue =
                 new LinkedBlockingQueue();
