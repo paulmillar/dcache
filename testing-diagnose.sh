@@ -308,10 +308,11 @@ function exercise() # $1 protocol
 	    ;;
 
         gsiftp)
-	    buildURI gsiftp
+	    buildURI gsiftp 2811
             globus-url-copy file:///bin/bash $URI
-            # globus-url-copy just disconnects after the transfer, which
-            # causes a problem in a few seconds.
+            # NB. globus-url-copy just disconnects after the transfer, which
+            #     causes a problem a few seconds later.  We wait to capture
+            #     that in this run.
             sleep 4
             ;;
 
@@ -361,13 +362,13 @@ ensureDcacheRunning
 echo Output saved as testing-diagnose.out
 exec 3>&1 >testing-diagnose.out 2>&1
 
-#testProtocol SRM          SRM-$host      "dn:$DN"
-#testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
-#testProtocol dcap         DCap-$host
-#testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
-#testProtocol webdav       WebDAV-$host
-#testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
-#testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
+testProtocol SRM          SRM-$host      "dn:$DN"
+testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
+testProtocol dcap         DCap-$host
+testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
+testProtocol webdav       WebDAV-$host
+testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
+testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
 testProtocol gsiftp       GFTP-$host
 
 #  TODO
