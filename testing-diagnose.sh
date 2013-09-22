@@ -369,7 +369,7 @@ testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
 testProtocol webdav       WebDAV-$host
 testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
 testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
-testProtocol gsiftp       GFTP-$host
+testProtocol gsiftp       GFTP-$host     "dn:$DN"
 
 #  TODO
 #
