@@ -316,6 +316,16 @@ function exercise() # $1 protocol
             sleep 4
             ;;
 
+        xrootd)
+	    buildURI root 1094
+            xrdcp -s /bin/bash $URI
+            ;;
+
+        gsi-xrootd)
+	    buildURI roots 1095
+            xrdcp -s /bin/bash $URI
+            ;;
+
 	*)
 	    echo ERROR: unknown protocol $1
 	    ;;
@@ -362,18 +372,19 @@ ensureDcacheRunning
 echo Output saved as testing-diagnose.out
 exec 3>&1 >testing-diagnose.out 2>&1
 
-testProtocol SRM          SRM-$host      "dn:$DN"
-testProtocol SRM-over-SSL SRM-$host      "dn:$DN"
+testProtocol SRM          SRM-$host        "dn:$DN"
+testProtocol SRM-over-SSL SRM-$host        "dn:$DN"
 testProtocol dcap         DCap-$host
-testProtocol gsidcap      DCap-gsi-$host "dn:$DN"
+testProtocol gsidcap      DCap-gsi-$host   "dn:$DN"
 testProtocol webdav       WebDAV-$host
-testProtocol webdavs      WebDAV-S-$host "org.dcache.auth.UidPrincipal:0"
-testProtocol ftp          FTP-$host      "org.dcache.auth.UidPrincipal:0"
-testProtocol gsiftp       GFTP-$host     "dn:$DN"
+testProtocol webdavs      WebDAV-S-$host   "org.dcache.auth.UidPrincipal:0"
+testProtocol ftp          FTP-$host        "org.dcache.auth.UidPrincipal:0"
+testProtocol gsiftp       GFTP-$host       "dn:$DN"
+testProtocol xrootd       Xrootd-$host
+testProtocol gsi-xrootd   Xrootd-gsi-$host "dn:$DN"
+
 
 #  TODO
 #
-# gsiftp
-# xrootd
 # NFS v3
 # NFS v4.1
