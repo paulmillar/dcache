@@ -1,25 +1,25 @@
 package org.dcache.util;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.ref.PhantomReference;
-import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * The SharableDiagnosticContext provides a set of key-value associations that,
@@ -60,36 +60,338 @@ public class SDC
 
     private static final Joiner WITH_NEWLINES = Joiner.on("\n        ");
 
+
     /**
-     * The WeakReference supplied by Java does not have an equals method.  This
-     * class simply adds an equals and hashCode based on the wrapped object.
+     * A class that implements Queue where all values are wrapped in a
+     * WeakReference.  The methods never expose that weak-references are held;
+     * the iterator will skip over any WeakReference that has been cleared as
+     * will the Queue-related operations.
+     * <p>
+     * NB. This class differs from Queue as methods that operate on a specific
+     * item are checked for being the same object, rather than checking with
+     * the equals method.
+     * <p>
+     * The class wraps a ConcurrentLinkedDeque object, so inherits the
+     * concurrency behaviour from that class.
+     * <p>
+     * The size method tries to make sure all cleared WeakReferences are not
+     * included.  This makes the method slow; however, as it is only used when
+     * debugging SDC, that trade-off seems reasonable.
      */
-    private static class WeakReferenceWithEquals<T> extends WeakReference<T>
+    private static class WeakConcurrentQueue<T> implements Queue<T>
     {
-        private final int _hashCode;
+        private final Queue<WeakReference<T>> _inner =
+                new ConcurrentLinkedDeque<>();
 
-        WeakReferenceWithEquals(T object)
+        @Override
+        public boolean add(T e) throws IllegalStateException
         {
-            super(object);
-            _hashCode = object.hashCode();
+            return _inner.add(new WeakReference(e));
         }
 
         @Override
-        public boolean equals(Object other)
+        public boolean offer(T e)
         {
-            if (other instanceof Reference) {
-                return Objects.equal(get(), ((Reference)other).get());
-            } else {
-                return false;
+            return _inner.offer(new WeakReference(e));
+        }
+
+        @Override
+        public T remove() throws NoSuchElementException
+        {
+            T item;
+
+            do {
+                item = _inner.remove().get();
+            } while (item == null);
+
+            return item;
+        }
+
+        @Override
+        public T poll()
+        {
+            T item;
+
+            do {
+                WeakReference<T> ref = _inner.poll();
+                if (ref == null) {
+                    return null;
+                } else {
+                    item = ref.get();
+                }
+            } while (item == null);
+
+            return item;
+        }
+
+        @Override
+        public T element() throws NoSuchElementException
+        {
+            T item = peek();
+            if (item == null) {
+                throw new NoSuchElementException("queue is empty");
             }
+            return item;
         }
 
         @Override
-        public int hashCode()
+        public T peek()
         {
-            return _hashCode;
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        public int size()
+        {
+            int count=0;
+
+            // Since size is only called when debugging SDC, we can afford to
+            // make this expensive but (hopefully) more accurate.
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        @Override
+        public boolean isEmpty()
+        {
+            return _inner.isEmpty();
+        }
+
+        @Override
+        public boolean contains(Object o)
+        {
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else if (item == o) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        @Override
+        public Iterator<T> iterator()
+        {
+            final Iterator<WeakReference<T>> iterator = _inner.iterator();
+
+            return new Iterator<T>() {
+
+                private T _next;
+                private boolean _isNextValid;
+
+                private T getNext() {
+                    if (_isNextValid) {
+                        return _next;
+                    }
+
+                    _next = null;
+
+                    while (iterator.hasNext()) {
+                        WeakReference<T> ref = iterator.next();
+                        _next = ref.get();
+
+                        if (_next == null) {
+                            iterator.remove();
+                        } else {
+                            break;
+                        }
+                    }
+                    _isNextValid = true;
+                    return _next;
+                }
+
+                @Override
+                public boolean hasNext()
+                {
+                    return getNext() != null;
+                }
+
+                @Override
+                public T next()
+                {
+                    T next = getNext();
+
+                    if (next == null) {
+                        throw new NoSuchElementException("no more elements");
+                    }
+
+                    _isNextValid = false;
+                    return next;
+                }
+
+                @Override
+                public void remove()
+                {
+                    iterator.remove();
+                }
+            };
+        }
+
+        @Override
+        public Object[] toArray()
+        {
+            ArrayList<T> items = new ArrayList<>(_inner.size());
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else {
+                    items.add(item);
+                }
+            }
+
+            return items.toArray();
+        }
+
+        @Override
+        public <AT> AT[] toArray(AT[] a)
+        {
+            ArrayList<T> items = new ArrayList<>(_inner.size());
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else {
+                    items.add(item);
+                }
+            }
+
+            return items.toArray(a);
+        }
+
+        @Override
+        public boolean remove(Object o)
+        {
+            boolean removed = false;
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else if (item == o) {
+                    ref.clear();
+                    iterator.remove();
+                    removed = true;
+                }
+            }
+
+            return removed;
+        }
+
+        @Override
+        public boolean containsAll(Collection<?> c)
+        {
+            ArrayList itemsToCheck = new ArrayList(c);
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else {
+                    while (itemsToCheck.remove(item)) {
+                        // do nothing.
+                    }
+                }
+            }
+
+            return itemsToCheck.isEmpty();
+        }
+
+        @Override
+        public boolean addAll(Collection<? extends T> c)
+        {
+            for (T item : c) {
+                add(item);
+            }
+
+            return true;
+        }
+
+        @Override
+        public boolean removeAll(Collection<?> c)
+        {
+            boolean changed = false;
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else if (c.contains(item)) {
+                    ref.clear();
+                    iterator.remove();
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        @Override
+        public boolean retainAll(Collection<?> c)
+        {
+            boolean changed = false;
+
+            Iterator<WeakReference<T>> iterator = _inner.iterator();
+            while (iterator.hasNext()) {
+                WeakReference<T> ref = iterator.next();
+                T item = ref.get();
+                if (item == null) {
+                    iterator.remove();
+                } else if (!c.contains(item)) {
+                    ref.clear();
+                    iterator.remove();
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        @Override
+        public void clear()
+        {
+            _inner.clear();
         }
     }
+
 
     /**
      * A simple Map-like interface.  This Interface is the basis for
@@ -100,7 +402,7 @@ public class SDC
         /**
          * Update the context so that the next call to {@code #get} with the
          * same key will return the supplied value.  Returns the previous value
-         * for key.
+         * for key.  Value may be null.
          */
         public V put(K key, V value);
 
@@ -115,8 +417,8 @@ public class SDC
     /**
      * The interface on which public SDC operations are based.  Each thread
      * has a thread-local instance of a class that implements this interface.
-     * Other classes do not interact directly with this thread-local class: a
-     * set of static methods mediate this interaction.
+     * Other classes do not interact directly with this thread-local Context
+     * object: a set of static methods mediate this interaction.
      */
     private interface Context<K,V> extends SimpleMap<K,V>
     {
@@ -129,7 +431,7 @@ public class SDC
          * Returns the current number of captures.  The method provides no
          * strict guarantee that a capture is not included after
          * {@code SDC#adopt} or {@code SDC#rollback}. This is intended for
-         * diagnosing problems rather than for
+         * diagnosing problems, such as leaking Context objects.
          */
         public int getCaptureCount();
 
@@ -142,8 +444,9 @@ public class SDC
 
 
     /**
-     * An implementation of ExtendedMap that is thread-safe and has the same
-     * concurrence behaviour as ConcurrentHashMap.
+     * An implementation of SimpleMap that is thread-safe and has the same
+     * concurrence behaviour as ConcurrentHashMap.  The class also implements
+     * Iterable, allowing other code to iterate over all key-value pairs.
      */
     private static class ConcurrentSimpleMap<K,V> implements SimpleMap<K,V>,
             Iterable<Map.Entry<K,V>>
@@ -195,13 +498,10 @@ public class SDC
     }
 
     /**
-     * Class that implements SimpleMap and wraps some other SimpleMap.  The
-     * class honours the SimpleMap interface, but no changes are propagated
-     * to the wrapped SimpleMap until @code #commit} is called.  This call
-     * results in all changes being applied to the wrapped SimpleMap.
-     * <p>
-     * After {@code reset}, all changes are lost and subsequent calls to
-     * {@code #get} reflect the value returned by the wrapped SimpleMap.
+     * Class that wraps some other SimpleMap and honours the SimpleMap
+     * interface, but no changes are propagated to the wrapped SimpleMap
+     * until {@code #commit} is called.  This call results in all changes being
+     * applied to the wrapped SimpleMap.
      */
     private static class DelayedSimpleMap<K,V> implements SimpleMap<K,V>
     {
@@ -218,7 +518,8 @@ public class SDC
             _inner = inner;
         }
 
-        void describeInnerAs(String description)
+        /** Provide alternative description for wrapped SimpleMap. */
+        protected void describeInnerAs(String description)
         {
             _innerDescription = description;
         }
@@ -247,27 +548,27 @@ public class SDC
             }
         }
 
+        /** Revert any pending changes. */
         public void reset()
         {
             _newValues.clear();
             _deletes.clear();
         }
 
-        /**
-         * Allow a DelayedSimpleMap to act as the aggregation of several
-         * DelayedSimpleMap instances.
-         */
+        /** Include all pending changes from another DelayedSimpleMap. */
         protected void accept(DelayedSimpleMap<K,V> changes)
         {
             _deletes.addAll(changes._deletes);
             _newValues.putAll(changes._newValues);
         }
 
+        /** Apply all pending changes to underlying SimpleMap. */
         public void commit()
         {
             commitTo(_inner);
         }
 
+        /** Apply all pending changes to some other SimpleMap. */
         public void commitTo(SimpleMap<K,V> map)
         {
             for (Map.Entry<K,V> entry : _newValues) {
@@ -282,6 +583,7 @@ public class SDC
             _deletes.clear();
         }
 
+        /** Remove any pending changes to the supplied key. */
         public void forget(K key)
         {
             _newValues.put(key, null);
@@ -350,7 +652,8 @@ public class SDC
         }
 
         /**
-         * Write all pending changes to maintaining-target.
+         * Write all pending changes to maintaining-target. Pending changes
+         * are not committed.
          */
         public void updateMaintained()
         {
@@ -360,34 +663,50 @@ public class SDC
 
 
     /**
-     * The class is the context seen by a thread initially and after calling
-     * {@code SDC#adopt} or {@code SDC#rollback}.
+     * The class is the context seen by a thread initially and some time after
+     * calling SDC#adopt or SDC#callback.
      */
     private static class MainContext<K,V> implements Context<K,V>
     {
-        private final Set<WeakReferenceWithEquals<CapturedContext<K,V>>> _activeCaptures =
-                Collections.newSetFromMap(new ConcurrentHashMap<WeakReferenceWithEquals<CapturedContext<K,V>>,Boolean>());
+        /** Captures that have not yet been adopted. */
+        private final Queue<CapturedContext<K,V>> _activeCaptures;
 
         /** All associations that are not at risk of being rolled back. */
         private final ConcurrentSimpleMap<K,V> _storage =
                 new ConcurrentSimpleMap<>();
 
-        /** View that includes associations at risk of being rolled back. */
+        /**
+         * View that includes associations at risk of being rolled back.
+         * Although this is a DelayedSimpleMap, the pending changes are
+         * never committed.  Instead, this provides a convenient way of
+         * defaulting to the not-at-risk set of associations if no
+         * CapturedContext has updated the association
+         */
         private final DelayedSimpleMap<K,V> _aggregatedChanges =
                 new DelayedSimpleMap<>(_storage);
+
+        /** A MainContext for a new Thread. */
+        public MainContext()
+        {
+            _activeCaptures = new WeakConcurrentQueue();
+        }
+
+        /** A MainContext for an orphaned CapturedContext. */
+        public MainContext(Queue<CapturedContext<K,V>> activeCaptures)
+        {
+            _activeCaptures = activeCaptures;
+
+            for (CapturedContext<K,V> capture : activeCaptures) {
+                capture.setMainContext(this, _storage, _aggregatedChanges);
+            }
+        }
 
         @Override
         public CapturedContext<K,V> capture()
         {
             CapturedContext<K,V> capture = new CapturedContext(this, _storage,
                     _aggregatedChanges);
-
-            Set<WeakReferenceWithEquals<CapturedContext<K,V>>> captures =
-                Collections.newSetFromMap(new ConcurrentHashMap<WeakReferenceWithEquals<CapturedContext<K,V>>,Boolean>());
-            captures.addAll(_activeCaptures);
-            capture.setEarlierCaptures(captures);
-
-            _activeCaptures.add(new WeakReferenceWithEquals(capture));
+            _activeCaptures.add(capture);
             return capture;
         }
 
@@ -400,87 +719,56 @@ public class SDC
         @Override
         public V put(K key, V value)
         {
-            // Remove any potential change from other threads.
-            for (WeakReferenceWithEquals<CapturedContext<K,V>> captureRef : _activeCaptures) {
-                CapturedContext capture = captureRef.get();
-                if (capture != null) {
-                    capture.forget(key);
-                }
+            for (CapturedContext<K,V> capture : _activeCaptures) {
+                capture.forget(key);
             }
             _aggregatedChanges.forget(key);
             return _storage.put(key, value);
         }
 
-        void remove(CapturedContext<K,V> captureToRemove)
-        {
-            removeContext(captureToRemove);
-            rebuildAggregatedView();
-        }
-
         void rollback(CapturedContext<K,V> captureToRollback)
         {
-            Collection<CapturedContext> after = capturedAfter(captureToRollback);
+            Queue<CapturedContext<K,V>> afterRollback =
+                    new ConcurrentLinkedDeque<>();
 
-            if (!after.isEmpty()) {
-                MainContext<K,V> newMain = new MainContext<>();
-                newMain._storage.putAll(this._storage);
+            boolean isAfterRollback = false;
 
-                captureToRollback.applyCaptureTo(newMain._storage);
-
-                for (CapturedContext context : after) {
-                    context._main = newMain;
-                    newMain._activeCaptures.add(new WeakReferenceWithEquals<CapturedContext<K,V>>(context));
-                    removeContext(context);
-                    context.retainEarlierCaptures(after);
-                }
-
-                newMain.rebuildAggregatedView();
-            }
-
-            remove(captureToRollback);
-        }
-
-        private void removeContext(CapturedContext<K,V> capture)
-        {
-            WeakReferenceWithEquals<CapturedContext<K,V>> removeRef =
-                    new WeakReferenceWithEquals<>(capture);
-            _activeCaptures.remove(removeRef);
-            removeRef.clear();
-        }
-
-        private void rebuildAggregatedView()
-        {
+            Iterator<CapturedContext<K,V>> iterator = _activeCaptures.iterator();
             _aggregatedChanges.reset();
-            Iterator<WeakReferenceWithEquals<CapturedContext<K,V>>> iterator =
-                    _activeCaptures.iterator();
             while (iterator.hasNext()) {
-                WeakReferenceWithEquals<CapturedContext<K,V>> captureRef = iterator.next();
-
-                CapturedContext capture = captureRef.get();
-                if (capture != null) {
-                    capture.updateAggregation();
-                } else {
+                CapturedContext capture = iterator.next();
+                if (capture == captureToRollback) {
                     iterator.remove();
+                    isAfterRollback = true;
+                } else if (isAfterRollback) {
+                    iterator.remove();
+                    afterRollback.add(capture);
+                } else {
+                    capture.updateAggregation();
                 }
+            }
+
+            // Handle orphaned CapturedContext by giving them a new MainContext
+            if (!afterRollback.isEmpty()) {
+                MainContext<K,V> newMain = new MainContext<>(afterRollback);
+                newMain._storage.putAll(_storage);
+                captureToRollback.applyCaptureTo(newMain._storage);
+                newMain.applyAdoptedCaptures();
             }
         }
 
-        private Collection<CapturedContext> capturedAfter(CapturedContext rollback)
+        private void applyAdoptedCaptures()
         {
-            Set<CapturedContext> after = new HashSet<>();
+            Iterator<CapturedContext<K,V>> iterator = _activeCaptures.iterator();
+            while (iterator.hasNext()) {
+                CapturedContext capture = iterator.next();
 
-            WeakReferenceWithEquals<CapturedContext> rollbackRef =
-                    new WeakReferenceWithEquals<>(rollback);
-
-            for (WeakReferenceWithEquals<CapturedContext<K,V>> captureRef :
-                    _activeCaptures) {
-                CapturedContext capture = captureRef.get();
-                if (capture != null && capture.hasEarlierCapture(rollbackRef)) {
-                    after.add(capture);
+                if (capture.applyCapture()) {
+                    iterator.remove();
+                } else {
+                    break;
                 }
             }
-
-            return after;
         }
 
         @Override
@@ -495,26 +783,22 @@ public class SDC
             if (currentThreadsContext == this) {
                 sb.append("*");
             }
-            sb.append("MainContext(").append(Integer.toHexString(hashCode())).
-                    append("): changes=").append(_aggregatedChanges);
-            for (WeakReferenceWithEquals<CapturedContext<K,V>> captureRef : _activeCaptures) {
+            sb.append("Main(").append(Integer.toHexString(hashCode())).
+                    append("): aggregatedChanges=").append(_aggregatedChanges);
+            for (CapturedContext<K,V> capture : _activeCaptures) {
                 sb.append("; ");
-                CapturedContext capture = captureRef.get();
-                if (capture != null) {
-                    if (capture == currentThreadsContext) {
-                        sb.append("*");
-                    }
-                    sb.append("Capture=").append(capture);
-                } else {
-                    sb.append("ZombieCapture");
+                if (capture == currentThreadsContext) {
+                    sb.append("*");
                 }
+                sb.append("(").append(Integer.toHexString(capture.hashCode()));
+                sb.append(")=").append(capture);
             }
             return sb.toString();
         }
 
-        private String describe(Context current)
+        private String describe(Context currentThreadsContext)
         {
-            return toString(current);
+            return toString(currentThreadsContext);
         }
 
         @Override
@@ -534,33 +818,40 @@ public class SDC
     /**
      * An instance of this class that is the Context seen by a Thread after
      * capturing the context.  Changes to the context are delayed (against
-     * the underlying storage) but are live (for the aggregated view).  This
-     * allows such changes to be rolled back if {@code #removeCapture} is
-     * called.
+     * the underlying storage) but are live (for the aggregated view).
      * <p>
-     * If {@code #applyCapture} is called then all changes are propagated to
-     * the underlying storage and the capture is removed from the list of
-     * captures maintained by MainContext.
+     * Adopting a context is a two-step operation: 'adopt' and 'apply'.  The
+     * first step, adoption, makes all staged changes live.  The second step,
+     * applying, is intended to allow the thread-local Context to go back to
+     * being the MainContext.  The first step is triggered by
+     * {@code #adopt} and makes this CapturedContext eligible for the
+     * second step; the second step happens when all CapturedContext objects
+     * earlier in the Queue are adopted or applied.
+     * <p>
+     * If an earlier CapturedContext is rolled-back then all subsequent
+     * CapturedContext objects obtain a new MainContext.
      */
     private static class CapturedContext<K,V> implements Context<K,V>
     {
         private MainContext<K,V> _main;
 
         /** Main storage of associations. */
-        private final SimpleMap<K,V> _storage;
+        private SimpleMap<K,V> _storage;
 
         /** Used by get and put to update state. */
-        private final MaintainingSimpleMap<K,V> _pending;
+        private MaintainingSimpleMap<K,V> _pending;
 
         /** Used by stagedPut for storing state. */
-        private final DelayedSimpleMap<K,V> _staged;
+        private DelayedSimpleMap<K,V> _staged;
 
         /** Whether this capture has ever been adopted or rolledback. */
         private final AtomicBoolean _hasBeenUsed = new AtomicBoolean();
 
+        /** Whether this captured has been adopted when it was used. */
+        private volatile boolean _hasBeenAdopted;
 
-        /** Set of captures that existed when this capture was created. */
-        private Set<WeakReferenceWithEquals<CapturedContext<K,V>>> _earlierCaptures;
+        /** Whether this capture has been folded into main context. */
+        private volatile boolean _hasBeenApplied;
 
         private final StackTraceElement[] _creationStacktrace;
         private StackTraceElement[] _usageStacktrace;
@@ -568,37 +859,37 @@ public class SDC
         public CapturedContext(MainContext<K,V> main, SimpleMap storage,
                 DelayedSimpleMap aggregation)
         {
-            _main = main;
-            _storage = storage;
-            _pending = new MaintainingSimpleMap(storage, aggregation);
-            _pending.describeInnerAs("<MainContext>");
-            _staged = new DelayedSimpleMap(_pending);
+            setMainContext(main, storage, aggregation);
             _creationStacktrace = Thread.currentThread().getStackTrace();
-        }
-
-        public void setEarlierCaptures(Set<WeakReferenceWithEquals<CapturedContext<K,V>>> captures)
-        {
-            _earlierCaptures = captures;
-        }
-
-        public boolean hasEarlierCapture(WeakReferenceWithEquals<CapturedContext<K,V>> captureRef)
-        {
-            return _earlierCaptures.contains(captureRef);
-        }
-
-        public void retainEarlierCaptures(Iterable<CapturedContext<K,V>> captures)
-        {
-            Collection<WeakReferenceWithEquals<CapturedContext<K,V>>> refs =
-                    new HashSet<>();
-            for (CapturedContext<K,V> context : captures) {
-                refs.add(new WeakReferenceWithEquals<>(context));
-            }
-            _earlierCaptures.retainAll(refs);
         }
 
         public MainContext<K,V> getMainContext()
         {
             return _main;
+        }
+
+        public final void setMainContext(MainContext<K,V> main, SimpleMap storage,
+                DelayedSimpleMap aggregation)
+        {
+            _main = main;
+
+            _storage = storage;
+
+            MaintainingSimpleMap<K,V> newPending = new MaintainingSimpleMap(storage, aggregation);
+            if (_pending != null) {
+                newPending.accept(_pending);
+            }
+            newPending.describeInnerAs("<MainContext>");
+
+            DelayedSimpleMap<K,V> newStaged = new DelayedSimpleMap(newPending);
+            if (_staged != null) {
+                newStaged.accept(_staged);
+            }
+
+            _pending = newPending;
+            _staged = newStaged;
+
+            updateAggregation();
         }
 
         @Override
@@ -616,7 +907,7 @@ public class SDC
         @Override
         public V put(K key, V value)
         {
-            if (_hasBeenUsed.get()) {
+            if (_hasBeenApplied) {
                 return _storage.put(key, value);
             } else {
                 return _pending.put(key, value);
@@ -629,9 +920,9 @@ public class SDC
             _staged.put(key, value);
         }
 
-        public boolean hasBeenUsed()
+        public boolean hasBeenApplied()
         {
-            return _hasBeenUsed.get();
+            return _hasBeenApplied;
         }
 
         public void forget(K key)
@@ -643,27 +934,40 @@ public class SDC
         @Override
         public V get(K key)
         {
-            if (_hasBeenUsed.get()) {
+            if (_hasBeenApplied) {
                 return _storage.get(key);
             } else {
                 return _pending.get(key);
             }
         }
 
-        public void removeCapture()
+        public void rollback()
         {
             failUnless(!_hasBeenUsed.getAndSet(true));
             rememberUsage();
             _main.rollback(this);
         }
 
-        public void applyCapture()
+        public void adopt()
         {
             if (!_hasBeenUsed.getAndSet(true)) {
-                _staged.commit();  // Update pending with localPut values
-                _pending.commit(); // Write pending into main storage
-                _main.remove(this);
+                rememberUsage();
+                _staged.commit();
+                _hasBeenAdopted = true;
+                _main.applyAdoptedCaptures();
             }
+        }
+
+        public boolean applyCapture()
+        {
+            if (_hasBeenAdopted && !_hasBeenApplied) {
+                _hasBeenApplied = true;
+                _staged.commit();
+                _pending.commit(); // Write pending into main storage
+                return true;
+            }
+
+            return false;
         }
 
         public void applyCaptureTo(ConcurrentSimpleMap<K,V> map)
@@ -713,8 +1017,12 @@ public class SDC
         @Override
         public String toString()
         {
-            return ((_hasBeenUsed.get()) ? "!" : "") +
-                    _staged.toString();
+            StringBuilder sb = new StringBuilder();
+            if (_hasBeenUsed.get()) {
+                sb.append(_hasBeenAdopted ? 'A' : 'R');
+            }
+            sb.append(_staged.toString());
+            return sb.toString();
         }
 
         @Override
@@ -732,6 +1040,9 @@ public class SDC
              * To prevent this, we apply any changes made to this capture when
              * the object is garbage-collected.
              */
+
+            // REVISIT: can we do this with PhantomReference and amortise the
+            // cost against other operations?
             if (!_hasBeenUsed.get()) {
                 applyCapture();
             }
@@ -753,7 +1064,7 @@ public class SDC
         Context context = _currentContext.get();
 
         if (context instanceof CapturedContext &&
-                ((CapturedContext) context).hasBeenUsed()) {
+                ((CapturedContext) context).hasBeenApplied()) {
             context = ((CapturedContext) context).getMainContext();
             _currentContext.set(context);
         }
@@ -839,11 +1150,17 @@ public class SDC
      * changes made by other threads are unaffected.
      * <p>
      * If, after capturing the context, this thread adopts some other context
-     * and makes changes to that context then calling {@literal rollback} will
-     * NOT affect those changes.
+     * and makes changes to the context then calling {@literal rollback}
+     * against the first context then the changes made to the second context
+     * are NOT affected by the rollback.
      * <p>
-     * A captured context is for single use.  Once either {@literal adopt} or
-     * {@literal rollback} has been called, neither method is allowed.
+     * A captured context may be used once; either by calling {@literal adopt}
+     * or {@literal rollback}.  Subsequent calls to {@literal rollback} will
+     * fail; subsequent calls to {@literal adopt} are silently ignored.
+     * <p>
+     * Capture-local changes to the context may be made via the
+     * {@code localPut} method.  Such changes only take effect once the
+     * context is adopted.
      */
     public SDC()
     {
@@ -857,7 +1174,8 @@ public class SDC
      */
     public void rollback()
     {
-        _captured.removeCapture();
+        _captured.rollback();
+        // REVIEW: should this be main or previous unapplied context?
         _currentContext.set(_captured.getMainContext());
     }
 
@@ -867,8 +1185,8 @@ public class SDC
      */
     public void adopt()
     {
-        _captured.applyCapture();
-        _currentContext.set(_captured.getMainContext());
+        _captured.adopt();
+        _currentContext.set(_captured);
     }
 
     /**
@@ -883,7 +1201,7 @@ public class SDC
 
     /**
      * Provide mechanism to be notified when this CapturedContext has been
-     * finalized.
+     * finalized.  This is intended only for unit-tests.
      */
     PhantomReference<CapturedContext<String,String>>
             addPhantomToQueue(ReferenceQueue queue)
