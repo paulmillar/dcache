@@ -106,6 +106,7 @@
     <property name="door" ref="door"/>
     <property name="channelHandlerFactories" ref="channelhandler-factories"/>
     <property name="rootPath" value="${xrootd.root}"/>
+    <property name="diagnoseTriggers" ref="diagnose-triggers"/>
   </bean>
 
   <bean id="pnfs" class="diskCacheV111.util.PnfsHandler">
@@ -172,4 +173,16 @@
     <property name="address" value="#{ '${xrootd.net.listen}'.equals('any') ? null : '${xrootd.net.listen}' }"/>
     <property name="loginBrokers" value="${xrootd.service.loginbroker}"/>
   </bean>
+
+  <bean id="diagnose-triggers" class="dmg.util.CDCDiagnoseTriggers">
+      <description>The set of addresses that trigger additional logging</description>
+  </bean>
+
+  <bean id="diagnose-triggers-cli"
+        class="org.dcache.util.AddressTriggerDiagnoseCLI">
+      <description>CLI for managing diagnostic triggers</description>
+
+      <property name="diagnoseTriggers" ref="diagnose-triggers"/>
+  </bean>
+
 </beans>

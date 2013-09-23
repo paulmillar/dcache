@@ -21,6 +21,7 @@ import java.util.concurrent.Executor;
 
 import diskCacheV111.util.FsPath;
 
+import org.dcache.util.DiagnoseTriggers;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;
@@ -47,6 +48,7 @@ public class NettyXrootdServer
     private List<ChannelHandlerFactory> _channelHandlerFactories;
     private FsPath _rootPath;
     private InetAddress _address;
+    private DiagnoseTriggers<InetAddress> _triggers;
 
     /**
      * Switch Netty to slf4j for logging.
@@ -133,6 +135,12 @@ public class NettyXrootdServer
         _rootPath = new FsPath(s);
     }
 
+    @Required
+    public void setDiagnoseTriggers(DiagnoseTriggers<InetAddress> triggers)
+    {
+        _triggers = triggers;
+    }
+
     public void init()
     {
         ServerBootstrap bootstrap = new ServerBootstrap(_channelFactory);
@@ -145,6 +153,7 @@ public class NettyXrootdServer
                 public ChannelPipeline getPipeline()
                 {
                     ChannelPipeline pipeline = pipeline();
+                    pipeline.addLast("diagnose", new DiagnoseTrigger(_triggers));
                     pipeline.addLast("tracker", _connectionTracker);
                     pipeline.addLast("encoder", new XrootdEncoder());
                     pipeline.addLast("decoder", new XrootdDecoder());
