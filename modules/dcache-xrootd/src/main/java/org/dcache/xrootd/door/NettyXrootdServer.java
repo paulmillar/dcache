@@ -21,6 +21,8 @@ import java.util.concurrent.Executor;
 
 import diskCacheV111.util.FsPath;
 
+import dmg.cells.nucleus.CDC;
+
 import org.dcache.util.DiagnoseTriggers;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
@@ -153,7 +155,7 @@ public class NettyXrootdServer
                 public ChannelPipeline getPipeline()
                 {
                     ChannelPipeline pipeline = pipeline();
-                    pipeline.addLast("diagnose", new DiagnoseTrigger(_triggers));
+                    pipeline.addFirst("diagnose", new DiagnoseTrigger(_triggers));
                     pipeline.addLast("tracker", _connectionTracker);
                     pipeline.addLast("encoder", new XrootdEncoder());
                     pipeline.addLast("decoder", new XrootdDecoder());
@@ -161,7 +163,23 @@ public class NettyXrootdServer
                         pipeline.addLast("logger", new LoggingHandler(NettyXrootdServer.class));
                     }
                     pipeline.addLast("handshake", new XrootdHandshakeHandler(XrootdProtocol.LOAD_BALANCER));
-                    pipeline.addLast("executor", new ExecutionHandler(_requestExecutor));
+                    pipeline.addLast("executor", new ExecutionHandler(new Executor(){
+                        @Override
+                        public void execute(final Runnable command)
+                        {
+                            _requestExecutor.execute(new Runnable(){
+                                private final CDC _cdc = new CDC();
+
+                                @Override
+                                public void run()
+                                {
+                                    try (CDC ignored = _cdc.restore()) {
+                                        command.run();
+                                    }
+                                }
+                            });
+                        }
+                    }));
                     for (ChannelHandlerFactory factory: _channelHandlerFactories) {
                         pipeline.addLast("plugin:" + factory.getName(), factory.createHandler());
                     }
