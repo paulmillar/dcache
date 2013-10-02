@@ -1,10 +1,10 @@
 package org.dcache.xrootd.door;
 
+import org.dcache.xrootd.DynamicLoggerHandler;
 import com.google.common.net.InetAddresses;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.ChannelFactory;
 import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.handler.execution.ExecutionHandler;
 import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.logging.InternalLoggerFactory;
@@ -21,16 +21,17 @@ import java.util.concurrent.Executor;
 
 import diskCacheV111.util.FsPath;
 
-import dmg.cells.nucleus.CDC;
-
+import org.dcache.xrootd.CDCExecutorDecorator;
 import org.dcache.util.DiagnoseTriggers;
+import org.dcache.xrootd.CDCAwareChannelPipeline;
+import org.dcache.xrootd.CDCHandler;
+import org.dcache.xrootd.DynamicLoggingChannelPipelineFactory;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.dcache.xrootd.protocol.XrootdProtocol;
 
-import static org.jboss.netty.channel.Channels.pipeline;
 
 /**
  * Netty based xrootd redirector. Could possibly be replaced by pure
@@ -95,7 +96,7 @@ public class NettyXrootdServer
     @Required
     public void setRequestExecutor(Executor executor)
     {
-        _requestExecutor = executor;
+        _requestExecutor = new CDCExecutorDecorator(executor);
     }
 
     @Required
@@ -150,41 +151,36 @@ public class NettyXrootdServer
         bootstrap.setOption("child.tcpNoDelay", true);
         bootstrap.setOption("child.keepAlive", true);
 
-        bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+        bootstrap.setPipelineFactory(new DynamicLoggingChannelPipelineFactory() {
                 @Override
                 public ChannelPipeline getPipeline()
                 {
-                    ChannelPipeline pipeline = pipeline();
-                    pipeline.addFirst("diagnose", new DiagnoseTrigger(_triggers));
+                    ChannelPipeline pipeline = new CDCAwareChannelPipeline();
+                    pipeline.addLast("diagnose-trigger", new DiagnoseTrigger(_triggers));
+                    pipeline.addLast("cdc", new CDCHandler());
+                    pipeline.addLast("dynamic-logger", new DynamicLoggerHandler(this));
                     pipeline.addLast("tracker", _connectionTracker);
                     pipeline.addLast("encoder", new XrootdEncoder());
                     pipeline.addLast("decoder", new XrootdDecoder());
                     if (_log.isDebugEnabled()) {
-                        pipeline.addLast("logger", new LoggingHandler(NettyXrootdServer.class));
+                        addLogging(pipeline);
                     }
                     pipeline.addLast("handshake", new XrootdHandshakeHandler(XrootdProtocol.LOAD_BALANCER));
-                    pipeline.addLast("executor", new ExecutionHandler(new Executor(){
-                        @Override
-                        public void execute(final Runnable command)
-                        {
-                            _requestExecutor.execute(new Runnable(){
-                                private final CDC _cdc = new CDC();
-
-                                @Override
-                                public void run()
-                                {
-                                    try (CDC ignored = _cdc.restore()) {
-                                        command.run();
-                                    }
-                                }
-                            });
-                        }
-                    }));
+                    pipeline.addLast("executor", new ExecutionHandler(new CDCExecutorDecorator(_requestExecutor)));
                     for (ChannelHandlerFactory factory: _channelHandlerFactories) {
                         pipeline.addLast("plugin:" + factory.getName(), factory.createHandler());
                     }
                     pipeline.addLast("redirector", new XrootdRedirectHandler(_door, _rootPath));
                     return pipeline;
+                }
+
+                @Override
+                public void addLogging(ChannelPipeline pipeline)
+                {
+                    if (pipeline.getContext("logger") == null) {
+                        pipeline.addAfter("decoder", "logger",
+                                new LoggingHandler(NettyXrootdServer.class));
+                    }
                 }
             });
 

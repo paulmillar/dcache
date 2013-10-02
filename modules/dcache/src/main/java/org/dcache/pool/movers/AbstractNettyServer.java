@@ -33,6 +33,8 @@ import org.dcache.pool.classic.Cancellable;
 import org.dcache.util.CDCThreadFactory;
 import org.dcache.util.PortRange;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * Abstract base class for all netty servers running on the pool
  * dispatching movers. This class provides most methods needed by a
@@ -223,6 +225,12 @@ public abstract class AbstractNettyServer<T extends ProtocolInfo>
         conditionallyStopServer();
     }
 
+    public CDC restoreCDC(UUID uuid)
+    {
+        Entry entry = _uuids.get(uuid);
+        checkState(entry != null, "cannot find UUID " + uuid);
+        return entry.restoreCDC();
+    }
 
     public MoverChannel<T> open(UUID uuid, boolean exclusive)
     {
@@ -272,6 +280,10 @@ public abstract class AbstractNettyServer<T extends ProtocolInfo>
                     }
                 }
             }, connectTimeout, TimeUnit.MILLISECONDS);
+        }
+
+        CDC restoreCDC() {
+            return _cdc.restore();
         }
 
         MoverChannel<T> open(boolean exclusive) {

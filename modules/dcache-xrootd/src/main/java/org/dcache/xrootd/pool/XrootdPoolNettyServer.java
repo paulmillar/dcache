@@ -1,7 +1,15 @@
 package org.dcache.xrootd.pool;
 
+import org.dcache.xrootd.CDCHandler;
+import org.jboss.netty.channel.ChannelEvent;
+import org.jboss.netty.channel.ChannelHandler;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.channel.ChannelUpstreamHandler;
+import org.jboss.netty.channel.DefaultChannelPipeline;
+import org.jboss.netty.channel.ExceptionEvent;
+import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.handler.execution.ExecutionHandler;
 import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.handler.timeout.IdleStateHandler;
@@ -13,12 +21,17 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import dmg.cells.nucleus.CDC;
 import org.dcache.pool.movers.AbstractNettyServer;
+import org.dcache.xrootd.CDCExecutorDecorator;
 import org.dcache.util.PortRange;
 import org.dcache.vehicles.XrootdProtocolInfo;
+import org.dcache.xrootd.CDCAwareChannelPipeline;
+import org.dcache.xrootd.DynamicLoggingChannelPipelineFactory;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;
+import org.dcache.xrootd.DynamicLoggerHandler;
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.stream.ChunkedResponseWriteHandler;
@@ -119,20 +132,18 @@ public class XrootdPoolNettyServer
         conditionallyStopServer();
     }
 
-    private class XrootdPoolPipelineFactory implements ChannelPipelineFactory {
+    private class XrootdPoolPipelineFactory implements DynamicLoggingChannelPipelineFactory {
         @Override
         public ChannelPipeline getPipeline() throws Exception {
-            ChannelPipeline pipeline = pipeline();
-
+            ChannelPipeline pipeline = new CDCAwareChannelPipeline();
             pipeline.addLast("encoder", new XrootdEncoder());
             pipeline.addLast("decoder", new XrootdDecoder());
-            if (_logger.isDebugEnabled()) {
-                pipeline.addLast("logger",
-                                 new LoggingHandler(XrootdPoolNettyServer.class));
-            }
+            //if (_logger.isDebugEnabled()) {
+                addLogging(pipeline);
+            //}
             pipeline.addLast("handshake",
                              new XrootdHandshakeHandler(XrootdProtocol.DATA_SERVER));
-            pipeline.addLast("executor", new ExecutionHandler(getDiskExecutor()));
+            pipeline.addLast("executor", new ExecutionHandler(new CDCExecutorDecorator(getDiskExecutor())));
             for (ChannelHandlerFactory plugin: _plugins) {
                 pipeline.addLast("plugin:" + plugin.getName(),
                         plugin.createHandler());
@@ -143,9 +154,20 @@ public class XrootdPoolNettyServer
                                                              _clientIdleTimeout,
                                                              TimeUnit.MILLISECONDS));
             pipeline.addLast("chunkedWriter", new ChunkedResponseWriteHandler());
+            pipeline.addLast("dynamic-logger", new DynamicLoggerHandler(this));
+            pipeline.addLast("cdc", new CDCHandler());
             pipeline.addLast("transfer",
                              new XrootdPoolRequestHandler(XrootdPoolNettyServer.this));
             return pipeline;
+        }
+
+        @Override
+        public void addLogging(ChannelPipeline pipeline)
+        {
+            if (pipeline.getContext("logger") == null) {
+                pipeline.addAfter("decoder", "logger",
+                        new LoggingHandler(XrootdPoolNettyServer.class));
+            }
         }
     }
 }

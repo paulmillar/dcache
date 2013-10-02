@@ -1,5 +1,6 @@
 package org.dcache.xrootd.pool;
 
+import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ExceptionEvent;
@@ -17,10 +18,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import dmg.cells.nucleus.CDC;
 import org.dcache.pool.movers.IoMode;
 import org.dcache.pool.movers.MoverChannel;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.vehicles.XrootdProtocolInfo;
+import org.dcache.xrootd.CDCEvent;
 import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.core.XrootdRequestHandler;
 import org.dcache.xrootd.protocol.XrootdProtocol;
@@ -189,7 +192,7 @@ public class XrootdPoolRequestHandler extends XrootdRequestHandler
      */
     @Override
     protected AbstractResponseMessage
-        doOnOpen(ChannelHandlerContext ctx, MessageEvent event,
+        doOnOpen(final ChannelHandlerContext ctx, MessageEvent event,
                  OpenRequest msg)
         throws XrootdException
     {
@@ -227,7 +230,9 @@ public class XrootdPoolRequestHandler extends XrootdRequestHandler
                         "Request UUID is no longer valid. Contact redirector to obtain a new UUID.");
             }
 
-            try {
+            try (CDC ignored = _server.restoreCDC(uuid)) {
+                ctx.sendDownstream(new CDCEvent(ctx.getChannel()));
+
                 FileDescriptor descriptor;
                 IoMode mode = file.getIoMode();
                 if (msg.isNew() && mode != IoMode.WRITE) {
