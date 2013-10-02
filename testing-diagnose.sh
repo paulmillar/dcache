@@ -327,13 +327,13 @@ function exercise() # $1 protocol
             ;;
 
         xrootd)
-	    buildURI root 1094
+            buildURI root 1094
             xrdcp -s $FILE_TO_UPLOAD $URI
             ;;
 
         gsi-xrootd)
-	    buildURI roots 1095
-            xrdcp -s /bin/bash $URI
+            buildURI root 1095
+            X509_CERT_DIR=/home/paul/.globus/certificates xrdcp -s $FILE_TO_UPLOAD $URI
             ;;
 
 	*)
@@ -391,9 +391,7 @@ testProtocol webdavs      WebDAV-S-$host   "org.dcache.auth.UidPrincipal:0"
 testProtocol ftp          FTP-$host        "org.dcache.auth.UidPrincipal:0"
 testProtocol gsiftp       GFTP-$host       "dn:$DN"
 testProtocol xrootd       Xrootd-$host
-
-## GSI xrootd doesn't seem to work.
-#testProtocol gsi-xrootd   Xrootd-gsi-$host "dn:$DN"
+testProtocol gsi-xrootd   Xrootd-gsi-$host "dn:$DN"
 
 
 #  TODO
