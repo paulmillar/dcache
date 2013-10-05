@@ -29,13 +29,10 @@ public class DiagnoseTrigger extends SimpleChannelUpstreamHandler
                                  ChannelStateEvent e)
             throws Exception
     {
-        SocketAddress sockAddress = e.getChannel().getRemoteAddress();
-        if (sockAddress instanceof InetSocketAddress) {
-            InetAddress address = ((InetSocketAddress)sockAddress).getAddress();
-
-            if (_triggers.accept(address)) {
-                ctx.sendUpstream(new CDCEvent(ctx.getChannel()));
-            }
+        SocketAddress genericAddress = e.getChannel().getRemoteAddress();
+        if (genericAddress instanceof InetSocketAddress) {
+            InetSocketAddress inetAddress = (InetSocketAddress)genericAddress;
+            _triggers.accept(inetAddress.getAddress());
         }
 
         super.channelConnected(ctx, e);
