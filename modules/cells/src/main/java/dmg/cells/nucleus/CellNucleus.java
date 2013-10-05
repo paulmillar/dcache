@@ -436,7 +436,7 @@ public class CellNucleus implements ThreadFactory
             if (answer == null) {
                 return null;
             }
-            CDC.updateDiagnose(answer);
+            lock.restoreCdc();
             answer = answer.decode();
 
             Object obj = answer.getMessageObject();
@@ -963,7 +963,7 @@ public class CellNucleus implements ThreadFactory
         @Override
         public void innerRun()
         {
-            try (CDC ignored = _lock.getCdc().restore()) {
+            try (CDC ignored = _lock.restoreCdc()) {
                 CellMessageAnswerable callback =
                         _lock.getCallback();
 

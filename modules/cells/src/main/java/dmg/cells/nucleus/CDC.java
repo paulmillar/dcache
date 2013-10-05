@@ -294,13 +294,6 @@ public class CDC implements AutoCloseable
         NDC.clear();
     }
 
-    public static void updateDiagnose(CellMessage envelope)
-    {
-        if (envelope.isDiagnoseEnabled()) {
-            setDiagnoseEnabled(true);
-        }
-    }
-
     public void updateStoredDiagnose(CellMessage envelope)
     {
         if (envelope.isDiagnoseEnabled()) {

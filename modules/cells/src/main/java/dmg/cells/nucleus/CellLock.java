@@ -50,7 +50,7 @@ public class CellLock {
         return _timeout;
     }
 
-    public CDC getCdc() {
-        return _cdc;
+    public CDC restoreCdc() {
+        return _cdc.restore();
     }
 }
