@@ -17,10 +17,17 @@ public class CDCAwareChannelPipeline extends DefaultChannelPipeline
 {
     private volatile CDC _cdc;
 
+    public CDCAwareChannelPipeline()
+    {
+        try (CDC ignored = CDC.reset(CDC.getCellName(), CDC.getDomainName())) {
+            _cdc = new CDC();
+        }
+    }
+
     @Override
     public void sendUpstream(ChannelEvent e)
     {
-        try (CDC ignored = establishCDC()) {
+        try (CDC ignored = _cdc.restore()) {
             super.sendUpstream(e);
         }
     }
@@ -28,7 +35,7 @@ public class CDCAwareChannelPipeline extends DefaultChannelPipeline
     @Override
     public void sendDownstream(ChannelEvent e)
     {
-        try (CDC ignored = establishCDC()) {
+        try (CDC ignored = _cdc.restore()) {
             super.sendDownstream(e);
         }
     }
@@ -36,14 +43,5 @@ public class CDCAwareChannelPipeline extends DefaultChannelPipeline
     public void setCDC(CDC cdc)
     {
         _cdc = cdc;
-    }
-
-    private CDC establishCDC()
-    {
-        if (_cdc == null) {
-            return new CDC();
-        } else {
-            return _cdc.restore();
-        }
     }
 }
