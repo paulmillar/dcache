@@ -1,16 +1,5 @@
 #!/bin/bash
 
-#  Need to test...
-#
-#   Trig.:  gPlazma   IP address
-# Door:
-#
-# srm        done      done
-# dcap        --       done
-# gsidcap    done      done
-# webdav      --       done
-# webdavs    done      done
-
 set -e
 
 rc=0
@@ -38,7 +27,7 @@ trap cleanup EXIT
 
 function cleanup()
 {
-    rm $FILE_TO_UPLOAD
+    rm -f $FILE_TO_UPLOAD
 }
 
 
@@ -292,6 +281,21 @@ function exercise() # $1 protocol
 	    sleep 10
 	    ;;
 
+	telnetdcap)
+	    buildURI telnetdcap 22129
+	    cat >/tmp/dcap-passwd <<EOF
+dCap_Username = admin
+dCap_Password = dickerelch
+EOF
+	    DCACHE_IO_TUNNEL_TELNET_PWD=/tmp/dcap-passwd dccp /etc/profile $URI >/dev/null 2>&1 || :
+	    rm -f /tmp/dcap-passwd
+
+	    # The abortCacheProtocol method waits 10 seconds then logs
+	    # something. We need to allow for this so the captured log
+	    # files don't misplace this message.
+	    sleep 10
+	    ;;
+
 	gsidcap)
 	    buildURI gsidcap
 	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
@@ -304,26 +308,27 @@ function exercise() # $1 protocol
 
 	webdav)
 	    buildURI http 2880
-	    curl -so/dev/null -X PROPFIND $URI
+	    curl -so/dev/null -u admin:dickerelch -T $FILE_TO_UPLOAD $URI
 	    ;;
 
 	webdavs)
 	    buildURI https 2881
-	    curl -so/dev/null -u admin:dickerelch --insecure -X PROPFIND $URI
+	    curl -so/dev/null -u admin:dickerelch --insecure -T $FILE_TO_UPLOAD $URI
 	    # curl --cert ~/.globus/usercert.pem --key ~/.globus/userkey.pem -so/dev/null --insecure -X PROPFIND $URI
 	    ;;
 
 	ftp)
-	    curl -so/dev/null -l -u admin:dickerelch ftp://localhost:22126/
+	    buildURI ftp 22126
+	    curl -so/dev/null -l -u admin:dickerelch -T $FILE_TO_UPLOAD $URI
 	    ;;
 
         gsiftp)
 	    buildURI gsiftp 2811
             globus-url-copy file:///bin/bash $URI
-            # NB. globus-url-copy just disconnects after the transfer, which
-            #     causes a problem a few seconds later.  We wait to capture
-            #     that in this run.
-            sleep 4
+            # NB. globus-url-copy just disconnects after the transfer,
+            #     which causes a problem a few seconds later.  We wait
+            #     a few seconds to capture that in this run.
+            sleep 3
             ;;
 
         xrootd)
@@ -345,9 +350,9 @@ function exercise() # $1 protocol
     sleep 0.1
 
     echo "##"
-    echo "#"
+    echo
     tail -n +$(( $START + 1 )) $base/var/log/dCacheDomain.log 
-    echo "#"
+    echo
     echo "##"
 
     unset TRIGGER
@@ -385,8 +390,9 @@ exec 3>&1 >testing-diagnose.out 2>&1
 testProtocol SRM          SRM-$host        "dn:$DN"
 testProtocol SRM-over-SSL SRM-$host        "dn:$DN"
 testProtocol dcap         DCap-$host
+testProtocol telnetdcap   DCap-auth-$host  "org.dcache.auth.UidPrincipal:0"
 testProtocol gsidcap      DCap-gsi-$host   "dn:$DN"
-testProtocol webdav       WebDAV-$host
+testProtocol webdav       WebDAV-$host     "org.dcache.auth.UidPrincipal:0"
 testProtocol webdavs      WebDAV-S-$host   "org.dcache.auth.UidPrincipal:0"
 testProtocol ftp          FTP-$host        "org.dcache.auth.UidPrincipal:0"
 testProtocol gsiftp       GFTP-$host       "dn:$DN"
