@@ -308,12 +308,12 @@ EOF
 
 	webdav)
 	    buildURI http 2880
-	    curl -so/dev/null -u admin:dickerelch -T $FILE_TO_UPLOAD $URI
+	    curl -L -so/dev/null -u admin:dickerelch -T $FILE_TO_UPLOAD $URI
 	    ;;
 
 	webdavs)
 	    buildURI https 2881
-	    curl -so/dev/null -u admin:dickerelch --insecure -T $FILE_TO_UPLOAD $URI
+	    curl -L -so/dev/null -u admin:dickerelch --insecure -T $FILE_TO_UPLOAD $URI
 	    # curl --cert ~/.globus/usercert.pem --key ~/.globus/userkey.pem -so/dev/null --insecure -X PROPFIND $URI
 	    ;;
 
