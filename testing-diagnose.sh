@@ -22,7 +22,7 @@ dcache=$base/bin/dcache
 
 
 FILE_TO_UPLOAD=$(mktemp)
-dd if=/dev/zero of=$FILE_TO_UPLOAD bs=1M count=10 >/dev/null 2>&1
+dd if=/dev/zero of=$FILE_TO_UPLOAD bs=1k count=32 >/dev/null 2>&1
 trap cleanup EXIT
 
 function cleanup()
@@ -240,6 +240,8 @@ function buildURI() # $1 schema-type, $2 port number
 
     if [ -n "$2" ]; then
 	port=":$2"
+    else
+        unset port
     fi
 
     URI=$1://localhost${port}/public/$$-$COUNTER
@@ -273,7 +275,7 @@ function exercise() # $1 protocol
 
 	dcap)
 	    buildURI dcap
-	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+	    dccp $FILE_TO_UPLOAD $URI >/dev/null 2>&1
 
 	    # The abortCacheProtocol method waits 10 seconds then logs
 	    # something. We need to allow for this so the log files
@@ -287,7 +289,7 @@ function exercise() # $1 protocol
 dCap_Username = admin
 dCap_Password = dickerelch
 EOF
-	    DCACHE_IO_TUNNEL_TELNET_PWD=/tmp/dcap-passwd dccp /etc/profile $URI >/dev/null 2>&1 || :
+	    DCACHE_IO_TUNNEL_TELNET_PWD=/tmp/dcap-passwd dccp $FILE_TO_UPLOAD $URI >/dev/null 2>&1
 	    rm -f /tmp/dcap-passwd
 
 	    # The abortCacheProtocol method waits 10 seconds then logs
@@ -298,7 +300,7 @@ EOF
 
 	gsidcap)
 	    buildURI gsidcap
-	    dccp  /etc/profile $URI >/dev/null 2>&1 || :
+	    dccp $FILE_TO_UPLOAD $URI >/dev/null 2>&1
 
 	    # The abortCacheProtocol method waits 10 seconds then logs
 	    # something. We need to allow for this so the captured log
@@ -319,7 +321,6 @@ EOF
 	webdavs)
 	    buildURI https 2881
 	    curl -L -so/dev/null -u admin:dickerelch --insecure -T $FILE_TO_UPLOAD $URI
-	    # curl --cert ~/.globus/usercert.pem --key ~/.globus/userkey.pem -so/dev/null --insecure -X PROPFIND $URI
 
             #  Seems that we need to wait a little longer for all the msgs to
             #  finish bouncing around in dCache and the mover to shut down the
@@ -334,7 +335,7 @@ EOF
 
         gsiftp)
 	    buildURI gsiftp 2811
-            globus-url-copy file:///bin/bash $URI
+            globus-url-copy file://$FILE_TO_UPLOAD $URI
             # NB. globus-url-copy just disconnects after the transfer,
             #     which causes a problem a few seconds later.  We wait
             #     a few seconds to capture that in this run.
