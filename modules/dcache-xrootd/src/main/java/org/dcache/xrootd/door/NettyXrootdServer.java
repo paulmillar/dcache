@@ -1,6 +1,5 @@
 package org.dcache.xrootd.door;
 
-import org.dcache.xrootd.DynamicLoggerHandler;
 import com.google.common.net.InetAddresses;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.ChannelFactory;
@@ -21,11 +20,12 @@ import java.util.concurrent.Executor;
 
 import diskCacheV111.util.FsPath;
 
-import org.dcache.xrootd.CDCExecutorDecorator;
+import org.dcache.pool.movers.CDCAwareChannelPipeline;
+import org.dcache.pool.movers.CDCHandler;
+import org.dcache.pool.movers.DynamicLoggerHandler;
+import org.dcache.pool.movers.DynamicLoggingChannelPipelineFactory;
 import org.dcache.util.DiagnoseTriggers;
-import org.dcache.xrootd.CDCAwareChannelPipeline;
-import org.dcache.xrootd.CDCHandler;
-import org.dcache.xrootd.DynamicLoggingChannelPipelineFactory;
+import org.dcache.xrootd.CDCExecutorDecorator;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;

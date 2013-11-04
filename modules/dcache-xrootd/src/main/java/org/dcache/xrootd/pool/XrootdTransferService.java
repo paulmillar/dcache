@@ -38,6 +38,7 @@ import diskCacheV111.util.CacheException;
 import diskCacheV111.util.DiskErrorCacheException;
 import diskCacheV111.vehicles.PoolIoFileMessage;
 
+import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.NoRouteToCellException;
@@ -255,6 +256,7 @@ public class XrootdTransferService
             public void execute()
                     throws IOException, CacheException, NoRouteToCellException
             {
+                System.out.println("XrootdTransferService.execute: isDiagnoseEnabled="+CDC.isDiagnoseEnabled());
                 UUID uuid = mover.getProtocolInfo().getUUID();
                 MoverChannel<XrootdProtocolInfo> channel = autoclose(mover.open());
                 setCancellable(server.register(channel, uuid, CONNECT_TIMEOUT, this));

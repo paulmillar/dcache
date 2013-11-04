@@ -228,7 +228,7 @@ public abstract class AbstractNettyServer<T extends ProtocolInfo>
     public CDC restoreCDC(UUID uuid)
     {
         Entry entry = _uuids.get(uuid);
-        checkState(entry != null, "cannot find UUID " + uuid);
+        checkState(entry != null, "cannot find UUID");
         return entry.restoreCDC();
     }
 
@@ -266,6 +266,7 @@ public abstract class AbstractNettyServer<T extends ProtocolInfo>
         Entry(MoverChannel<T> channel, UUID uuid, final long connectTimeout, CompletionHandler<Void, Void> completionHandler) {
             _channel = channel;
             _uuid = uuid;
+            System.out.println("AbstractNettyServer.Entry isDiagnoseEnabled=" + CDC.isDiagnoseEnabled());
             _completionHandler = completionHandler;
             _timeout = _timeoutScheduler.schedule(new Runnable()
             {
@@ -283,7 +284,9 @@ public abstract class AbstractNettyServer<T extends ProtocolInfo>
         }
 
         CDC restoreCDC() {
-            return _cdc.restore();
+            CDC cdc = _cdc.restore();
+            System.out.println("AbstractNettyServer.Entry.restoreCDC isDiagnoseEnabled=" + CDC.isDiagnoseEnabled());
+            return cdc;
         }
 
         MoverChannel<T> open(boolean exclusive) {

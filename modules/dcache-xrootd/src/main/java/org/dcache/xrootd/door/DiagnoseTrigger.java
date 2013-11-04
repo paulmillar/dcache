@@ -9,7 +9,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import org.dcache.util.DiagnoseTriggers;
-import org.dcache.xrootd.CDCEvent;
 
 /**
  * Capture a channel connected event and check if we should enable diagnose

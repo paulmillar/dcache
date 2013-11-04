@@ -19,11 +19,12 @@ import java.util.Map;
 import java.util.UUID;
 
 import dmg.cells.nucleus.CDC;
+
+import org.dcache.pool.movers.CDCEvent;
 import org.dcache.pool.movers.IoMode;
 import org.dcache.pool.movers.MoverChannel;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.vehicles.XrootdProtocolInfo;
-import org.dcache.xrootd.CDCEvent;
 import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.core.XrootdRequestHandler;
 import org.dcache.xrootd.protocol.XrootdProtocol;
@@ -231,6 +232,7 @@ public class XrootdPoolRequestHandler extends XrootdRequestHandler
             }
 
             try (CDC ignored = _server.restoreCDC(uuid)) {
+                System.out.println("XrootdPoolRequestHandler.doOnOpen isDiagnoseEnabled=" + CDC.isDiagnoseEnabled());
                 ctx.sendDownstream(new CDCEvent(ctx.getChannel()));
 
                 FileDescriptor descriptor;

@@ -42,6 +42,7 @@ import diskCacheV111.vehicles.HttpProtocolInfo;
 import dmg.util.HttpException;
 
 import org.dcache.namespace.FileAttribute;
+import org.dcache.pool.movers.CDCEvent;
 import org.dcache.pool.movers.IoMode;
 import org.dcache.pool.movers.MoverChannel;
 import org.dcache.pool.repository.RepositoryChannel;
@@ -382,6 +383,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
 
         try {
             file = open(request, false);
+            context.sendDownstream(new CDCEvent(context.getChannel()));
 
             if (file.getIoMode() != IoMode.READ) {
                 throw new HttpException(METHOD_NOT_ALLOWED.getCode(),
@@ -466,6 +468,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             checkContentHeader(request.getHeaderNames(), asList(CONTENT_LENGTH));
 
             file = open(request, true);
+            context.sendDownstream(new CDCEvent(context.getChannel()));
 
             if (file.getIoMode() != IoMode.WRITE) {
                 throw new HttpException(METHOD_NOT_ALLOWED.getCode(),
@@ -601,6 +604,8 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             throw new IllegalArgumentException("Request is no longer valid. " +
                                                "Please resubmit to door.");
         }
+
+        _server.restoreCDC(uuid);
 
         URI uri = new URI(request.getUri());
         FsPath requestedFile = new FsPath(uri.getPath());

@@ -18,6 +18,10 @@ import java.util.concurrent.TimeUnit;
 import diskCacheV111.vehicles.HttpProtocolInfo;
 
 import org.dcache.pool.movers.AbstractNettyServer;
+import org.dcache.pool.movers.CDCAwareChannelPipeline;
+import org.dcache.pool.movers.CDCHandler;
+import org.dcache.pool.movers.DynamicLoggerHandler;
+import org.dcache.pool.movers.DynamicLoggingChannelPipelineFactory;
 import org.dcache.util.PortRange;
 
 import static org.jboss.netty.channel.Channels.pipeline;
@@ -94,17 +98,17 @@ public class HttpPoolNettyServer
      * @author tzangerl
      *
      */
-    class HttpPoolPipelineFactory implements ChannelPipelineFactory {
+    class HttpPoolPipelineFactory implements DynamicLoggingChannelPipelineFactory {
 
         @Override
         public ChannelPipeline getPipeline() throws Exception {
-            ChannelPipeline pipeline = pipeline();
+            ChannelPipeline pipeline = new CDCAwareChannelPipeline();
 
             pipeline.addLast("decoder", new HttpRequestDecoder());
             pipeline.addLast("encoder", new HttpResponseEncoder());
 
             if (_logger.isDebugEnabled()) {
-                pipeline.addLast("logger", new LoggingHandler(HttpPoolNettyServer.class));
+                addLogging(pipeline);
             }
             pipeline.addLast("executor",
                              new ExecutionHandler(getDiskExecutor()));
@@ -115,9 +119,20 @@ public class HttpPoolNettyServer
                                                   _clientIdleTimeout,
                                                   TimeUnit.MILLISECONDS));
             pipeline.addLast("chunkedWriter", new ChunkedWriteHandler());
+            pipeline.addLast("dynamic-logger", new DynamicLoggerHandler(this));
+            pipeline.addLast("cdc", new CDCHandler());
             pipeline.addLast("transfer", new HttpPoolRequestHandler(HttpPoolNettyServer.this, _chunkSize));
 
             return pipeline;
+        }
+
+        @Override
+        public void addLogging(ChannelPipeline pipeline)
+        {
+            if (pipeline.getContext("logger") == null) {
+                pipeline.addAfter("encoder", "logger",
+                        new LoggingHandler(HttpPoolNettyServer.class));
+            }
         }
     }
 }

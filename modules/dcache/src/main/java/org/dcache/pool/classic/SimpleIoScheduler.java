@@ -284,58 +284,57 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
                 _semaphore.acquire();
                 try {
                     final PrioritizedRequest request = _queue.take();
-                    request.getCdc().restore();
-                    request.transfer(
-                            new CompletionHandler<Void,Void>()
-                            {
-                                @Override
-                                public void completed(Void result, Void attachment)
+                    try (CDC ignored = request.getCdc().restore()) {
+                        request.transfer(
+                                new CompletionHandler<Void,Void>()
                                 {
-                                    postprocess();
-                                }
-
-                                @Override
-                                public void failed(Throwable exc, Void attachment)
-                                {
-                                    if (exc instanceof InterruptedException || exc instanceof InterruptedIOException) {
-                                        request.getMover().setTransferStatus(CacheException.DEFAULT_ERROR_CODE, "Transfer was killed");
+                                    @Override
+                                    public void completed(Void result, Void attachment)
+                                    {
+                                        postprocess();
                                     }
-                                    postprocess();
-                                }
 
-                                private void postprocess()
-                                {
-                                    request.getMover().postprocess(
-                                            new CompletionHandler<Void, Void>()
-                                            {
-                                                @Override
-                                                public void completed(Void result,
-                                                                      Void attachment)
-                                                {
-                                                    release();
-                                                }
+                                    @Override
+                                    public void failed(Throwable exc, Void attachment)
+                                    {
+                                        if (exc instanceof InterruptedException || exc instanceof InterruptedIOException) {
+                                            request.getMover().setTransferStatus(CacheException.DEFAULT_ERROR_CODE, "Transfer was killed");
+                                        }
+                                        postprocess();
+                                    }
 
-                                                @Override
-                                                public void failed(Throwable exc,
-                                                                   Void attachment)
+                                    private void postprocess()
+                                    {
+                                        request.getMover().postprocess(
+                                                new CompletionHandler<Void, Void>()
                                                 {
-                                                    release();
-                                                }
+                                                    @Override
+                                                    public void completed(Void result,
+                                                                          Void attachment)
+                                                    {
+                                                        release();
+                                                    }
 
-                                                private void release()
-                                                {
-                                                    request.done();
-                                                    _jobs.remove(request.getId());
-                                                    _semaphore.release();
-                                                }
-                                            });
-                                }
-                            });
+                                                    @Override
+                                                    public void failed(Throwable exc,
+                                                                       Void attachment)
+                                                    {
+                                                        release();
+                                                    }
+
+                                                    private void release()
+                                                    {
+                                                        request.done();
+                                                        _jobs.remove(request.getId());
+                                                        _semaphore.release();
+                                                    }
+                                                });
+                                    }
+                                });
+                    }
                 } catch (RuntimeException | Error | InterruptedException e) {
                     _semaphore.release();
                     throw e;
-                } finally {
-                    CDC.clear();
                 }
             }
         } catch (InterruptedException e) {

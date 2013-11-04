@@ -1,4 +1,4 @@
-package org.dcache.xrootd;
+package org.dcache.pool.movers;
 
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;

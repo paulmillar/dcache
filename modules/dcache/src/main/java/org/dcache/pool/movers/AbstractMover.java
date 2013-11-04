@@ -33,6 +33,7 @@ import diskCacheV111.vehicles.PoolAcceptFileMessage;
 import diskCacheV111.vehicles.PoolIoFileMessage;
 import diskCacheV111.vehicles.ProtocolInfo;
 
+import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellPath;
 
 import org.dcache.pool.classic.Cancellable;

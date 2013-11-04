@@ -1,15 +1,7 @@
 package org.dcache.xrootd.pool;
 
-import org.dcache.xrootd.CDCHandler;
-import org.jboss.netty.channel.ChannelEvent;
-import org.jboss.netty.channel.ChannelHandler;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.ChannelUpstreamHandler;
-import org.jboss.netty.channel.DefaultChannelPipeline;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.handler.execution.ExecutionHandler;
 import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.handler.timeout.IdleStateHandler;
@@ -21,22 +13,21 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import dmg.cells.nucleus.CDC;
 import org.dcache.pool.movers.AbstractNettyServer;
-import org.dcache.xrootd.CDCExecutorDecorator;
+import org.dcache.pool.movers.CDCAwareChannelPipeline;
+import org.dcache.pool.movers.CDCHandler;
+import org.dcache.pool.movers.DynamicLoggerHandler;
+import org.dcache.pool.movers.DynamicLoggingChannelPipelineFactory;
 import org.dcache.util.PortRange;
 import org.dcache.vehicles.XrootdProtocolInfo;
-import org.dcache.xrootd.CDCAwareChannelPipeline;
-import org.dcache.xrootd.DynamicLoggingChannelPipelineFactory;
+import org.dcache.xrootd.CDCExecutorDecorator;
 import org.dcache.xrootd.core.XrootdDecoder;
 import org.dcache.xrootd.core.XrootdEncoder;
 import org.dcache.xrootd.core.XrootdHandshakeHandler;
-import org.dcache.xrootd.DynamicLoggerHandler;
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.stream.ChunkedResponseWriteHandler;
 
-import static org.jboss.netty.channel.Channels.pipeline;
 
 /**
  * Pool-netty server tailored to the requirements of the xrootd protocol.
@@ -138,9 +129,9 @@ public class XrootdPoolNettyServer
             ChannelPipeline pipeline = new CDCAwareChannelPipeline();
             pipeline.addLast("encoder", new XrootdEncoder());
             pipeline.addLast("decoder", new XrootdDecoder());
-            //if (_logger.isDebugEnabled()) {
+            if (_logger.isDebugEnabled()) {
                 addLogging(pipeline);
-            //}
+            }
             pipeline.addLast("handshake",
                              new XrootdHandshakeHandler(XrootdProtocol.DATA_SERVER));
             pipeline.addLast("executor", new ExecutionHandler(new CDCExecutorDecorator(getDiskExecutor())));

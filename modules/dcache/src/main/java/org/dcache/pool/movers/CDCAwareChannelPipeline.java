@@ -1,4 +1,4 @@
-package org.dcache.xrootd;
+package org.dcache.pool.movers;
 
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.DefaultChannelPipeline;
@@ -28,6 +28,7 @@ public class CDCAwareChannelPipeline extends DefaultChannelPipeline
     public void sendUpstream(ChannelEvent e)
     {
         try (CDC ignored = _cdc.restore()) {
+            System.out.println("CDCAwareChannelPipeline("+Integer.toHexString(this.hashCode())+").sendUpstream,  diagnose=" + CDC.isDiagnoseEnabled());
             super.sendUpstream(e);
         }
     }
@@ -36,12 +37,14 @@ public class CDCAwareChannelPipeline extends DefaultChannelPipeline
     public void sendDownstream(ChannelEvent e)
     {
         try (CDC ignored = _cdc.restore()) {
+            System.out.println("CDCAwareChannelPipeline("+Integer.toHexString(this.hashCode())+").sendDownstream,  diagnose=" + CDC.isDiagnoseEnabled());
             super.sendDownstream(e);
         }
     }
 
     public void setCDC(CDC cdc)
     {
+        System.out.println("CDCAwareChannelPipeline("+Integer.toHexString(this.hashCode())+").setCDC");
         _cdc = cdc;
     }
 }

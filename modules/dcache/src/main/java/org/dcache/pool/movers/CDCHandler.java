@@ -1,4 +1,4 @@
-package org.dcache.xrootd;
+package org.dcache.pool.movers;
 
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
@@ -24,6 +24,7 @@ public class CDCHandler extends SimpleChannelHandler
             throws Exception
     {
         if (event instanceof CDCEvent) {
+            System.out.println("CDCHandler received upstream");
             updatePipeline(ctx.getPipeline(), (CDCEvent)event);
         } else {
             super.handleUpstream(ctx, event);
@@ -35,6 +36,7 @@ public class CDCHandler extends SimpleChannelHandler
             throws Exception
     {
         if (event instanceof CDCEvent) {
+            System.out.println("CDCHandler received downstream");
             updatePipeline(ctx.getPipeline(), (CDCEvent)event);
         } else {
             super.handleDownstream(ctx, event);
