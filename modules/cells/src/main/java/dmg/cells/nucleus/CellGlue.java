@@ -447,6 +447,7 @@ class CellGlue {
         try {
             _killerExecutor.execute(command);
         } catch (OutOfMemoryError e) {
+            LOGGER.error("FAILED TO EXECUTE KILL TASK IN killerExecutor, SWITCHING TO emergencyKillerExecutor");
             /* This can signal that we cannot create any more threads. The emergency
              * pool has one thread preallocated for this situation.
              */
