@@ -16,6 +16,9 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class Subjects
 {
     public static final String UNKNOWN = "<unknown>";
@@ -471,7 +474,9 @@ public class Subjects
                     } catch (ClassNotFoundException e) {
                         throw new IllegalArgumentException("No matching class found: "+type);
                     } catch (InvocationTargetException e) {
-                        throw new IllegalArgumentException("Invocation failed: "+e.toString());
+                        Exception cause = unwrapInvocationTargetException(e,
+                                THROWS_RUNTIMEEXCEPTION);
+                        throw new IllegalArgumentException("Invocation failed: "+cause.toString());
                     } catch (InstantiationException e) {
                         throw new IllegalArgumentException("Instantiation failed: "+e.toString());
                     } catch (IllegalAccessException e) {

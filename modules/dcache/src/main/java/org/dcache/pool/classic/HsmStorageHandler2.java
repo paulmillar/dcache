@@ -80,6 +80,8 @@ import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getFirst;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 public class HsmStorageHandler2
     extends AbstractCellComponent implements CellCommandListener
@@ -337,7 +339,8 @@ public class HsmStorageHandler2
                  * bug.
                  */
                 throw new RuntimeException("Failed to queue fetch request",
-                        e.getCause());
+                        unwrapInvocationTargetException(e,
+                                THROWS_RUNTIMEEXCEPTION));
             }
         }
         if (callback != null) {

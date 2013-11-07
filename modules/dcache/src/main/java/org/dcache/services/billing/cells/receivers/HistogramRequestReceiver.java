@@ -125,6 +125,9 @@ import org.dcache.services.billing.histograms.data.ITimeFrameHistogramDataServic
 import org.dcache.services.billing.histograms.data.TimeFrameHistogramData;
 import org.dcache.vehicles.billing.HistogramRequestMessage;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * Serves up histogram data. The {@link HistogramRequestMessage} specifies an
  * array of {@link TimeFrameHistogramData} containing arrays of doubles. The
@@ -159,7 +162,9 @@ public class HistogramRequestReceiver implements CellMessageReceiver {
             request.setReturnValue(data);
             request.setSucceeded();
         } catch (Exception t) {
-            request.setFailed(-1, t.getMessage());
+            Exception cause = unwrapInvocationTargetException(t,
+                    RETURNS_RUNTIMEEXCEPTION);
+            request.setFailed(-1, cause.getMessage());
         }
 
         return request;

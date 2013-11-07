@@ -3,6 +3,7 @@ package org.dcache.services.login;
 import javax.security.auth.Subject;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.security.Principal;
 
 import diskCacheV111.util.CacheException;
@@ -15,6 +16,9 @@ import org.dcache.auth.LoginStrategy;
 import org.dcache.auth.Subjects;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.cells.CellCommandListener;
+
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 public class LoginCLI
     implements CellCommandListener
@@ -107,7 +111,11 @@ public class LoginCLI
         }
 
         Constructor<? extends Principal> constructor = c.getConstructor(String.class);
-        return constructor.newInstance(name);
+        try {
+            return constructor.newInstance(name);
+        } catch (InvocationTargetException e) {
+            throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
+        }
     }
 
 }

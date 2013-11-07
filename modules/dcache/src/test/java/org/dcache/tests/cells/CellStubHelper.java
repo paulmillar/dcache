@@ -12,6 +12,8 @@ import java.util.List;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -122,7 +124,8 @@ public abstract class CellStubHelper
                 fail("Unexpected failure while invoking message handler: " +
                         e.getMessage());
             } catch (InvocationTargetException e) {
-                throw e.getTargetException();
+                throw unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
             } catch (IllegalArgumentException e) {
                 /* Handler parameters didn't match message object.
                  */

@@ -16,6 +16,10 @@ import dmg.util.CommandRequestable;
 import dmg.util.CommandSyntaxException;
 import dmg.util.CommandThrowableException;
 
+import org.dcache.util.Exceptions;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * Implements the legacy cell shell commands which use reflection
  * on method and field names.
@@ -156,14 +160,13 @@ class AcCommandExecutor implements CommandExecutor
         try {
             return (Serializable) method.invoke(_listener, arguments);
         } catch (InvocationTargetException e) {
-            Throwable te = e.getTargetException();
+            Exception cause = unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
 
-            Throwables.propagateIfInstanceOf(te, CommandException.class);
-            Throwables.propagateIfInstanceOf(te, Error.class);
+            Throwables.propagateIfInstanceOf(cause, CommandException.class);
 
-            if (te instanceof RuntimeException &&
-                    !(te instanceof IllegalArgumentException) &&
-                    !(te instanceof IllegalStateException)) {
+            if (cause instanceof RuntimeException &&
+                    !(cause instanceof IllegalArgumentException) &&
+                    !(cause instanceof IllegalStateException)) {
                 /* We treat uncaught RuntimeExceptions other than
                  * IllegalArgumentException, IllegalStateException,
                  * and those declared to be thrown by the method as
@@ -171,18 +174,18 @@ class AcCommandExecutor implements CommandExecutor
                  */
                 boolean declared = false;
                 for (Class<?> clazz: method.getExceptionTypes()) {
-                    if (clazz.isAssignableFrom(te.getClass())) {
+                    if (clazz.isAssignableFrom(cause.getClass())) {
                         declared = true;
                     }
                 }
 
                 if (!declared) {
-                    throw (RuntimeException) te;
+                    throw (RuntimeException) cause;
                 }
             }
 
-            throw new CommandThrowableException(te.toString() + " from " + method.getName(),
-                    te);
+            throw new CommandThrowableException(cause.toString() + " from " + method.getName(),
+                    cause);
         } catch (IllegalAccessException e) {
             throw new CommandPanicException("Exception while invoking " +
                     method.getName(), e);

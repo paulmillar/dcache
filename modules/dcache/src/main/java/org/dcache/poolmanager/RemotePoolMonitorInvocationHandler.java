@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +18,8 @@ import org.dcache.cells.CellStub;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  * InvocationHandler to access a cached PoolMonitor that is periodically imported from pool manager.
@@ -110,7 +113,11 @@ public class RemotePoolMonitorInvocationHandler implements InvocationHandler
     public Object invoke(Object proxy, Method method, Object[] args)
             throws Throwable
     {
-        return method.invoke(getPoolMonitor(), args);
+        try {
+            return method.invoke(getPoolMonitor(), args);
+        } catch (InvocationTargetException e) {
+            throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
+        }
     }
 
     private class UpdatePoolMonitorTask

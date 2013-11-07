@@ -40,6 +40,9 @@ import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.util.CDCExecutorServiceDecorator;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class MoverProtocolTransferService extends AbstractCellComponent
         implements TransferService<MoverProtocolMover>, MoverFactory, CellCommandListener
 {
@@ -85,7 +88,8 @@ public class MoverProtocolTransferService extends AbstractCellComponent
             return new MoverProtocolMover(handle, message, pathToDoor, this, _postTransferService,
                     moverProtocol);
         } catch (InvocationTargetException e) {
-            throw new CacheException(27, "Could not create mover for " + info, e.getTargetException());
+            throw new CacheException(27, "Could not create mover for " + info,
+                    unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION));
         } catch (ClassNotFoundException e) {
             throw new CacheException(27, "Protocol " + info + " is not supported", e);
         } catch (NoSuchMethodException | InstantiationException | IllegalAccessException e) {

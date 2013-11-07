@@ -11,6 +11,10 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
 
+import org.dcache.util.Exceptions;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  *
  * @author  timur
@@ -31,7 +35,9 @@ public class Handler extends URLStreamHandler{
         }
         catch(Exception e)
         {
-            e.printStackTrace();
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+            cause.printStackTrace();
         }
         return null;
     }

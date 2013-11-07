@@ -14,6 +14,9 @@ import dmg.cells.nucleus.CellNucleus;
 import dmg.util.Args;
 import dmg.util.cdb.CdbLockable;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  **
   *
@@ -132,8 +135,8 @@ public class       UserMgrCell
             a[0] = priv ;
             a[1] = request ;
             answer = (Serializable) m.invoke( this , a ) ;
-         }catch( InvocationTargetException ite ){
-            throw (Exception)ite.getTargetException() ;
+         }catch( InvocationTargetException ite ) {
+            throw unwrapInvocationTargetException(ite, THROWS_RUNTIMEEXCEPTION);
          }catch( Exception xe ){
             throw new Exception( "Command not found : "+ request[2]) ;
          }

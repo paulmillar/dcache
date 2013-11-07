@@ -9,6 +9,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
 
 import dmg.cells.nucleus.CellEndpoint;
@@ -22,6 +23,9 @@ import org.dcache.services.httpd.HttpServiceCell;
 import org.dcache.services.httpd.util.StandardHttpRequest;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  * Wraps calls to {@link HttpResponseEngine} aliases with the Jetty handler API.
@@ -89,6 +93,8 @@ public class ResponseEngineHandler extends AbstractHandler {
             args[1] = this.args;
             engine = constr.newInstance(args);
         } catch (final Exception e) {
+            unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
+
             try {
                 Class<?>[] argsClass = new Class<?>[1];
                 argsClass[0] = String[].class;
@@ -98,10 +104,17 @@ public class ResponseEngineHandler extends AbstractHandler {
                 args[0] = this.args;
                 engine = constr.newInstance(args);
             } catch (final Exception ee) {
+                unwrapInvocationTargetException(ee, THROWS_RUNTIMEEXCEPTION);
+
                 Class<?>[] argsClass = new Class<?>[0];
                 Constructor<? extends HttpResponseEngine> constr
                     = c.getConstructor(argsClass);
-                engine = constr.newInstance();
+                try {
+                    engine = constr.newInstance();
+                } catch (InvocationTargetException ite) {
+                    throw unwrapInvocationTargetException(ite,
+                            RETURNS_RUNTIMEEXCEPTION);
+                }
             }
         }
         cell.addCommandListener(engine);

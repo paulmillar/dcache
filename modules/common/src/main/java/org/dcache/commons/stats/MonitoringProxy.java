@@ -8,6 +8,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * MonitoringProxy can be used to decorate a any class implementing an interface
  * T for measuring  the number of invocations
@@ -50,7 +53,7 @@ public class MonitoringProxy  <T> implements InvocationHandler {
             if(counter != null) {
                 counter.incrementFailed(method);
             }
-            throw e.getTargetException();
+            throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
         } finally {
             long execTime = System.currentTimeMillis() - startTimeStamp;
             if (logger.isDebugEnabled()) {

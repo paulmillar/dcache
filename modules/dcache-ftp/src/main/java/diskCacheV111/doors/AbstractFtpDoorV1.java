@@ -179,6 +179,8 @@ import org.dcache.util.list.ListDirectoryHandler;
 import org.dcache.vehicles.FileAttributes;
 
 import static org.dcache.namespace.FileAttribute.*;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  * Exception indicating an error during processing of an FTP command.
@@ -1364,20 +1366,21 @@ public abstract class AbstractFtpDoorV1
                 _skipBytes = 0;
             }
         } catch (InvocationTargetException ite) {
+            Exception cause = unwrapInvocationTargetException(ite,
+                    RETURNS_RUNTIMEEXCEPTION);
             //
             // is thrown if the underlying method
             // actively throws an exception.
             //
-            Throwable te = ite.getTargetException();
-            if (te instanceof FTPCommandException) {
-                FTPCommandException failure = (FTPCommandException) te;
+            if (cause instanceof FTPCommandException) {
+                FTPCommandException failure = (FTPCommandException) cause;
                 reply(String.valueOf(failure.getCode()) + " " + failure.getReply());
-            } else if (te instanceof CommandExitException) {
-                throw (CommandExitException) te;
+            } else if (cause instanceof CommandExitException) {
+                throw (CommandExitException) cause;
             } else {
                 reply("500 Operation failed due to internal error: " +
-                      te.getMessage());
-                _logger.error("FTP command '{}' got exception", cmd, te);
+                      cause.getMessage());
+                _logger.error("FTP command '{}' got exception", cmd, cause);
             }
 
             _skipBytes = 0;
@@ -2413,7 +2416,9 @@ public abstract class AbstractFtpDoorV1
                 _logger.info("Error return invoking: {}({})", m.getName(), arg);
                 m.invoke(this, args);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                reply("500 " + e.toString());
+                Exception cause = unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
+                reply("500 " + cause.toString());
                 _skipBytes = 0;
             }
         } else {
@@ -2439,7 +2444,9 @@ public abstract class AbstractFtpDoorV1
                 _logger.info("Esto invoking: {} ({})", m.getName(), arg);
                 m.invoke(this, args);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                reply("500 " + e.toString());
+                Exception cause = unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
+                reply("500 " + cause.toString());
                 _skipBytes = 0;
             }
         } else {

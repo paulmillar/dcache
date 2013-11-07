@@ -35,6 +35,9 @@ import org.dcache.services.pinmanager1.PinManagerMovePinMessage;
 import org.dcache.util.ReflectionUtils;
 import org.dcache.vehicles.FileAttributes;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class Task
 {
     private final static Logger _log = LoggerFactory.getLogger(Job.class);
@@ -506,10 +509,12 @@ public class Task
                                     m.invoke(_fsm, arguments);
                                 }
                             } catch (IllegalAccessException | InvocationTargetException e) {
+                                Exception cause = unwrapInvocationTargetException(e,
+                                        THROWS_RUNTIMEEXCEPTION);
                                 /* We are not allowed to call this
                                  * method. Better escalate it.
                                  */
-                                throw new RuntimeException("Bug detected", e);
+                                throw new RuntimeException("Bug detected", cause);
                             } catch (TransitionUndefinedException e) {
                                 throw new RuntimeException("State machine is incomplete", e);
                             }

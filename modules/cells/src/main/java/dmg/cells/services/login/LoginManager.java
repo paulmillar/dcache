@@ -47,9 +47,12 @@ import dmg.util.StreamEngine;
 import dmg.util.UserValidatable;
 
 import org.dcache.auth.Subjects;
+
+import static org.dcache.util.Exceptions.Behaviour.*;
 import org.dcache.util.Version;
 
 import static com.google.common.collect.Maps.newHashMap;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  **
@@ -743,16 +746,17 @@ public void cleanUp(){
            try {
               obj = ssfConstructor.newInstance(args);
            } catch (InvocationTargetException e) {
-               Throwable t = e.getCause();
-               if(t instanceof Exception) {
-                   throw (Exception)t;
-               } else {
-                   throw new Exception(t.getMessage(), t);
-               }
+               throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
            }
 
            Method meth = ssfClass.getMethod("createServerSocket", new Class[0]) ;
-           _serverSocket = (ServerSocket)meth.invoke( obj ) ;
+
+           try {
+               _serverSocket = (ServerSocket)meth.invoke( obj ) ;
+           } catch (InvocationTargetException e) {
+               throw unwrapInvocationTargetException(e,
+                       RETURNS_RUNTIMEEXCEPTION);
+           }
 
            if (local == null || local.equals("any")) {
                _serverSocket.bind(new InetSocketAddress( _listenPort ) );
@@ -1051,25 +1055,27 @@ public void cleanUp(){
                    childrenCounterChanged() ;
                 }
              }catch( Exception ee ){
-                 _log.warn("Can't determine child name " + ee, ee) ;
+                 Exception cause = unwrapInvocationTargetException(ee,
+                         RETURNS_RUNTIMEEXCEPTION);
+                 _log.warn("Can't determine child name: " + cause, cause);
              }
           }
           _loginCounter ++ ;
 
-       }catch( Exception e ){
-          if (e instanceof InvocationTargetException) {
-              Throwable cause = e.getCause();
-              if (cause instanceof Error) {
-                  throw (Error) cause;
-              }
-              _log.warn("Exception (ITE) in secure protocol : {}",
-                      (cause == null ? "(null)" : cause.toString()));
-          } else {
-              _log.warn( "Exception in secure protocol : {}", e.toString() ) ;
-          }
-          try{ _socket.close() ; }catch(IOException ee ){/* dead any way....*/}
-          _loginFailures ++ ;
-          synchronized( _childHash ){ _childCount -- ; }
+       } catch(Exception e) {
+            try {
+                _socket.close();
+            } catch (IOException ee) {
+                /* dead any way....*/
+            }
+            _loginFailures ++ ;
+            synchronized (_childHash) {
+                _childCount--;
+            }
+
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+            _log.warn("Exception in secure protocol : {}", cause);
        }
      }
   }

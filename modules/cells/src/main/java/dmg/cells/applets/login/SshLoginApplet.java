@@ -12,6 +12,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.StringTokenizer;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class      SshLoginApplet
        extends    Applet
        implements ActionListener  {
@@ -105,7 +108,8 @@ public class      SshLoginApplet
                _switchBoard.add( p , name ) ;
                panelCounter ++ ;
             }catch( Exception e ){
-               System.err.println( "Skipping "+name+" ("+e+")") ;
+                Exception cause = unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
+               System.err.println( "Skipping "+name+" ("+cause+")") ;
             }
          }
          if( panelCounter == 0 ){
@@ -132,7 +136,9 @@ public class      SshLoginApplet
             m.invoke( p , args ) ;
             _switchPanel.add( p , "commander" ) ;
          }catch( Exception e ){
-            System.out.println( "Problem while new commander instance : "+e ) ;
+             Exception cause = unwrapInvocationTargetException(e,
+                     THROWS_RUNTIMEEXCEPTION);
+            System.out.println( "Problem while new commander instance : " + cause);
             System.exit(1) ;
          }
       }

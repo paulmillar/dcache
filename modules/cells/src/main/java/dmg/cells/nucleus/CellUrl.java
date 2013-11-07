@@ -16,6 +16,9 @@ import java.util.Dictionary;
 import java.util.Map;
 import java.util.Properties;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class CellUrl {
 
    private final static Logger _log =
@@ -204,7 +207,9 @@ public class CellUrl {
              return new StringReader( o.toString() ) ;
 
           }catch( Exception e ){
-             throw new IOException( "Problem : "+e ) ;
+              Exception cause = unwrapInvocationTargetException(e,
+                      RETURNS_RUNTIMEEXCEPTION);
+              throw new IOException("Problem: " + cause, cause);
           }
 
        }

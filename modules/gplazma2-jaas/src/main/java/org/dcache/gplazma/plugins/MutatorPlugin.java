@@ -18,6 +18,8 @@ import org.dcache.auth.UserNamePrincipal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.instanceOf;
 import static com.google.common.collect.Iterables.filter;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  * A {@link GPlazmaMappingPlugin} that maps a one principal type to an other one.
@@ -57,6 +59,7 @@ public class MutatorPlugin implements GPlazmaMappingPlugin {
                 mutated.add(out);
             } catch (IllegalAccessException | IllegalArgumentException |
                     InstantiationException | InvocationTargetException e) {
+                unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
             }
         }
         principals.addAll(mutated);

@@ -40,6 +40,9 @@ import org.dcache.srm.scheduler.SharedMemoryCacheJobStorage;
 import org.dcache.srm.scheduler.State;
 import org.dcache.srm.util.Configuration;
 
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+
 /**
  *
  * @author timur
@@ -126,7 +129,8 @@ public class DatabaseJobStorageFactory extends JobStorageFactory{
             Throwables.propagateIfPossible(e.getCause(), IOException.class);
             throw new RuntimeException("Request persistence initialization failed: " + e.toString(), e);
         } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-            throw new RuntimeException("Request persistence initialization failed: " + e.toString(), e);
+            Throwables.propagate(unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION));
         }
     }
 

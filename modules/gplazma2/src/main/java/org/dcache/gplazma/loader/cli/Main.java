@@ -4,6 +4,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  *  The main class of a simple CLI for querying about gPlazma plugins
  */
@@ -47,9 +50,10 @@ public class Main {
         Command command;
         try {
             command = constructor.newInstance();
-        } catch (IllegalArgumentException | InvocationTargetException | IllegalAccessException | InstantiationException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        } catch (IllegalArgumentException | InvocationTargetException |
+                IllegalAccessException | InstantiationException e) {
+            Exception cause = unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
+            cause.printStackTrace();
             return;
         }
 

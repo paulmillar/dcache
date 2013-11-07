@@ -184,6 +184,9 @@ import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 
 import static org.dcache.srm.v2_2.TStatusCode.*;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 public class SRMServerV2 implements ISRM  {
 
@@ -310,8 +313,11 @@ public class SRMServerV2 implements ISRM  {
                 }
                 return response;
             } catch (InvocationTargetException | NoSuchMethodException | InstantiationException | IllegalAccessException | RuntimeException e) {
-                LOGGER.error("Please report this failure to support@dcache.org", e);
+                Exception cause = unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
                 srmServerCounters.incrementFailed(requestClass);
+                LOGGER.error("Please report this failure to support@dcache.org",
+                        cause);
                 return getFailedResponse(capitalizedRequestName,
                         TStatusCode.SRM_INTERNAL_ERROR,
                         "Internal error (server log contains additional information)");

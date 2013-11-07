@@ -21,6 +21,9 @@ import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class DummyStreamEngine implements StreamEngine
 {
     private final static Logger _logger =
@@ -52,7 +55,9 @@ public class DummyStreamEngine implements StreamEngine
         } catch (NoSuchMethodException nsm) {
 
         } catch (Exception e) {
-            _logger.warn("Failed to initialize user name in DummyStreamEngine", e);
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+            _logger.warn("Failed to initialize user name in DummyStreamEngine", cause);
         }
     }
 

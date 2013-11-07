@@ -33,6 +33,8 @@ import dmg.util.StreamEngine;
 import org.dcache.auth.Subjects;
 
 import static com.google.common.base.Objects.firstNonNull;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 public class StreamObjectCell
     extends CellAdapter
@@ -103,9 +105,10 @@ public class StreamObjectCell
 
             prepareClass(args.argv(0));
         } catch (Exception e) {
+            Exception cause = unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
             start();
             kill();
-            throw e;
+            throw cause;
         }
         useInterpreter(false);
         start();
@@ -261,6 +264,7 @@ public class StreamObjectCell
                 (String) _promptMethod.invoke(_commandObject);
             return (s == null) ? "" : s;
         } catch (Exception e) {
+            unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
             return "";
         }
     }
@@ -275,6 +279,7 @@ public class StreamObjectCell
                 (String) _helloMethod.invoke(_commandObject);
             return (s == null) ? "" : s;
         } catch (Exception e) {
+            unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
             return "";
         }
     }
@@ -400,11 +405,10 @@ public class StreamObjectCell
                                        "executeCommand(String/String or Object/String)");
                     }
                 }
-            } catch (InvocationTargetException ite) {
-                result = ite.getTargetException();
-                done = result instanceof CommandExitException;
             } catch (Exception ae) {
-                result = ae;
+                result = unwrapInvocationTargetException(ae,
+                        RETURNS_RUNTIMEEXCEPTION);
+                done = result instanceof CommandExitException;
             }
             _frame.setPayload(result);
             try {
@@ -470,7 +474,8 @@ public class StreamObjectCell
             try {
                 result = com.invoke(_commandObject, str);
             } catch (InvocationTargetException ite) {
-                result = ite.getTargetException();
+                result = unwrapInvocationTargetException(ite,
+                        RETURNS_RUNTIMEEXCEPTION);
                 if(result instanceof CommandExitException) {
                     _log.debug( "User requested to logout.");
                     done = true;

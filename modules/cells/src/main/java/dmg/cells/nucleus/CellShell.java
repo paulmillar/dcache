@@ -55,6 +55,10 @@ import dmg.util.ReplaceableBackedProperties;
 import dmg.util.Slf4jErrorWriter;
 import dmg.util.Slf4jInfoWriter;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
   *
   *
@@ -817,7 +821,9 @@ public class      CellShell
 
             return "created : " + cell;
         } catch (InvocationTargetException e) {
-            throw new CommandThrowableException(e.getTargetException().getMessage(), e.getTargetException());
+            Exception cause = unwrapInvocationTargetException(e,
+                    THROWS_RUNTIMEEXCEPTION);
+            throw new CommandThrowableException(cause.getMessage(), cause);
         }
     }
    ////////////////////////////////////////////////////////////
@@ -918,21 +924,27 @@ public class      CellShell
          paras[1]    = this ;
          interObject = con.newInstance( paras ) ;
       }catch(Exception e0 ){
-         answer.append( e0.toString() ).append( '\n' ) ;
+          Exception cause0 = unwrapInvocationTargetException(e0,
+                  RETURNS_RUNTIMEEXCEPTION);
+         answer.append(cause0.toString()).append('\n');
          try{
             con         = c.getConstructor( paraList1 ) ;
             paras       = new Object[1] ;
             paras[0]    = _nucleus ;
             interObject = con.newInstance( paras ) ;
          }catch(Exception e1 ){
-            answer.append( e1.toString() ).append( '\n' ) ;
+             Exception cause1 = unwrapInvocationTargetException(e1,
+                     RETURNS_RUNTIMEEXCEPTION);
+            answer.append(cause1.toString()).append('\n');
             try{
                interObject = c.newInstance() ;
                if( interObject == null ) {
                    throw new CommandException(36, answer.toString());
                }
-            }catch(Throwable e2 ){
-               answer.append( e2.toString() ).append( '\n' ) ;
+            }catch(Exception e2 ){
+                Exception cause2 = unwrapInvocationTargetException(e2,
+                        RETURNS_RUNTIMEEXCEPTION);
+               answer.append(cause2.toString()).append('\n');
                throw new CommandException( 36 , answer.toString() ) ;
             }
          }

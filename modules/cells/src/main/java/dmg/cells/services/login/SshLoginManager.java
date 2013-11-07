@@ -27,6 +27,9 @@ import dmg.protocols.ssh.SshStreamEngine;
 import dmg.util.Args;
 import dmg.util.StreamEngine;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  **
   *
@@ -187,7 +190,9 @@ public class       SshLoginManager
             Object cell = _loginConstructor.newInstance( args ) ;
             _loginCounter ++ ;
        }catch( Exception ie ){
-          _log.warn( "Can't create new instance of "+_loginClass.getName()+" "+ie ) ;
+           Exception cause = unwrapInvocationTargetException(ie,
+                   RETURNS_RUNTIMEEXCEPTION);
+          _log.warn( "Can't create new instance of "+_loginClass.getName()+": "+cause);
           engine.close() ;
           _loginFailures ++ ;
        }

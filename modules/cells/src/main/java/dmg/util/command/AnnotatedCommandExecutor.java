@@ -30,6 +30,9 @@ import dmg.util.CommandThrowableException;
 
 import static com.google.common.collect.Iterables.*;
 import static java.util.Arrays.asList;
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  * CommandExecutor for commands implemented as non-static inner
@@ -176,8 +179,9 @@ public class AnnotatedCommandExecutor implements CommandExecutor
         try {
             return _constructor.newInstance(_parent);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(
-                    "This is a bug. Please notify support@dcache.org", e);
+            Throwables.propagate(unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION));
+            return null; // A no-op to satisfy the Java compiler
         }
     }
 
@@ -836,9 +840,9 @@ public class AnnotatedCommandExecutor implements CommandExecutor
             try {
                 return _constructor.newInstance(value);
             } catch (InvocationTargetException e) {
-                Throwable t = e.getTargetException();
-                Throwables.propagateIfPossible(t);
-                throw new IllegalArgumentException(t.getMessage(), t);
+                Exception cause = unwrapInvocationTargetException(e,
+                        THROWS_RUNTIMEEXCEPTION);
+                throw new IllegalArgumentException(cause.getMessage(), cause);
             } catch (InstantiationException | IllegalAccessException e) {
                 throw new RuntimeException("This is a bug. Please notify support@dcache.org", e);
             }
@@ -863,9 +867,9 @@ public class AnnotatedCommandExecutor implements CommandExecutor
             try {
                 return _method.invoke(null, value);
             } catch (InvocationTargetException e) {
-                Throwable t = e.getTargetException();
-                Throwables.propagateIfPossible(t);
-                throw new IllegalArgumentException(t.getMessage(), t);
+                Exception cause = unwrapInvocationTargetException(e,
+                        THROWS_RUNTIMEEXCEPTION);
+                throw new IllegalArgumentException(cause.getMessage(), cause);
             } catch (IllegalAccessException e) {
                 throw new RuntimeException("This is a bug. Please notify support@dcache.org", e);
             }

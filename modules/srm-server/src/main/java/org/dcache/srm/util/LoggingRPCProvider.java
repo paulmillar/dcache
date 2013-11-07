@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * This class wraps the default Axis Java dispatcher (RPCProvider) to provide
  * reasonable logging of problems via slf4j.
@@ -65,9 +68,10 @@ public class LoggingRPCProvider extends RPCProvider
             }
             return result;
         } catch(InvocationTargetException e) {
-            Throwable t = e.getCause();
-            if(t instanceof AxisFault) {
-                AxisFault fault = (AxisFault) t;
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+            if (cause instanceof AxisFault) {
+                AxisFault fault = (AxisFault) cause;
                 /*
                 * All exceptions that are to be delivered as a SOAP Fault are
                 * subclasses of AxisFault.
@@ -76,11 +80,11 @@ public class LoggingRPCProvider extends RPCProvider
                         "reason={}, string={}",
                         fault.getClass().getSimpleName(), fault.getFaultCode(),
                         fault.getFaultReason(), fault.getFaultString());
-            } else if(t instanceof RuntimeException) {
+            } else if (cause instanceof RuntimeException) {
                 _log.error("Bug detected, please report this to " +
-                        "support@dCache.org", t);
+                        "support@dCache.org", cause);
             } else {
-                _log.error("Unexpected invocation exception", t);
+                _log.error("Unexpected invocation exception", cause);
             }
 
             throw e;

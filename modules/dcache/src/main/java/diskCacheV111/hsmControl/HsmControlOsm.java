@@ -22,6 +22,9 @@ import dmg.cells.nucleus.CellNucleus;
 import dmg.cells.nucleus.SyncFifo2;
 import dmg.util.Args;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class HsmControlOsm extends CellAdapter implements Runnable {
 
     private final static Logger _log =
@@ -167,8 +170,8 @@ public class HsmControlOsm extends CellAdapter implements Runnable {
             values[0] = driver ;
             values[1] = con.newInstance( objectArgs ) ;
             values[2] = args ;
-        }catch(InvocationTargetException ite ){
-            throw (Exception)ite.getTargetException();
+        } catch (InvocationTargetException ite) {
+            throw unwrapInvocationTargetException(ite, RETURNS_RUNTIMEEXCEPTION);
         }
         if( ! ( values[1] instanceof HsmControllable ) ) {
             throw new

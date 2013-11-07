@@ -24,6 +24,9 @@ import dmg.util.CommandException;
 import dmg.util.CommandInterpreter;
 import dmg.util.CommandSyntaxException;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  *
  * @author Patrick Fuhrmann patrick.fuhrmann@desy.de
@@ -349,18 +352,11 @@ public class CommandTaskCell extends CellAdapter {
 
            return "Task <"+taskName+"> created and attached to (us) ["+client.getClientKey()+"]" ;
 
-       }catch(InvocationTargetException ite ){
-           Throwable cause = ite.getCause() ;
-           _log.warn("Problem creating "+moduleName+" InvocationTargetException cause : "+cause, cause);
-           if( cause != null ){
-              throw cause ;
-           }else{
-              throw ite ;
-           }
-
-       }catch(Exception ee ){
-           _log.warn("Problem creating "+moduleName+" "+ee, ee);
-           throw ee ;
+       } catch (Exception e) {
+           Exception cause = unwrapInvocationTargetException(e,
+                   RETURNS_RUNTIMEEXCEPTION);
+           _log.warn("Problem creating "+moduleName+" "+e, e);
+           throw cause;
        }
    }
    public static final String hh_attach = "<sessionName>" ;

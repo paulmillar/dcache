@@ -13,6 +13,9 @@ import dmg.cells.nucleus.CellMessage;
 
 import org.dcache.util.ReflectionUtils;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * Automatic dispatch of dCache messages to message handlers.
  */
@@ -208,7 +211,8 @@ public class CellMessageDispatcher
             } catch (IllegalAccessException e) {
                 throw new RuntimeException("Cannot process message due to access error", e);
             } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
+                Exception cause = unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
                 if (cause instanceof IllegalArgumentException ||
                     cause instanceof IllegalStateException ||
                     receiver.isDeclaredToThrow(cause.getClass())) {
@@ -220,8 +224,6 @@ public class CellMessageDispatcher
                      */
                 } else if (cause instanceof RuntimeException) {
                     throw (RuntimeException) cause;
-                } else if (cause instanceof Error) {
-                    throw (Error) cause;
                 } else {
                     /* Since any Throwable not a RuntimeException and
                      * not an Error should have been declared to be

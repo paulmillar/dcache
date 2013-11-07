@@ -17,6 +17,9 @@ import java.util.StringTokenizer;
 
 import dmg.util.Args;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class      SshLoginMain
        extends    Frame
        implements WindowListener,
@@ -110,8 +113,10 @@ public class      SshLoginMain
                _switchBoard.add( p , name ) ;
                panelCounter ++ ;
             }catch( Exception e ){
-               System.err.println( "Skipping "+name+" ("+e+")") ;
-               e.printStackTrace() ;
+                Exception cause = unwrapInvocationTargetException(e,
+                        RETURNS_RUNTIMEEXCEPTION);
+               System.err.println( "Skipping "+name+" ("+cause+")") ;
+               cause.printStackTrace() ;
             }
          }
          if( panelCounter == 0 ){
@@ -138,7 +143,9 @@ public class      SshLoginMain
             m.invoke( p , argx ) ;
             _switchPanel.add( p , "commander" ) ;
          }catch( Exception e ){
-            System.out.println( "Problem while new commander instance : "+e ) ;
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+            System.out.println( "Problem while new commander instance : " + cause);
             System.exit(1) ;
          }
       }

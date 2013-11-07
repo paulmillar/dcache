@@ -12,6 +12,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class TunnelServerSocketCreator extends ServerSocketFactory {
 
 
@@ -31,7 +34,7 @@ public class TunnelServerSocketCreator extends ServerSocketFactory {
         try {
             _tunnel = cc.newInstance(a);
         } catch (InvocationTargetException e) {
-            throw e.getCause();
+            throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
         }
     }
 

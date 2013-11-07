@@ -14,6 +14,7 @@ import java.util.Hashtable;
 import dmg.cells.nucleus.Cell;
 import dmg.cells.nucleus.CellAdapter;
 import dmg.cells.nucleus.CellNucleus;
+import dmg.protocols.telnet.TelnetAuthenticationException;
 import dmg.protocols.telnet.TelnetServerAuthentication;
 import dmg.protocols.telnet.TelnetStreamEngine;
 import dmg.util.Args;
@@ -21,6 +22,9 @@ import dmg.util.DummyStreamEngine;
 import dmg.util.StreamEngine;
 
 import org.dcache.auth.Subjects;
+
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 /**
  **
@@ -170,13 +174,12 @@ public class      TelnetLoginManager
        createNewCell( _loginCellClass , cellName , paraNames , parameter ) ;
 
     }catch( Exception e ){
-       _log.warn( "Exception in TelnetStreamEngine : "+e ) ;
-       if( e instanceof InvocationTargetException ){
-          Exception ie =
-             (Exception)((InvocationTargetException)e).getTargetException() ;
-             _log.warn( "TargetException in TelnetStreamEngine : "+ie ) ;
-       }
-       try{ socket.close(); }catch(Exception ee){}
+        try{ socket.close(); }catch(Exception ee){}
+
+        Exception cause = unwrapInvocationTargetException(e,
+                RETURNS_RUNTIMEEXCEPTION);
+
+       _log.warn( "Exception in TelnetStreamEngine : " + cause);
     }
 
 

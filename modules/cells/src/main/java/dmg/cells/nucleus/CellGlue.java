@@ -24,6 +24,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import dmg.util.CollectionFactory;
 
+import org.dcache.util.Exceptions;
+
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
   *
   *
@@ -242,12 +247,14 @@ class CellGlue {
        try {
           return constructor.newInstance(arguments) ;
       } catch (InvocationTargetException e) {
+           Exception cause = unwrapInvocationTargetException(e,
+                   RETURNS_RUNTIMEEXCEPTION);
            for (Class<?> clazz: constructor.getExceptionTypes()) {
-               if (clazz.isAssignableFrom(e.getTargetException().getClass())) {
+               if (clazz.isAssignableFrom(cause.getClass())) {
                    throw e;
                }
            }
-           throw Throwables.propagate(e.getTargetException());
+           throw Throwables.propagate(cause);
        }
    }
 

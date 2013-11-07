@@ -23,6 +23,9 @@ import dmg.cells.applets.login.DomainEventListener;
 import dmg.cells.services.gui.realm.JRealm;
 import dmg.util.Args;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 //
 
 
@@ -68,6 +71,8 @@ public class JLogin extends JFrame {
 
 
               }catch(Exception e){
+                  Exception cause = unwrapInvocationTargetException(e,
+                          RETURNS_RUNTIMEEXCEPTION);
                   System.err.println("Can't init "+args.argv(i)+" : "+e);
               }
            }

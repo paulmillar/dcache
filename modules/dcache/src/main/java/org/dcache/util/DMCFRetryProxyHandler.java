@@ -11,6 +11,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /*
 * Here we define the proxy class which will work as a ConnectionFactory
 * provided by DriverManagerConnectionFactory from DBCP package, but the
@@ -31,12 +35,12 @@ public class DMCFRetryProxyHandler implements InvocationHandler {
     }
 
     @Override
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    public Object invoke(Object proxy, Method method, Object[] args) throws Exception {
         //
         Object result;
         String methodName = method.getName();
         if (methodName.startsWith("createConnection")) {
-            Throwable te;
+            Exception cause;
             //System.out.println("Calling method " + method + " at " + System.currentTimeMillis());
             int ntry = timeout >= 0 ? timeout/3 : 1000000;
             do {
@@ -44,28 +48,28 @@ public class DMCFRetryProxyHandler implements InvocationHandler {
                     result = method.invoke(delegate, args);
                     return result;
                 } catch (InvocationTargetException e) {
-                    te = e.getTargetException();
-//		        if (te instanceof SQLException && ((SQLException)te).getSQLState().startsWith("08004")) {
-                    if (te instanceof SQLException) {
-                        System.out.println("createConnection(): Got exception " + te.getClass().getName() +
-                                ", SQLState: " + ((SQLException)te).getSQLState());
+                    cause = unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
+                    if (cause instanceof SQLException) {
+                        System.out.println("createConnection(): Got exception " +
+                                cause.getClass().getName() + ", SQLState: " +
+                                ((SQLException)cause).getSQLState());
                         if (ntry-- > 0) {
                             try { Thread.sleep(3000); } catch (InterruptedException ie) {}
                             System.out.println("Sleep 3 s, try to get connection ... tries left: "+ntry);
                         }
                     } else {
-                        throw te;
+                        throw cause;
                     }
                 }
             } while (ntry > 0);
-            throw te;
+            throw cause;
         } else {
             try {
                 //System.out.println("Calling method " + method + " at " + System.currentTimeMillis());
                 result = method.invoke(delegate, args);
                 return result;
             } catch (InvocationTargetException e) {
-                throw e.getTargetException();
+                throw unwrapInvocationTargetException(e, RETURNS_RUNTIMEEXCEPTION);
             } finally {
                 //System.out.println("Called  method " + method + " at " + System.currentTimeMillis());
             }

@@ -546,6 +546,9 @@ public class OptionParser {
                      //hard cast:
                      result = type.cast(object);
                  } catch (InvocationTargetException e) {
+                     if (e.getCause() instanceof Error) {
+                         throw (Error)e.getCause();
+                     }
                      //hard cast:
                      result = type.cast(object);
                  }

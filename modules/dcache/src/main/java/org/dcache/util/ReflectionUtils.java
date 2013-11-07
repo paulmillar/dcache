@@ -12,6 +12,9 @@ import java.util.Map;
 
 import diskCacheV111.util.PnfsId;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * This class contains useful static methods for working with Java
  * reflection.
@@ -107,8 +110,10 @@ public class ReflectionUtils
             _log.debug("Failed to extract PNFS ID from object: "
                        + e.getMessage(), e);
         } catch (InvocationTargetException e) {
+            Exception cause = unwrapInvocationTargetException(e,
+                    THROWS_RUNTIMEEXCEPTION);
             _log.error("Failed to extract PNFS ID from message: "
-                       + e.getMessage(), e);
+                       + cause.getMessage(), cause);
         }
         return null;
     }

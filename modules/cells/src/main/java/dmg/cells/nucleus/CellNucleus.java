@@ -27,6 +27,9 @@ import dmg.util.Pinboard;
 import dmg.util.logback.FilterThresholds;
 import dmg.util.logback.RootFilterThresholds;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  *
  *
@@ -853,13 +856,7 @@ public class CellNucleus implements ThreadFactory
             return __cellGlue._newInstance(
                     cellClass, cellName, args, systemOnly);
         } catch (InvocationTargetException e) {
-            Throwable t = e.getTargetException();
-            if (t instanceof RuntimeException) {
-                throw (RuntimeException) t;
-            }
-            if (t instanceof Error) {
-                throw (Error) t;
-            }
+            unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
             throw e;
         }
     }

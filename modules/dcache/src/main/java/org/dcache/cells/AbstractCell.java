@@ -29,6 +29,9 @@ import dmg.cells.nucleus.Reply;
 import dmg.cells.nucleus.UOID;
 import dmg.util.Args;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * Abstract cell implementation providing features needed by many
  * dCache cells.
@@ -614,6 +617,7 @@ public class AbstractCell extends CellAdapter implements CellMessageReceiver
                     //hard cast:
                     result = type.cast(object);
                 } catch (InvocationTargetException e) {
+                    unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
                     //hard cast:
                     result = type.cast(object);
                 }

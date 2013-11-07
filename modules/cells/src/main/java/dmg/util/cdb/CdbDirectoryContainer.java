@@ -1,5 +1,6 @@
 package dmg.util.cdb ;
 
+import com.google.common.base.Throwables;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -7,6 +8,10 @@ import java.lang.reflect.Method;
 import java.util.Hashtable;
 
 import dmg.cells.services.login.UserHandle;
+import dmg.util.CommandException;
+
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
 
 public class      CdbDirectoryContainer
        extends    CdbGLock
@@ -215,8 +220,9 @@ public class      CdbDirectoryContainer
               element  = _elementConstructor.newInstance( args );
            }
        }catch( InvocationTargetException ite ){
-          throw new
-          CdbException( "Invocation Failed : "+ite.getTargetException() ) ;
+           Exception cause = unwrapInvocationTargetException(ite,
+                   RETURNS_RUNTIMEEXCEPTION);
+           throw new CdbException("Invocation Failed : "+cause);
        }catch( Exception  e ){
           throw new
           CdbException( "Problem : "+e ) ;
@@ -248,8 +254,9 @@ public class      CdbDirectoryContainer
            handle  = _handlerConstructor.newInstance( args );
 
        }catch( InvocationTargetException ite ){
-          throw new
-          CdbException( "Invocation Failed : "+ite.getTargetException() ) ;
+           Exception cause = unwrapInvocationTargetException(ite,
+                   RETURNS_RUNTIMEEXCEPTION);
+          throw new CdbException( "Invocation Failed: "+cause);
        }catch( Exception  e ){
           throw new
           CdbException( "Problem : "+e ) ;
@@ -267,18 +274,12 @@ public class      CdbDirectoryContainer
                ElementEntry entry = _table.get( name );
                CdbLockable element = entry.getLockable() ;
                _elementRemoveMethod.invoke( element) ;
-           }catch( InvocationTargetException ive ){
-              handle.close(CdbLockable.ABORT) ;
-              Throwable t = ive.getTargetException() ;
-              if( t instanceof CdbException ) {
-                  throw (CdbException) t;
-              }
-              throw new
-              CdbException( "Problem in remove method : "+t );
            }catch( Exception ee ){
               handle.close(CdbLockable.ABORT) ;
-              throw new
-              CdbException( "Problem in remove method : "+ee);
+              Exception cause = unwrapInvocationTargetException(ee,
+                      RETURNS_RUNTIMEEXCEPTION);
+              Throwables.propagateIfInstanceOf(cause, CdbException.class);
+              throw new CdbException( "Problem in remove method : " + cause);
            }
            handle.close(CdbLockable.COMMIT ) ;
        }catch( CdbException | InterruptedException edbe ){

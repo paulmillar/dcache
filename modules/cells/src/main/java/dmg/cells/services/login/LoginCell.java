@@ -24,6 +24,10 @@ import dmg.util.StreamEngine;
 
 import org.dcache.auth.Subjects;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
   *
   *
@@ -124,12 +128,10 @@ public class      LoginCell
            o = con.newInstance( objList[j] ) ;
            addCommandListener( o ) ;
            _log.info( "Added : "+args.argv(i) ) ;
-        }catch(Exception ee ){
-           _log.warn( "Failed to load shell : "+args.argv(i)+" : "+ee ) ;
-           if( ee instanceof InvocationTargetException ){
-              _log.warn( "   -> Problem in constructor : "+
-                ((InvocationTargetException)ee).getTargetException() ) ;
-           }
+        }catch (Exception e) {
+            Exception cause = unwrapInvocationTargetException(e,
+                    RETURNS_RUNTIMEEXCEPTION);
+           _log.warn( "Failed to load shell : "+args.argv(i)+" : "+cause);
         }
 
      }
@@ -241,6 +243,7 @@ public class      LoginCell
                result = method.invoke(obj);
                println("    " + method.getName() + " -> " + result.toString());
            } catch (IllegalAccessException | InvocationTargetException e) {
+               unwrapInvocationTargetException(e, THROWS_RUNTIMEEXCEPTION);
                println("    " + method.getName() + " -> (???)");
            }
 

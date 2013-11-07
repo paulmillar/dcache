@@ -261,6 +261,9 @@ public class SRMClientV2 implements ISRM {
                 throw new RemoteException("incorrect usage of the handleClientCall", nsme);
             } catch(InvocationTargetException ite) {
                 Throwable e= ite.getCause();
+                if (e instanceof Error) {
+                    throw (Error)e;
+                }
                 logger.error("{} : try # {} failed with error {}", name, i, e != null ? e.getMessage() : "");
                 if(retry) {
                     if(i <retries) {

@@ -7,6 +7,9 @@ import java.util.Properties;
 
 import org.dcache.gplazma.plugins.GPlazmaPlugin;
 
+import static org.dcache.util.Exceptions.Behaviour.THROWS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 /**
  * This class creates a plugin by reflection when given the plugin Class.
  * The plugin must have a constructor that accepts a single argument: a
@@ -76,7 +79,8 @@ public class PropertiesPluginFactory implements PluginFactory
         } catch (IllegalAccessException e) {
             throw new PluginLoadingException("unauthorised", e);
         } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
+            Exception cause = unwrapInvocationTargetException(e,
+                    THROWS_RUNTIMEEXCEPTION);
             throw new PluginLoadingException(cause.getMessage(), cause);
         }
 

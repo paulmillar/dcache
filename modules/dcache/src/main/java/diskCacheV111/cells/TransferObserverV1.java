@@ -37,6 +37,9 @@ import dmg.cells.services.login.LoginBrokerInfo;
 import dmg.cells.services.login.LoginManagerChildrenInfo;
 import dmg.util.Args;
 
+import static org.dcache.util.Exceptions.Behaviour.RETURNS_RUNTIMEEXCEPTION;
+import static org.dcache.util.Exceptions.unwrapInvocationTargetException;
+
 public class TransferObserverV1
     extends CellAdapter
     implements Runnable
@@ -143,7 +146,9 @@ public class TransferObserverV1
             try {
                 return (String)_mapOwner.invoke(_master, args);
             } catch (Exception ee) {
-                _log.warn("Problem invoking 'mapOwner' : " + ee);
+                Exception cause = unwrapInvocationTargetException(ee,
+                        RETURNS_RUNTIMEEXCEPTION);
+                _log.warn("Problem invoking 'mapOwner' : " + cause);
                 return owner;
             }
         }
