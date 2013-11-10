@@ -402,7 +402,7 @@ public class SDC
         /**
          * Update the context so that the next call to {@code #get} with the
          * same key will return the supplied value.  Returns the previous value
-         * for key.  Value may be null but key must not be null.
+         * for key.  Value may be null.
          */
         public V put(K key, V value);
 
@@ -726,16 +726,47 @@ public class SDC
             return _storage.put(key, value);
         }
 
-        void remove(CapturedContext<K,V> captureToAdopt)
+        void rollback(CapturedContext<K,V> captureToRollback)
         {
+            Queue<CapturedContext<K,V>> afterRollback =
+                    new ConcurrentLinkedDeque<>();
+
+            boolean isAfterRollback = false;
+
             Iterator<CapturedContext<K,V>> iterator = _activeCaptures.iterator();
             _aggregatedChanges.reset();
             while (iterator.hasNext()) {
                 CapturedContext capture = iterator.next();
-                if (capture == captureToAdopt) {
+                if (capture == captureToRollback) {
                     iterator.remove();
+                    isAfterRollback = true;
+                } else if (isAfterRollback) {
+                    iterator.remove();
+                    afterRollback.add(capture);
                 } else {
                     capture.updateAggregation();
+                }
+            }
+
+            // Handle orphaned CapturedContext by giving them a new MainContext
+            if (!afterRollback.isEmpty()) {
+                MainContext<K,V> newMain = new MainContext<>(afterRollback);
+                newMain._storage.putAll(_storage);
+                captureToRollback.applyCaptureTo(newMain._storage);
+                newMain.applyAdoptedCaptures();
+            }
+        }
+
+        private void applyAdoptedCaptures()
+        {
+            Iterator<CapturedContext<K,V>> iterator = _activeCaptures.iterator();
+            while (iterator.hasNext()) {
+                CapturedContext capture = iterator.next();
+
+                if (capture.applyCapture()) {
+                    iterator.remove();
+                } else {
+                    break;
                 }
             }
         }
@@ -815,7 +846,12 @@ public class SDC
 
         /** Whether this capture has ever been adopted or rolledback. */
         private final AtomicBoolean _hasBeenUsed = new AtomicBoolean();
+
+        /** Whether this captured has been adopted when it was used. */
         private volatile boolean _hasBeenAdopted;
+
+        /** Whether this capture has been folded into main context. */
+        private volatile boolean _hasBeenApplied;
 
         private final StackTraceElement[] _creationStacktrace;
         private StackTraceElement[] _usageStacktrace;
@@ -871,7 +907,7 @@ public class SDC
         @Override
         public V put(K key, V value)
         {
-            if (_hasBeenUsed.get()) {
+            if (_hasBeenApplied) {
                 return _storage.put(key, value);
             } else {
                 return _pending.put(key, value);
@@ -884,9 +920,9 @@ public class SDC
             _staged.put(key, value);
         }
 
-        public boolean hasBeenUsed()
+        public boolean hasBeenApplied()
         {
-            return _hasBeenUsed.get();
+            return _hasBeenApplied;
         }
 
         public void forget(K key)
@@ -898,7 +934,7 @@ public class SDC
         @Override
         public V get(K key)
         {
-            if (_hasBeenUsed.get()) {
+            if (_hasBeenApplied) {
                 return _storage.get(key);
             } else {
                 return _pending.get(key);
@@ -909,20 +945,35 @@ public class SDC
         {
             failUnless(!_hasBeenUsed.getAndSet(true));
             rememberUsage();
-            _main.remove(this);
+            _main.rollback(this);
         }
 
         public void adopt()
         {
             if (!_hasBeenUsed.getAndSet(true)) {
-                _hasBeenAdopted = true;
                 rememberUsage();
                 _staged.commit();
-                _pending.commit(); // Write pending into main storage
-                _main.remove(this);
-            } else {
-                // multiple adopt is allowed and is a no-op
+                _hasBeenAdopted = true;
+                _main.applyAdoptedCaptures();
             }
+        }
+
+        public boolean applyCapture()
+        {
+            if (_hasBeenAdopted && !_hasBeenApplied) {
+                _hasBeenApplied = true;
+                _staged.commit();
+                _pending.commit(); // Write pending into main storage
+                return true;
+            }
+
+            return false;
+        }
+
+        public void applyCaptureTo(ConcurrentSimpleMap<K,V> map)
+        {
+            _pending.commitTo(map);
+            _staged.commitTo(map);
         }
 
         /**
@@ -993,7 +1044,7 @@ public class SDC
             // REVISIT: can we do this with PhantomReference and amortise the
             // cost against other operations?
             if (!_hasBeenUsed.get()) {
-                adopt();
+                applyCapture();
             }
             super.finalize();
         }
@@ -1013,7 +1064,7 @@ public class SDC
         Context context = _currentContext.get();
 
         if (context instanceof CapturedContext &&
-                ((CapturedContext) context).hasBeenUsed()) {
+                ((CapturedContext) context).hasBeenApplied()) {
             context = ((CapturedContext) context).getMainContext();
             _currentContext.set(context);
         }

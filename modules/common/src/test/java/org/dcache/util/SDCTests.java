@@ -405,7 +405,7 @@ public class SDCTests
 
         captureForRollback.rollback();
 
-        assertThat(SDC.get("key"), is(equalTo("new-value")));
+        assertThat(SDC.get("key"), is(equalTo("value")));
     }
 
     @Test
@@ -844,7 +844,7 @@ public class SDCTests
 
         capture.adopt();
 
-        assertThat(SDC.get("key"), is(nullValue()));
+        assertThat(SDC.get("key"), is("value"));
     }
 
     @Test
@@ -859,45 +859,43 @@ public class SDCTests
     @Test
     public void shouldSplitOffCaptureWhenRollbackOfEarlierCapture() throws InterruptedException, ExecutionException
     {
-        final Object sync = new Object();
-
         SDC captureForRollback = new SDC();
         SDC.put("key", "value");
         final SDC captureForAdopt = new SDC();
 
         Future f;
-        synchronized(sync) {
+        synchronized(captureForAdopt) {
             f = runParallel(new Callable<Void>() {
                 @Override
                 public Void call() throws InterruptedException
                 {
-                    synchronized(sync) {
+                    synchronized(captureForAdopt) {
                         try {
                             captureForAdopt.adopt();
                             assertThat(SDC.get("key"), is("value"));
                         } finally {
-                            sync.notify();
+                            captureForAdopt.notify();
                         }
 
-                        sync.wait(); // point #1, waiting for main thread to get to point #2
+                        captureForAdopt.wait(); // wait for rollback
 
-                        assertThat(SDC.get("key"), is(nullValue()));
+                        assertThat(SDC.get("key"), is("value"));
                     }
 
                     return null;
                 }
             });
 
-            sync.wait(); // wait for runParallel thread to get to point #1
+            captureForAdopt.wait(); // wait for adopt
 
             captureForRollback.rollback();
 
             assertThat(SDC.get("key"), is(nullValue()));
 
-            sync.notify();
+            captureForAdopt.notify();
         }
 
-        f.get(); // point #2, wait for runParallel thread to terminate
+        f.get();
     }
 
     /**
