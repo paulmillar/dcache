@@ -1167,7 +1167,7 @@ public class SDC
         String existing=Integer.toHexString(getContext().hashCode());
         _captured = getContext().capture();
         _currentContext.set(_captured);
-        System.out.println("SDC(" + existing+").capture() --> " + Integer.toHexString(_captured.hashCode()));
+        //System.out.println("SDC(" + existing+").capture() --> " + Integer.toHexString(_captured.hashCode()));
     }
 
     /**
@@ -1176,7 +1176,7 @@ public class SDC
      */
     public void rollback()
     {
-        System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").rollback()");
+        //System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").rollback()");
         _captured.rollback();
         // REVIEW: should this be main or previous unapplied context?
         _currentContext.set(_captured.getMainContext());
@@ -1188,7 +1188,7 @@ public class SDC
      */
     public void adopt()
     {
-        System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").adopt()");
+        //System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").adopt()");
         _captured.adopt();
         _currentContext.set(_captured);
     }
@@ -1199,7 +1199,7 @@ public class SDC
      */
     public void localPut(String key, String value)
     {
-        System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").localPut("+key+","+value+")");
+        //System.out.println("SDC(" + Integer.toHexString(_captured.hashCode())+").localPut("+key+","+value+")");
         _captured.stagedPut(key, value);
     }
 

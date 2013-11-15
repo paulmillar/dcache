@@ -276,9 +276,9 @@ public final class PutCompanion extends AbstractMessageCallback<PnfsMessage>
                 askPnfsForParentInfo();
             }
             break;
-        case CacheException.INVALID_ARGS:
+        case CacheException.NOT_FILE:
             if (state == State.RECEIVED_FILE_DELETE_RESPONSE_MESSAGE) {
-                errorString = "Destination is not a file";
+                errorString = "Failed to overwrite: not a file.";
             }
             callbacks.InvalidPathError(errorString);
             break;
@@ -312,10 +312,9 @@ public final class PutCompanion extends AbstractMessageCallback<PnfsMessage>
 
     private void fileExists(PnfsMapPathMessage message) {
 
-        if(!overwrite) {
-            String errorString = String.format("file/directory %s exists, overwite is not allowed ",path);
-            _log.debug(errorString);
-            callbacks.DuplicationError(errorString);
+        if (!overwrite) {
+            _log.debug("Path exists and overwrite is not permitted: {}", path);
+            callbacks.DuplicationError("SURL refers to an existing SURL and overwriting is not permitted.");
             return;
         }
         //
@@ -412,14 +411,8 @@ public final class PutCompanion extends AbstractMessageCallback<PnfsMessage>
         dirMsg.setReplyRequired(true);
 
 
-        try {
-            pnfsStub.send(dirMsg,PnfsMessage.class,
-                    new ThreadManagerMessageCallback(this) );
-        }
-        catch(Exception ee ) {
-            _log.error(ee.toString());
-            callbacks.Exception(ee);
-        }
+        pnfsStub.send(dirMsg,PnfsMessage.class,
+                new ThreadManagerMessageCallback<>(this) );
         lastOperationTime = System.currentTimeMillis();
     }
 

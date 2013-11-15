@@ -52,36 +52,36 @@ import org.dcache.cells.CellStub;
 import org.dcache.chimera.FsInode;
 import org.dcache.chimera.FsInodeType;
 import org.dcache.chimera.JdbcFs;
-import org.dcache.chimera.nfs.ChimeraNFSException;
-import org.dcache.chimera.nfs.ExportFile;
-import org.dcache.chimera.nfs.nfsstat;
-import org.dcache.chimera.nfs.v3.MountServer;
-import org.dcache.chimera.nfs.v3.NfsServerV3;
-import org.dcache.chimera.nfs.v3.xdr.mount_prot;
-import org.dcache.chimera.nfs.v3.xdr.nfs3_prot;
-import org.dcache.chimera.nfs.v4.CompoundContext;
-import org.dcache.chimera.nfs.v4.Layout;
-import org.dcache.chimera.nfs.v4.MDSOperationFactory;
-import org.dcache.chimera.nfs.v4.NFS4Client;
-import org.dcache.chimera.nfs.v4.NFSServerV41;
-import org.dcache.chimera.nfs.v4.NFSv41DeviceManager;
-import org.dcache.chimera.nfs.v4.NFSv41Session;
-import org.dcache.chimera.nfs.v4.RoundRobinStripingPattern;
-import org.dcache.chimera.nfs.v4.StripingPattern;
-import org.dcache.chimera.nfs.v4.xdr.device_addr4;
-import org.dcache.chimera.nfs.v4.xdr.deviceid4;
-import org.dcache.chimera.nfs.v4.xdr.layout4;
-import org.dcache.chimera.nfs.v4.xdr.layoutiomode4;
-import org.dcache.chimera.nfs.v4.xdr.layouttype4;
-import org.dcache.chimera.nfs.v4.xdr.multipath_list4;
-import org.dcache.chimera.nfs.v4.xdr.netaddr4;
-import org.dcache.chimera.nfs.v4.xdr.nfs4_prot;
-import org.dcache.chimera.nfs.v4.xdr.nfs_fh4;
-import org.dcache.chimera.nfs.v4.xdr.nfsv4_1_file_layout_ds_addr4;
-import org.dcache.chimera.nfs.v4.xdr.stateid4;
-import org.dcache.chimera.nfs.vfs.ChimeraVfs;
-import org.dcache.chimera.nfs.vfs.Inode;
-import org.dcache.chimera.nfs.vfs.VirtualFileSystem;
+import org.dcache.nfs.ChimeraNFSException;
+import org.dcache.nfs.ExportFile;
+import org.dcache.nfs.nfsstat;
+import org.dcache.nfs.v3.MountServer;
+import org.dcache.nfs.v3.NfsServerV3;
+import org.dcache.nfs.v3.xdr.mount_prot;
+import org.dcache.nfs.v3.xdr.nfs3_prot;
+import org.dcache.nfs.v4.CompoundContext;
+import org.dcache.nfs.v4.Layout;
+import org.dcache.nfs.v4.MDSOperationFactory;
+import org.dcache.nfs.v4.NFS4Client;
+import org.dcache.nfs.v4.NFSServerV41;
+import org.dcache.nfs.v4.NFSv41DeviceManager;
+import org.dcache.nfs.v4.NFSv41Session;
+import org.dcache.nfs.v4.RoundRobinStripingPattern;
+import org.dcache.nfs.v4.StripingPattern;
+import org.dcache.nfs.v4.xdr.device_addr4;
+import org.dcache.nfs.v4.xdr.deviceid4;
+import org.dcache.nfs.v4.xdr.layout4;
+import org.dcache.nfs.v4.xdr.layoutiomode4;
+import org.dcache.nfs.v4.xdr.layouttype4;
+import org.dcache.nfs.v4.xdr.multipath_list4;
+import org.dcache.nfs.v4.xdr.netaddr4;
+import org.dcache.nfs.v4.xdr.nfs4_prot;
+import org.dcache.nfs.v4.xdr.nfs_fh4;
+import org.dcache.nfs.v4.xdr.nfsv4_1_file_layout_ds_addr4;
+import org.dcache.nfs.v4.xdr.stateid4;
+import org.dcache.nfs.vfs.ChimeraVfs;
+import org.dcache.nfs.vfs.Inode;
+import org.dcache.nfs.vfs.VirtualFileSystem;
 import org.dcache.chimera.nfsv41.mover.NFS4ProtocolInfo;
 import org.dcache.commons.util.NDC;
 import org.dcache.util.LoginBrokerHandler;
@@ -89,10 +89,10 @@ import org.dcache.util.RedirectedTransfer;
 import org.dcache.util.Transfer;
 import org.dcache.util.TransferRetryPolicy;
 import org.dcache.utils.Bytes;
-import org.dcache.xdr.IpProtocolType;
 import org.dcache.xdr.OncRpcException;
 import org.dcache.xdr.OncRpcProgram;
 import org.dcache.xdr.OncRpcSvc;
+import org.dcache.xdr.OncRpcSvcBuilder;
 import org.dcache.xdr.XdrBuffer;
 import org.dcache.xdr.gss.GssSessionManager;
 import org.springframework.beans.factory.annotation.Required;
@@ -104,10 +104,10 @@ public class NFSv41Door extends AbstractCellComponent implements
     private static final Logger _log = LoggerFactory.getLogger(NFSv41Door.class);
 
     /** dCache-friendly NFS device id to pool name mapping */
-    private Map<String, PoolDS> _poolNameToIpMap = new HashMap<>();
+    private final Map<String, PoolDS> _poolNameToIpMap = new HashMap<>();
 
     /** All known devices */
-    private Map<deviceid4, PoolDS> _deviceMap = new HashMap<>();
+    private final Map<deviceid4, PoolDS> _deviceMap = new HashMap<>();
 
     /** next device id, 0 reserved for MDS */
     private final AtomicInteger _nextDeviceID = new AtomicInteger(1);
@@ -224,7 +224,11 @@ public class NFSv41Door extends AbstractCellComponent implements
         _cellName = getCellName();
         _domainName = getCellDomainName();
 
-        _rpcService = new OncRpcSvc(_port, IpProtocolType.TCP, true);
+        _rpcService = new OncRpcSvcBuilder()
+                .withPort(_port)
+                .withTCP()
+                .withAutoPublish()
+                .build();
         if (_enableRpcsecGss) {
             _rpcService.setGssSessionManager(new GssSessionManager(_idMapper));
         }
@@ -382,7 +386,8 @@ public class NFSv41Door extends AbstractCellComponent implements
                 InetSocketAddress remote = context.getRpcCall().getTransport().getRemoteSocketAddress();
                 PnfsId pnfsId = new PnfsId(inode.toString());
                 Transfer.initSession();
-                NfsTransfer transfer = new NfsTransfer(_pnfsHandler, Subjects.ROOT, new FsPath("/"),
+                NfsTransfer transfer = new NfsTransfer(_pnfsHandler, Subjects.ROOT,
+                        context.getRpcCall().getCredential().getSubject(),
                         remote, stateid);
 
                 NFS4ProtocolInfo protocolInfo = transfer.getProtocolInfoForPool();
@@ -507,8 +512,13 @@ public class NFSv41Door extends AbstractCellComponent implements
 
             pw.println();
             pw.println("  Known movers (layouts):");
-            for (Transfer io : _ioMessages.values()) {
-                pw.println(String.format("    %s : %s@%s", io.getPnfsId(), io.getMoverId(), io.getPool()));
+            for (NfsTransfer io : _ioMessages.values()) {
+                pw.println(String.format("    %s : %s@%s, OS=%s,cl=[%s]",
+                        io.getPnfsId(),
+                        io.getMoverId(),
+                        io.getPool(),
+                        io.getProtocolInfoForPool().stateId(),
+                        io.getProtocolInfoForPool().getSocketAddress().getAddress().getHostAddress()));
             }
 
             pw.println();
@@ -594,9 +604,9 @@ public class NFSv41Door extends AbstractCellComponent implements
         private final stateid4 _stateid;
         private final NFS4ProtocolInfo _protocolInfo;
 
-        NfsTransfer(PnfsHandler pnfs, Subject subject, FsPath path, InetSocketAddress client,
+        NfsTransfer(PnfsHandler pnfs, Subject namespaceSubject, Subject ioSubject, InetSocketAddress client,
                 stateid4 stateid) {
-            super(pnfs, subject, path);
+            super(pnfs, namespaceSubject, ioSubject,  new FsPath("/"));
             _stateid = stateid;
             _protocolInfo = new NFS4ProtocolInfo(client, _stateid);
         }

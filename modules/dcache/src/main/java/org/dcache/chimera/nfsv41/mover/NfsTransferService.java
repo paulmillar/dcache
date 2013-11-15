@@ -12,19 +12,24 @@ import java.nio.channels.CompletionHandler;
 import java.util.List;
 
 import diskCacheV111.util.CacheException;
+import diskCacheV111.util.DiskErrorCacheException;
 import diskCacheV111.vehicles.PoolIoFileMessage;
 import diskCacheV111.vehicles.PoolPassiveIoFileMessage;
 
 import dmg.cells.nucleus.CellPath;
+import dmg.cells.nucleus.NoRouteToCellException;
 import dmg.util.Args;
 
 import org.dcache.cells.AbstractCellComponent;
 import org.dcache.cells.CellCommandListener;
 import org.dcache.cells.CellStub;
 import org.dcache.chimera.ChimeraFsException;
-import org.dcache.chimera.nfs.v4.NFS4Client;
-import org.dcache.chimera.nfs.v4.NFSv41Session;
-import org.dcache.chimera.nfs.v4.xdr.stateid4;
+import org.dcache.nfs.v4.NFS4Client;
+import org.dcache.nfs.v4.NFSv41Session;
+import org.dcache.nfs.v4.xdr.stateid4;
+import org.dcache.pool.FaultAction;
+import org.dcache.pool.FaultEvent;
+import org.dcache.pool.FaultListener;
 import org.dcache.pool.classic.Cancellable;
 import org.dcache.pool.classic.PostTransferService;
 import org.dcache.pool.classic.TransferService;
@@ -51,6 +56,8 @@ public class NfsTransferService extends AbstractCellComponent
     private CellStub _door;
     private PostTransferService _postTransferService;
 
+    private FaultListener _faultListener;
+
     public void init() throws ChimeraFsException, IOException, GSSException, OncRpcException {
 
         String dcachePorts = System.getProperty("org.dcache.net.tcp.portrange");
@@ -69,6 +76,11 @@ public class NfsTransferService extends AbstractCellComponent
     }
 
     @Required
+    public void setFaultListener(FaultListener faultListener) {
+        _faultListener = faultListener;
+    }
+
+    @Required
     public void setPostTransferService(PostTransferService postTransferService) {
         _postTransferService = postTransferService;
     }
@@ -84,14 +96,12 @@ public class NfsTransferService extends AbstractCellComponent
     }
 
     @Override
-    public Cancellable execute(NfsMover mover, final CompletionHandler<Void,Void> completionHandler) {
+    public Cancellable execute(final NfsMover mover, final CompletionHandler<Void,Void> completionHandler) {
         try {
-            NFS4ProtocolInfo nfs4ProtocolInfo = mover.getProtocolInfo();
 
-            final stateid4 stateid = nfs4ProtocolInfo.stateId();
+            final stateid4 stateid = mover.getStateId();
             final RepositoryChannel repositoryChannel = mover.open();
-            final MoverBridge moverBridge = new MoverBridge(mover, repositoryChannel);
-            _nfsIO.addHandler(stateid, moverBridge);
+            _nfsIO.add(mover);
 
             CellPath directDoorPath = new CellPath(mover.getPathToDoor().getDestinationAddress());
             _door.send(directDoorPath, new PoolPassiveIoFileMessage<>(getCellName(), _localSocketAddresses, stateid));
@@ -102,7 +112,7 @@ public class NfsTransferService extends AbstractCellComponent
             return new Cancellable() {
                 @Override
                 public void cancel() {
-                    _nfsIO.removeHandler(stateid);
+                    _nfsIO.remove(mover);
                     try {
                         repositoryChannel.close();
                     } catch (IOException e) {
@@ -111,7 +121,11 @@ public class NfsTransferService extends AbstractCellComponent
                     completionHandler.completed(null, null);
                 }
             };
-        } catch (Throwable e) {
+        } catch (DiskErrorCacheException e) {
+            _faultListener.faultOccurred(new FaultEvent("repository", FaultAction.DISABLED,
+                    e.getMessage(), e));
+            completionHandler.failed(e, null);
+        } catch (NoRouteToCellException e) {
             completionHandler.failed(e, null);
         }
         return null;

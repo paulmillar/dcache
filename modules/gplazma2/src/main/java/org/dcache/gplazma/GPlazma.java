@@ -1,6 +1,7 @@
 package org.dcache.gplazma;
 
 import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,8 +97,6 @@ public class GPlazma
     private SessionStrategy _sessionStrategy;
     private ValidationStrategy validationStrategy;
     private IdentityStrategy identityStrategy;
-
-
 
 
     /**

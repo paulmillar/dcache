@@ -61,7 +61,6 @@
         <property name="partitionCount" value="3"/>
         <property name="acquireIncrement" value="5"/>
         <property name="statementsCacheSize" value="100"/>
-        <property name="releaseHelperThreads" value="3"/>
     </bean>
 
     <bean id="fileSystem" class="org.dcache.chimera.DCacheAwareJdbcFs">
@@ -72,7 +71,7 @@
         <property name="poolManagerStub" ref="poolManagerStub"/>
     </bean>
 
-    <bean id="export" class="org.dcache.chimera.nfs.ExportFile">
+    <bean id="export" class="org.dcache.nfs.ExportFile">
         <description>NFS export file</description>
         <constructor-arg>
             <bean class="java.io.File">

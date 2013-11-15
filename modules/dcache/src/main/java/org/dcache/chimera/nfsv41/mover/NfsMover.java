@@ -17,10 +17,14 @@
  */
 package org.dcache.chimera.nfsv41.mover;
 
-import diskCacheV111.vehicles.PoolIoFileMessage;
-import dmg.cells.nucleus.CellPath;
 import java.util.Collections;
 import java.util.Set;
+
+import diskCacheV111.vehicles.PoolIoFileMessage;
+
+import dmg.cells.nucleus.CellPath;
+
+import org.dcache.nfs.v4.xdr.stateid4;
 import org.dcache.pool.classic.PostTransferService;
 import org.dcache.pool.movers.MoverChannelMover;
 import org.dcache.pool.repository.ReplicaDescriptor;
@@ -36,7 +40,7 @@ public class NfsMover extends MoverChannelMover<NFS4ProtocolInfo, NfsMover> {
 
     @Override
     public Set<Checksum> getActualChecksums() {
-        return Collections.<Checksum>emptySet();
+        return Collections.emptySet();
     }
 
     @Override
@@ -44,4 +48,18 @@ public class NfsMover extends MoverChannelMover<NFS4ProtocolInfo, NfsMover> {
         return Collections.emptySet();
     }
 
+    public stateid4 getStateId() {
+        return getProtocolInfo().stateId();
+    }
+
+    @Override
+    protected String getStatus() {
+        StringBuilder s = new StringBuilder();
+        s.append("NFSv4.1/pNFS,OS=")
+                .append(getStateId())
+                .append(",cl=[")
+                .append(getProtocolInfo().getSocketAddress().getAddress().getHostAddress())
+                .append("]");
+        return s.toString();
+    }
 }

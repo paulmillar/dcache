@@ -66,7 +66,7 @@
     </dependency>
     <dependency>
       <groupId>org.dcache</groupId>
-      <artifactId>srm</artifactId>
+      <artifactId>srm-server</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -163,7 +163,10 @@
         <artifactId>commons-codec</artifactId>
         <version>1.4</version>
     </dependency>
-
+    <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+    </dependency>
     <dependency>
         <groupId>org.liquibase</groupId>
         <artifactId>liquibase-core</artifactId>
@@ -273,8 +276,8 @@
       </dependency>
 
     <dependency>
-        <groupId>org.dcache.chimera</groupId>
-        <artifactId>jpnfs</artifactId>
+        <groupId>org.dcache</groupId>
+        <artifactId>nfs4j-core</artifactId>
     </dependency>
 
   </dependencies>
@@ -351,6 +354,10 @@
                                 <pluginExecutionFilter>
                                     <groupId>org.datanucleus</groupId>
                                     <artifactId>datanucleus-maven-plugin</artifactId>
+                                    <!-- The following line is only necessary to work around a NPE in
+                                         the m2e plugin. This is a known bug reported here:
+                                         https://bugs.eclipse.org/bugs/show_bug.cgi?id=347602 -->
+                                    <versionRange>${datanucleus.plugin.version}</versionRange>
                                     <goals>
                                         <goal>enhance</goal>
                                     </goals>

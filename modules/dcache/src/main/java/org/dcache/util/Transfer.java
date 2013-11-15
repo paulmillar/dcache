@@ -87,7 +87,8 @@ public class Transfer implements Comparable<Transfer>
     private String _poolName;
     private CellAddressCore _poolAddress;
     private Integer _moverId;
-    private boolean _hasMover;
+    private boolean _hasMoverBeenCreated;
+    private boolean _hasMoverFinished;
     private String _status;
     private CacheException _error;
     private FileAttributes _fileAttributes = new FileAttributes();
@@ -108,18 +109,30 @@ public class Transfer implements Comparable<Transfer>
      * Constructs a new Transfer object.
      *
      * @param pnfs PnfsHandler used for pnfs communication
-     * @param subject The subject performing the transfer
+     * @param namespaceSubject The subject performing the namespace operations
+     * @param ioSubject The subject performing the transfer
      * @param path The path of the file to transfer
      */
-    public Transfer(PnfsHandler pnfs, Subject subject, FsPath path)
-    {
-        _pnfs = new PnfsHandler(pnfs, subject);
-        _subject = subject;
+    public Transfer(PnfsHandler pnfs, Subject namespaceSubject, Subject ioSubject, FsPath path) {
+        _pnfs = new PnfsHandler(pnfs, namespaceSubject);
+        _subject = ioSubject;
         _path = path;
         _startedAt = System.currentTimeMillis();
         _sessionId = _sessionCounter.next();
         _session = CDC.getSession();
         _checkStagePermission = new CheckStagePermission(null);
+    }
+
+    /**
+     * Constructs a new Transfer object.
+     *
+     * @param pnfs PnfsHandler used for pnfs communication
+     * @param subject The subject performing the transfer and namespace operations
+     * @param path The path of the file to transfer
+     */
+    public Transfer(PnfsHandler pnfs, Subject subject, FsPath path)
+    {
+        this(pnfs, subject, subject, path);
     }
 
     /**
@@ -322,7 +335,7 @@ public class Transfer implements Comparable<Transfer>
     public synchronized void setMoverId(Integer moverId)
     {
         _moverId = moverId;
-        _hasMover = (_moverId != null);
+        _hasMoverBeenCreated = (_moverId != null);
     }
 
     /**
@@ -339,7 +352,7 @@ public class Transfer implements Comparable<Transfer>
      */
     public synchronized boolean hasMover()
     {
-        return _hasMover;
+        return _hasMoverBeenCreated && !_hasMoverFinished;
     }
 
     /**
@@ -421,7 +434,7 @@ public class Transfer implements Comparable<Transfer>
      */
     public synchronized void finished(CacheException error)
     {
-        _hasMover = false;
+        _hasMoverFinished = true;
         _error = error;
         notifyAll();
     }
@@ -519,7 +532,7 @@ public class Transfer implements Comparable<Transfer>
         throws CacheException, InterruptedException
     {
         long deadline = System.currentTimeMillis() + millis;
-        while (_hasMover && System.currentTimeMillis() < deadline) {
+        while (!_hasMoverFinished && System.currentTimeMillis() < deadline) {
             wait(deadline - System.currentTimeMillis());
         }
 
@@ -527,7 +540,7 @@ public class Transfer implements Comparable<Transfer>
             throw _error;
         }
 
-        return !_hasMover;
+        return _hasMoverFinished;
     }
 
     /**
@@ -757,7 +770,7 @@ public class Transfer implements Comparable<Transfer>
                     _poolManager.sendAndWait(request, timeout);
                 setPool(reply.getPoolName());
                 setPoolAddress(reply.getPoolAddress());
-                setStorageInfo(reply.getStorageInfo());
+                setFileAttributes(reply.getFileAttributes());
             } else if (!_fileAttributes.getStorageInfo().isCreatedOnly()) {
                 EnumSet<RequestContainerV5.RequestState> allowedStates =
                     _checkStagePermission.canPerformStaging(_subject, fileAttributes.getStorageInfo())
@@ -777,7 +790,7 @@ public class Transfer implements Comparable<Transfer>
                     _poolManager.sendAndWait(request, timeout);
                 setPool(reply.getPoolName());
                 setPoolAddress(reply.getPoolAddress());
-                setStorageInfo(reply.getStorageInfo());
+                setFileAttributes(reply.getFileAttributes());
                 setReadPoolSelectionContext(reply.getContext());
             } else {
                 throw new FileIsNewCacheException();
