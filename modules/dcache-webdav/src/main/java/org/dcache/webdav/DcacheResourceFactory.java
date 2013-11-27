@@ -3,6 +3,7 @@ package org.dcache.webdav;
 import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
@@ -11,6 +12,7 @@ import com.google.common.net.InetAddresses;
 import io.milton.http.HttpManager;
 import io.milton.http.Request;
 import io.milton.http.ResourceFactory;
+import io.milton.http.webdav.PropertiesRequest;
 import io.milton.resource.Resource;
 import io.milton.servlet.ServletRequest;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
@@ -23,6 +25,7 @@ import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
 
 import javax.security.auth.Subject;
+import javax.xml.namespace.QName;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -110,10 +113,43 @@ public class DcacheResourceFactory
         EnumSet.of(TYPE, PNFSID, CREATION_TIME, MODIFICATION_TIME, SIZE,
                    MODE, OWNER, OWNER_GROUP);
 
+    public static final String DCACHE_NAMESPACE_URI =
+            "http://www.dcache.org/2013/webdav";
+
+    // We use the SRM 2.2 WSDL's TargetNamespace for the WebDAV properties
+    // associated with SRM concepts.
+    public static final String SRM_NAMESPACE_URI =
+            "http://srm.lbl.gov/StorageResourceManager";
+
+    /*
+     * Our dCache WebDAV properties.
+     */
+    public static final String PROPERTY_CHECKSUMS = "Checksums";
+    /*
+     * Our SRM WebDAV properties.
+     */
+    public static final String PROPERTY_ACCESS_LATENCY = "AccessLatency";
+    public static final String PROPERTY_RETENTION_POLICY = "RetentionPolicy";
+
+    /* QNames for these properties */
+    public static final QName ACCESS_LATENCY_QNAME =
+            new QName(SRM_NAMESPACE_URI, PROPERTY_ACCESS_LATENCY);
+    public static final QName RETENTION_POLICY_QNAME =
+            new QName(SRM_NAMESPACE_URI, PROPERTY_RETENTION_POLICY);
+    public static final QName CHECKSUMS_QNAME =
+            new QName(DCACHE_NAMESPACE_URI, PROPERTY_CHECKSUMS);
+
+
+
     // Additional attributes needed for PROPFIND requests; e.g., to supply
     // values for properties.
-    private static final Set<FileAttribute> PROPFIND_ATTRIBUTES =
-        EnumSet.of(CHECKSUM, ACCESS_LATENCY, RETENTION_POLICY);
+    private static final ImmutableMap<QName,EnumSet<FileAttribute>> PROPFIND_ATTRIBUTES =
+            ImmutableMap.<QName,EnumSet<FileAttribute>>builder()
+            .put(ACCESS_LATENCY_QNAME, EnumSet.of(ACCESS_LATENCY))
+            .put(RETENTION_POLICY_QNAME, EnumSet.of(RETENTION_POLICY))
+            .put(CHECKSUMS_QNAME, EnumSet.of(CHECKSUM))
+            .build();
+
 
     private static final String PROTOCOL_INFO_NAME = "Http";
     private static final int PROTOCOL_INFO_MAJOR_VERSION = 1;
@@ -1079,13 +1115,16 @@ public class DcacheResourceFactory
         }
 
         if (isPropfindRequest()) {
-            // FIXME: Unfortunately, Milton parses the request body after
-            // requesting the Resource, so we cannot know which additional
-            // attributes are being requested; therefore, we must request all
-            // of them.
-            attributes.addAll(PROPFIND_ATTRIBUTES);
+            PropertiesRequest request = CachingPropFindRequestFieldParser.get();
+            for (QName name : request.getNames()) {
+                EnumSet<FileAttribute> required = PROPFIND_ATTRIBUTES.get(name);
+                if (required != null) {
+                    attributes.addAll(required);
+                }
+            }
         }
 
+        _log.trace("Building Resource with attributes: {}", attributes);
         return attributes;
     }
 

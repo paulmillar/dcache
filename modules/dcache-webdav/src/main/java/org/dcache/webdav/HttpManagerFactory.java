@@ -1,12 +1,19 @@
 package org.dcache.webdav;
 
 import io.milton.config.HttpManagerBuilder;
+import io.milton.http.Handler;
 import io.milton.http.HttpManager;
+import io.milton.http.webdav.DefaultPropPatchParser;
 import io.milton.http.webdav.DefaultWebDavResponseHandler;
+import io.milton.http.webdav.PropFindHandler;
+import io.milton.http.webdav.WebDavProtocol;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.core.io.Resource;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Iterator;
+import java.util.Set;
 
 public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBean
 {
@@ -21,6 +28,10 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
 
         init();
 
+        Set<Handler> handlers = getWebDavHandlers();
+        PropFindHandler handler = extractPropFindHandler(handlers);
+        handlers.add(new EarlyParsePropFindHandler(handler));
+
         // Late initialization of DcacheResponseHandler because AuthenticationService and other collaborators
         // have to be created first.
         dcacheResponseHandler.setAuthenticationService(getAuthenticationService());
@@ -32,6 +43,38 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
         dcacheResponseHandler.setBuffering(getBuffering());
 
         return buildHttpManager();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<Handler> getWebDavHandlers()
+    {
+        try {
+            Field field = WebDavProtocol.class.getDeclaredField("handlers");
+            field.setAccessible(true);
+            return (Set<Handler>) field.get(getWebDavProtocol());
+        } catch (NoSuchFieldException|IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private PropFindHandler extractPropFindHandler(Set<Handler> handlers)
+    {
+        PropFindHandler handler = null;
+
+        Iterator<Handler> iterator = handlers.iterator();
+        while (iterator.hasNext()) {
+            Handler h = iterator.next();
+            if (h instanceof PropFindHandler) {
+                handler = (PropFindHandler) h;
+                iterator.remove();
+            }
+        }
+
+        if (handler == null) {
+            throw new RuntimeException("Unable to find PropFindHandler");
+        }
+
+        return handler;
     }
 
     @Override

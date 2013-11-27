@@ -36,6 +36,14 @@ import org.dcache.vehicles.FileAttributes;
 
 import static io.milton.property.PropertySource.PropertyAccessibility.READ_ONLY;
 import static org.dcache.util.Checksums.TO_RFC3230;
+import static org.dcache.webdav.DcacheResourceFactory.SRM_NAMESPACE_URI;
+import static org.dcache.webdav.DcacheResourceFactory.DCACHE_NAMESPACE_URI;
+import static org.dcache.webdav.DcacheResourceFactory.PROPERTY_ACCESS_LATENCY;
+import static org.dcache.webdav.DcacheResourceFactory.PROPERTY_RETENTION_POLICY;
+import static org.dcache.webdav.DcacheResourceFactory.PROPERTY_CHECKSUMS;
+import static org.dcache.webdav.DcacheResourceFactory.ACCESS_LATENCY_QNAME;
+import static org.dcache.webdav.DcacheResourceFactory.RETENTION_POLICY_QNAME;
+import static org.dcache.webdav.DcacheResourceFactory.CHECKSUMS_QNAME;
 
 /**
  * Exposes regular dCache files as resources in the Milton WebDAV
@@ -49,32 +57,14 @@ public class DcacheFileResource
     private static final FileNameMap MIME_TYPE_MAP =
         URLConnection.getFileNameMap();
 
-    private static final String DCACHE_NAMESPACE_URI =
-            "http://www.dcache.org/2013/webdav";
-
-    // We use the SRM 2.2 WSDL's TargetNamespace for the WebDAV properties
-    // associated with SRM concepts.
-    private static final String SRM_NAMESPACE_URI =
-            "http://srm.lbl.gov/StorageResourceManager";
-
-    /*
-     * Our dCache WebDAV properties.
-     */
-    private static final String PROPERTY_CHECKSUMS = "Checksums";
-    /*
-     * Our SRM WebDAV properties.
-     */
-    private static final String PROPERTY_ACCESS_LATENCY = "AccessLatency";
-    private static final String PROPERTY_RETENTION_POLICY = "RetentionPolicy";
-
     private static final ImmutableMap<QName,PropertyMetaData> PROPERTY_METADATA =
             new ImmutableMap.Builder<QName,PropertyMetaData>()
-                    .put(new QName(SRM_NAMESPACE_URI, PROPERTY_ACCESS_LATENCY),
-                            new PropertyMetaData(READ_ONLY, AccessLatency.class))
-                    .put(new QName(SRM_NAMESPACE_URI, PROPERTY_RETENTION_POLICY),
-                            new PropertyMetaData(READ_ONLY, RetentionPolicy.class))
-                    .put(new QName(DCACHE_NAMESPACE_URI, PROPERTY_CHECKSUMS),
-                            new PropertyMetaData(READ_ONLY, String.class))
+                    .put(ACCESS_LATENCY_QNAME, new PropertyMetaData(READ_ONLY,
+                            AccessLatency.class))
+                    .put(RETENTION_POLICY_QNAME, new PropertyMetaData(READ_ONLY,
+                            RetentionPolicy.class))
+                    .put(CHECKSUMS_QNAME, new PropertyMetaData(READ_ONLY,
+                            String.class))
                     .build();
 
     public DcacheFileResource(DcacheResourceFactory factory,
