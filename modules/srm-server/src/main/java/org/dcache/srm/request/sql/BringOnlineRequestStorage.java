@@ -17,7 +17,9 @@ package org.dcache.srm.request.sql;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -27,10 +29,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.request.BringOnlineFileRequest;
 import org.dcache.srm.request.BringOnlineRequest;
 import org.dcache.srm.request.Job;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 /**
  *
@@ -143,10 +146,11 @@ public class BringOnlineRequestStorage extends DatabaseContainerRequestStorage<B
 
 
     /** Creates a new instance of BringOnlineRequestStorage */
-    public BringOnlineRequestStorage(Configuration.DatabaseParameters configuration)
-            throws IOException, DataAccessException
+    public BringOnlineRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager,
+            SRMUserPersistenceManager userPersistenceManager) throws DataAccessException
     {
-        super(configuration);
+        super(configuration, datasource, transactionManager, userPersistenceManager);
     }
 
     private String getProtocolsTableName()

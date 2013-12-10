@@ -7,7 +7,9 @@
 package org.dcache.srm.request.sql;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,7 +17,7 @@ import java.sql.SQLException;
 
 import org.dcache.srm.request.Job;
 import org.dcache.srm.request.PutFileRequest;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.v2_2.TAccessLatency;
 import org.dcache.srm.v2_2.TRetentionPolicy;
 
@@ -159,10 +161,11 @@ public class PutFileRequestStorage extends DatabaseFileRequestStorage<PutFileReq
     }
 
    /** Creates a new instance of PutFileRequestStorage */
-    public PutFileRequestStorage(Configuration.DatabaseParameters configuration)
+    public PutFileRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager)
             throws DataAccessException
     {
-        super(configuration);
+        super(configuration, datasource, transactionManager);
     }
 
     @Override

@@ -15,6 +15,8 @@ import org.dcache.srm.request.LsRequest;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.v2_2.SrmLsRequest;
 import org.dcache.srm.v2_2.SrmLsResponse;
@@ -22,6 +24,7 @@ import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.dcache.srm.util.Configuration.Operation.LS;
 
 public class SrmLs
 {
@@ -37,6 +40,7 @@ public class SrmLs
     private final SRM srm;
     private final String clientHost;
     private final int max_results_num;
+    private final OperationParameters parameters;
 
     public SrmLs(SRMUser user,
                  RequestCredential credential,
@@ -53,6 +57,7 @@ public class SrmLs
         this.clientHost = clientHost;
         this.configuration = srm.getConfiguration();
         this.srm = checkNotNull(srm);
+        parameters = configuration.getParametersFor(LS);
     }
 
     public SrmLsResponse getResponse()
@@ -82,8 +87,8 @@ public class SrmLs
                 credential.getId(),
                 surls,
                 TimeUnit.HOURS.toMillis(1),
-                configuration.getLsRetryTimeout(),
-                configuration.getLsMaxNumOfRetries(),
+                parameters.getRetryTimeout(),
+                parameters.getMaxRetries(),
                 clientHost,
                 count,
                 offset,
@@ -92,7 +97,9 @@ public class SrmLs
                 max_results_num);
         try (JDC ignored = r.applyJdc()) {
             srm.schedule(r);
-            return r.getSrmLsResponse(configuration.getLsSwitchToAsynchronousModeDelay());
+            return r.getSrmLsResponse(configuration
+                    .getDeferrableParametersFor(LS)
+                    .getSwitchToAsynchronousModeDelay());
         } catch (InterruptedException e) {
             throw new SRMInternalErrorException("Operation interrupted", e);
         } catch (IllegalStateTransition e) {

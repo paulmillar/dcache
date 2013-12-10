@@ -17,6 +17,7 @@ import org.dcache.srm.request.CopyRequest;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.v2_2.ArrayOfTExtraInfo;
 import org.dcache.srm.v2_2.SrmCopyRequest;
@@ -30,6 +31,7 @@ import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.dcache.srm.util.Configuration.Operation.COPY;
 
 public class SrmCopy
 {
@@ -41,7 +43,7 @@ public class SrmCopy
     private final SRMUser user;
     private final SRM srm;
     private final RequestCredential credential;
-    private final Configuration configuration;
+    private final OperationParameters parameters;
     private String clientHost;
 
     public SrmCopy(SRMUser user,
@@ -54,9 +56,9 @@ public class SrmCopy
         this.request = checkNotNull(request);
         this.user = checkNotNull(user);
         this.credential = checkNotNull(credential);
-        this.configuration = srm.getConfiguration();
         this.clientHost = clientHost;
         this.srm = checkNotNull(srm);
+        this.parameters = srm.getConfiguration().getParametersFor(COPY);
     }
 
     public SrmCopyResponse getResponse()
@@ -81,7 +83,7 @@ public class SrmCopy
                    SRMInternalErrorException
     {
         TCopyFileRequest[] arrayOfFileRequests = getFileRequests(request);
-        long lifetime = getTotalRequestTime(request, configuration.getCopyLifetime());
+        long lifetime = getTotalRequestTime(request, parameters.getLifetime());
         String spaceToken = request.getTargetSpaceToken();
 
         URI from_urls[] = new URI[arrayOfFileRequests.length];
@@ -107,8 +109,8 @@ public class SrmCopy
                 to_urls,
                 spaceToken,
                 lifetime,
-                configuration.getCopyRetryTimeout(),
-                configuration.getCopyMaxNumOfRetries(),
+                parameters.getRetryTimeout(),
+                parameters.getMaxRetries(),
                 SRMProtocol.V2_1,  // Revisit: v2.1?
                 request.getTargetFileStorageType(),
                 targetRetentionPolicy,

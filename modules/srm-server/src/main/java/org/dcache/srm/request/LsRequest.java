@@ -18,6 +18,7 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.NonFatalJobFailure;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
 import org.dcache.srm.util.RequestStatusTool;
 import org.dcache.srm.v2_2.ArrayOfTMetaDataPathDetail;
 import org.dcache.srm.v2_2.SrmLsResponse;
@@ -129,6 +130,13 @@ public final class LsRequest extends ContainerRequest<LsFileRequest> {
                 this.offset=offset;
 
         }
+
+        @Override
+        public Configuration.Operation getOperation()
+        {
+            return Configuration.Operation.LS;
+        }
+
 
         @Nonnull
         @Override

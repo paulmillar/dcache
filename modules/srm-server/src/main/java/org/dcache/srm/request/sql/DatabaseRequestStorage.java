@@ -10,7 +10,9 @@
 package org.dcache.srm.request.sql;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,7 +20,7 @@ import java.sql.SQLException;
 import org.dcache.srm.SRMUser;
 import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.request.Request;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -30,11 +32,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class DatabaseRequestStorage<R extends Request> extends DatabaseJobStorage<R> {
     SRMUserPersistenceManager srmUserPersistenceManager;
     /** Creates a new instance of DatabaseRequestStorage */
-    public DatabaseRequestStorage(Configuration.DatabaseParameters configuration)
-            throws DataAccessException
+    public DatabaseRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager,
+            SRMUserPersistenceManager userPersistenceManager) throws DataAccessException
     {
-        super(configuration);
-        srmUserPersistenceManager = checkNotNull(configuration.getSrmUserPersistenceManager());
+        super(configuration, datasource, transactionManager);
+        srmUserPersistenceManager = checkNotNull(userPersistenceManager);
     }
 
     public abstract String getRequestCreateTableFields();

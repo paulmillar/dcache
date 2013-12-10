@@ -92,6 +92,8 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.NonFatalJobFailure;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.Operation;
 import org.dcache.srm.v2_2.ArrayOfTBringOnlineRequestFileStatus;
 import org.dcache.srm.v2_2.SrmBringOnlineResponse;
 import org.dcache.srm.v2_2.SrmStatusOfBringOnlineRequestResponse;
@@ -197,6 +199,12 @@ public final class BringOnlineRequest extends ContainerRequest<BringOnlineFileRe
         this.protocols = protocols;
         this.desiredOnlineLifetimeInSeconds = 0;
 
+    }
+
+    @Override
+    public Operation getOperation()
+    {
+        return Operation.GET;
     }
 
     @Nonnull

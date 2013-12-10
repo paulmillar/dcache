@@ -14,14 +14,12 @@ import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMReleasedException;
 import org.dcache.srm.SRMUser;
-import org.dcache.srm.request.BringOnlineRequest;
 import org.dcache.srm.request.ContainerRequest;
-import org.dcache.srm.request.CopyRequest;
 import org.dcache.srm.request.FileRequest;
-import org.dcache.srm.request.PutRequest;
 import org.dcache.srm.request.Request;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.v2_2.ArrayOfTSURLLifetimeReturnStatus;
 import org.dcache.srm.v2_2.SrmExtendFileLifeTimeRequest;
@@ -148,17 +146,9 @@ public class SrmExtendFileLifeTime
 
     private long getMaxLifetime(ContainerRequest<?> containerRequest)
     {
-        long configMaximumLifetime;
-        if (containerRequest instanceof CopyRequest) {
-            configMaximumLifetime = configuration.getCopyLifetime();
-        } else if (containerRequest instanceof PutRequest) {
-            configMaximumLifetime = configuration.getPutLifetime();
-        } else if (containerRequest instanceof BringOnlineRequest) {
-            configMaximumLifetime = configuration.getBringOnlineLifetime();
-        } else {
-            configMaximumLifetime = configuration.getGetLifetime();
-        }
-        return configMaximumLifetime;
+        OperationParameters parameters = configuration
+                .getParametersFor(containerRequest.getOperation());
+        return parameters.getLifetime();
     }
 
     private SrmExtendFileLifeTimeResponse extendTurlOrPinLifeTime(

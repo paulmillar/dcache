@@ -19,6 +19,8 @@ import org.dcache.srm.request.PutRequest;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.util.Tools;
 import org.dcache.srm.v2_2.ArrayOfTExtraInfo;
@@ -38,6 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.Iterables.any;
 import static java.util.Arrays.asList;
+import static org.dcache.srm.util.Configuration.Operation.PUT;
 
 public class SrmPrepareToPut
 {
@@ -52,6 +55,7 @@ public class SrmPrepareToPut
     private final Configuration configuration;
     private final String clientHost;
     private final SRM srm;
+    private final OperationParameters parameters;
 
     public SrmPrepareToPut(SRMUser user,
                            RequestCredential credential,
@@ -67,6 +71,7 @@ public class SrmPrepareToPut
         this.configuration = checkNotNull(srm.getConfiguration());
         this.clientHost = clientHost;
         this.srm = checkNotNull(srm);
+        parameters = configuration.getParametersFor(PUT);
     }
 
     public SrmPrepareToPutResponse getResponse()
@@ -110,7 +115,7 @@ public class SrmPrepareToPut
         }
         TPutFileRequest[] fileRequests = getFileRequests(request);
 
-        long lifetime = getLifetime(request, configuration.getPutLifetime());
+        long lifetime = getLifetime(request, configuration.getParametersFor(PUT).getLifetime());
         TOverwriteMode overwriteMode = getOverwriteMode(request);
 
         String[] supportedProtocols = storage.supportedPutProtocols();
@@ -153,8 +158,8 @@ public class SrmPrepareToPut
                         wantPermanent,
                         protocols,
                         lifetime,
-                        configuration.getGetRetryTimeout(),
-                        configuration.getGetMaxNumOfRetries(),
+                        parameters.getRetryTimeout(),
+                        parameters.getMaxRetries(),
                         clientHost,
                         spaceToken,
                         retentionPolicy,
@@ -178,7 +183,9 @@ public class SrmPrepareToPut
             // RequestScheduler will take care of the rest
             //getRequestScheduler.add(r);
             // Return the request status
-            return r.getSrmPrepareToPutResponse(configuration.getPutSwitchToAsynchronousModeDelay());
+            return r.getSrmPrepareToPutResponse(configuration
+                    .getDeferrableParametersFor(PUT)
+                    .getSwitchToAsynchronousModeDelay());
         }
     }
 

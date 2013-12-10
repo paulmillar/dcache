@@ -8,6 +8,10 @@ import org.dcache.srm.request.PutFileRequest;
 import org.dcache.srm.request.ReserveSpaceRequest;
 import org.dcache.srm.util.Configuration;
 
+import org.dcache.srm.util.Configuration.OperationParameters;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+import static org.dcache.srm.util.Configuration.Operation.*;
+
 /**
  *
  * @author timur
@@ -27,33 +31,38 @@ public class SchedulerFactory
     {
         Scheduler scheduler = new Scheduler("ls_" + name, LsFileRequest.class);
 
-        scheduler.setMaxThreadQueueSize(config.getLsReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getLsThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getLsMaxWaitingRequests());
-        scheduler.setMaxReadyQueueSize(config.getLsReadyQueueSize());
-        scheduler.setMaxReadyJobs(config.getLsMaxReadyJobs());
-        scheduler.setMaxNumberOfRetries(config.getLsMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getLsRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getLsMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getLsPriorityPolicyPlugin());
+        DeferrableOperationParameters parameters =
+                config.getDeferrableParametersFor(LS);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxReadyQueueSize(parameters.getReadyQueueSize());
+        scheduler.setMaxReadyJobs(parameters.getMaxReadyJobs());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }
-
 
     public Scheduler buildGetScheduler()
     {
         Scheduler scheduler = new Scheduler("get_" + name, GetFileRequest.class);
 
-        scheduler.setMaxThreadQueueSize(config.getGetReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getGetThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getGetMaxWaitingRequests());
-        scheduler.setMaxReadyQueueSize(config.getGetReadyQueueSize());
-        scheduler.setMaxReadyJobs(config.getGetMaxReadyJobs());
-        scheduler.setMaxNumberOfRetries(config.getGetMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getGetRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getGetMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getGetPriorityPolicyPlugin());
+        DeferrableOperationParameters parameters =
+                config.getDeferrableParametersFor(GET);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxReadyQueueSize(parameters.getReadyQueueSize());
+        scheduler.setMaxReadyJobs(parameters.getMaxReadyJobs());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }
@@ -62,15 +71,18 @@ public class SchedulerFactory
     {
         Scheduler scheduler = new Scheduler("bring_online_" + name, BringOnlineFileRequest.class);
 
-        scheduler.setMaxThreadQueueSize(config.getBringOnlineReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getBringOnlineThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getBringOnlineMaxWaitingRequests());
-        scheduler.setMaxReadyQueueSize(config.getBringOnlineReadyQueueSize());
-        scheduler.setMaxReadyJobs(config.getBringOnlineMaxReadyJobs());
-        scheduler.setMaxNumberOfRetries(config.getBringOnlineMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getBringOnlineRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getBringOnlineMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getBringOnlinePriorityPolicyPlugin());
+        DeferrableOperationParameters parameters =
+                config.getDeferrableParametersFor(BRING_ONLINE);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxReadyQueueSize(parameters.getReadyQueueSize());
+        scheduler.setMaxReadyJobs(parameters.getMaxReadyJobs());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }
@@ -79,15 +91,18 @@ public class SchedulerFactory
     {
         Scheduler scheduler = new Scheduler("put_" + name, PutFileRequest.class);
 
-        scheduler.setMaxThreadQueueSize(config.getPutReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getPutThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getPutMaxWaitingRequests());
-        scheduler.setMaxReadyQueueSize(config.getPutReadyQueueSize());
-        scheduler.setMaxReadyJobs(config.getPutMaxReadyJobs());
-        scheduler.setMaxNumberOfRetries(config.getPutMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getPutRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getPutMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getPutPriorityPolicyPlugin());
+        DeferrableOperationParameters parameters =
+                config.getDeferrableParametersFor(PUT);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxReadyQueueSize(parameters.getReadyQueueSize());
+        scheduler.setMaxReadyJobs(parameters.getMaxReadyJobs());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }
@@ -95,14 +110,16 @@ public class SchedulerFactory
     public Scheduler buildCopyScheduler()
     {
         Scheduler scheduler = new Scheduler("copy_" + name, Job.class);
-        // scheduler parameters
-        scheduler.setMaxThreadQueueSize(config.getCopyReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getCopyThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getCopyMaxWaitingRequests());
-        scheduler.setMaxNumberOfRetries(config.getCopyMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getCopyRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getCopyMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getCopyPriorityPolicyPlugin());
+
+        OperationParameters parameters = config.getParametersFor(COPY);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }
@@ -111,15 +128,18 @@ public class SchedulerFactory
     {
         Scheduler scheduler = new Scheduler("reserve_space_" + name, ReserveSpaceRequest.class);
 
-        scheduler.setMaxThreadQueueSize(config.getReserveSpaceReqTQueueSize());
-        scheduler.setThreadPoolSize(config.getReserveSpaceThreadPoolSize());
-        scheduler.setMaxWaitingJobNum(config.getReserveSpaceMaxWaitingRequests());
-        scheduler.setMaxReadyQueueSize(config.getReserveSpaceReadyQueueSize());
-        scheduler.setMaxReadyJobs(config.getReserveSpaceMaxReadyJobs());
-        scheduler.setMaxNumberOfRetries(config.getReserveSpaceMaxNumOfRetries());
-        scheduler.setRetryTimeout(config.getReserveSpaceRetryTimeout());
-        scheduler.setMaxRunningByOwner(config.getReserveSpaceMaxRunningBySameOwner());
-        scheduler.setPriorityPolicyPlugin(config.getReserveSpacePriorityPolicyPlugin());
+        DeferrableOperationParameters parameters =
+                config.getDeferrableParametersFor(RESERVE_SPACE);
+
+        scheduler.setMaxThreadQueueSize(parameters.getReqTQueueSize());
+        scheduler.setThreadPoolSize(parameters.getThreadPoolSize());
+        scheduler.setMaxWaitingJobNum(parameters.getMaxWaitingRequests());
+        scheduler.setMaxReadyQueueSize(parameters.getReadyQueueSize());
+        scheduler.setMaxReadyJobs(parameters.getMaxReadyJobs());
+        scheduler.setMaxNumberOfRetries(parameters.getMaxRetries());
+        scheduler.setRetryTimeout(parameters.getRetryTimeout());
+        scheduler.setMaxRunningByOwner(parameters.getMaxRunningBySameOwner());
+        scheduler.setPriorityPolicyPlugin(parameters.getPriorityPolicyPlugin());
 
         return scheduler;
     }

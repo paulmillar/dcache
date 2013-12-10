@@ -79,10 +79,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -105,7 +107,7 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.JobStorage;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 import static com.google.common.collect.Iterables.filter;
 import static org.dcache.srm.request.sql.Utilities.getIdentifierAsStored;
@@ -131,7 +133,7 @@ public abstract class DatabaseJobStorage<J extends Job> implements JobStorage<J>
     @SuppressWarnings("unchecked")
     private final Class<J> jobType = (Class<J>) new TypeToken<J>(getClass()) {}.getRawType();
 
-    private final Configuration.DatabaseParameters configuration;
+    private final OperationParameters configuration;
     protected final JdbcTemplate jdbcTemplate;
     protected final TransactionTemplate transactionTemplate;
     private final boolean logHistory;
@@ -147,13 +149,14 @@ public abstract class DatabaseJobStorage<J extends Job> implements JobStorage<J>
     protected static final int dateTimeType_int= Types.TIMESTAMP;
     protected static final int booleanType_int= Types.INTEGER;
 
-    public DatabaseJobStorage(Configuration.DatabaseParameters configuration)
+    public DatabaseJobStorage(OperationParameters configuration,
+            DataSource datasource, PlatformTransactionManager manager)
             throws DataAccessException
     {
         this.configuration = configuration;
         this.logHistory = configuration.isRequestHistoryDatabaseEnabled();
-        this.jdbcTemplate = new JdbcTemplate(configuration.getDataSource());
-        this.transactionTemplate = new TransactionTemplate(configuration.getTransactionManager());
+        this.jdbcTemplate = new JdbcTemplate(datasource);
+        this.transactionTemplate = new TransactionTemplate(manager);
 
         dbInit(configuration.isCleanPendingRequestsOnRestart());
         //updatePendingJobs();

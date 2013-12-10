@@ -116,6 +116,7 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.NonFatalJobFailure;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
 import org.dcache.srm.util.SrmUrl;
 import org.dcache.srm.util.Tools;
 import org.dcache.srm.v2_2.ArrayOfTCopyRequestFileStatus;
@@ -132,7 +133,7 @@ import org.dcache.srm.v2_2.TStatusCode;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-
+import static org.dcache.srm.util.Configuration.Operation.COPY;
 /**
  *
  * @author  timur
@@ -311,6 +312,13 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
         this.overwriteMode = null;
      }
 
+    @Override
+    public Configuration.Operation getOperation()
+    {
+        return Configuration.Operation.COPY;
+    }
+
+
 
     public void proccessRequest() throws DataAccessException, IOException,
             SRMException, InterruptedException, IllegalStateTransition,
@@ -463,6 +471,9 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
     IOException,InterruptedException,IllegalStateTransition, DataAccessException,
     FatalJobFailure {
         logger.debug("getTURLS()");
+        long retryTimeout =
+                getConfiguration().getParametersFor(COPY).getRetryTimeout();
+
         if(isFrom_url_is_srm() && ! isFrom_url_is_local()) {
             // this means that the from url is remote srm url
             // and a "to" url is a local srm url
@@ -506,7 +517,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                  try {
                     setGetter_putter(new RemoteTurlGetterV1(getStorage(),
                             credential, remoteSurlsUniqueArray, getProtocols(),
-                            this, getConfiguration().getCopyRetryTimeout(), 2,
+                            this, retryTimeout, 2,
                             clientTransport));
                     getGetter_putter().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V1_1);
@@ -515,7 +526,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                      logger.error("connecting to server using version 1.1 protocol failed, trying version 2.1.1");
                     setGetter_putter(new RemoteTurlGetterV2(getStorage(),
                             credential, remoteSurlsUniqueArray, getProtocols(),
-                            this, getConfiguration().getCopyRetryTimeout(), 2,
+                            this, retryTimeout, 2,
                             this.getRemainingLifetime(), clientTransport));
                     getGetter_putter().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V2_1);
@@ -524,7 +535,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                  try{
                     setGetter_putter(new RemoteTurlGetterV2(getStorage(),
                             credential, remoteSurlsUniqueArray, getProtocols(),
-                            this, getConfiguration().getCopyRetryTimeout(), 2,
+                            this, retryTimeout, 2,
                             this.getRemainingLifetime(), clientTransport));
                     getGetter_putter().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V2_1);
@@ -533,7 +544,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                      logger.error("connecting to server using version 2.1.1 protocol failed, trying version 1.1");
                     setGetter_putter(new RemoteTurlGetterV1(getStorage(),
                             credential, remoteSurlsUniqueArray, getProtocols(),
-                            this, getConfiguration().getCopyRetryTimeout(), 2,
+                            this, retryTimeout, 2,
                             clientTransport));
                     getGetter_putter().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V1_1);
@@ -679,7 +690,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
             try {
                 setGetter_putter(new RemoteTurlPutterV1(getStorage(),
                         credential, dests, sizes, getProtocols(), this,
-                        getConfiguration().getCopyRetryTimeout(), 2,
+                        retryTimeout, 2,
                         clientTransport));
                 getGetter_putter().getInitialRequest();
                 setRemoteSrmProtocol(SRMProtocol.V1_1);
@@ -688,7 +699,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                  logger.error("connecting to server using version 1.1 protocol failed, trying version 2.1.1");
                  setGetter_putter(new RemoteTurlPutterV2(getStorage(),
                          credential, dests, sizes, getProtocols(), this,
-                         getConfiguration().getCopyRetryTimeout(), 2,
+                         retryTimeout, 2,
                          this.getRemainingLifetime(), getStorageType(),
                          getTargetRetentionPolicy(), getTargetAccessLatency(),
                          getOverwriteMode(), getTargetSpaceToken(),
@@ -700,7 +711,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
             try {
                 setGetter_putter(new RemoteTurlPutterV2(getStorage(),
                         credential, dests, sizes, getProtocols(), this,
-                        getConfiguration().getCopyRetryTimeout(), 2,
+                        retryTimeout, 2,
                         this.getRemainingLifetime(), getStorageType(),
                         getTargetRetentionPolicy(), getTargetAccessLatency(),
                         getOverwriteMode(), getTargetSpaceToken(),
@@ -712,7 +723,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                  logger.error("connecting to server using version 2.1.1 protocol failed, trying version 1.1");
                 setGetter_putter(new RemoteTurlPutterV1(getStorage(),
                         credential, dests, sizes, getProtocols(), this,
-                        getConfiguration().getCopyRetryTimeout(), 2,
+                        retryTimeout, 2,
                         clientTransport));
                 getGetter_putter().getInitialRequest();
                 setRemoteSrmProtocol(SRMProtocol.V1_1);
@@ -853,22 +864,22 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
                     int remoteFileId = Integer.parseInt(remoteFileIdString);
                     TurlGetterPutterV1.staticSetFileStatus(getCredential(),SURL,
                             remoteRequestId, remoteFileId,"Done",
-                            getConfiguration().getCopyRetryTimeout(),
-                            getConfiguration().getCopyMaxNumOfRetries(),
+                            max_update_period,
+                            maxNumberOfRetries,
                             clientTransport);
                 } else if( getRemoteSrmProtocol() == SRMProtocol.V2_1) {
                     if(isRemoteSrmGet())
                     {
                        RemoteTurlGetterV2.staticReleaseFile(getCredential(),
                                SURL, remoteRequestIdString,
-                               getConfiguration().getCopyRetryTimeout(),
-                               getConfiguration().getCopyMaxNumOfRetries(),
+                               max_update_period,
+                               maxNumberOfRetries,
                                clientTransport);
                     } else {
                         RemoteTurlPutterV2.staticPutDone(getCredential(),
                                SURL, remoteRequestIdString,
-                               getConfiguration().getCopyRetryTimeout(),
-                               getConfiguration().getCopyMaxNumOfRetries(),
+                               max_update_period,
+                               maxNumberOfRetries,
                                clientTransport);
                     }
 

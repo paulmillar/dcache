@@ -93,6 +93,7 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.NonFatalJobFailure;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
 import org.dcache.srm.v2_2.ArrayOfTPutRequestFileStatus;
 import org.dcache.srm.v2_2.SrmPrepareToPutResponse;
 import org.dcache.srm.v2_2.SrmStatusOfPutRequestResponse;
@@ -204,6 +205,12 @@ public final class PutRequest extends ContainerRequest<PutFileRequest> {
         statusCodeString);
         this.protocols = protocols.toArray(new String[protocols.size()]);
 
+    }
+
+    @Override
+    public Configuration.Operation getOperation()
+    {
+        return Configuration.Operation.PUT;
     }
 
     @Nonnull

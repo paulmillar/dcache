@@ -16,6 +16,7 @@ import org.dcache.srm.request.BringOnlineRequest;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.util.Tools;
 import org.dcache.srm.v2_2.ArrayOfTExtraInfo;
@@ -26,7 +27,10 @@ import org.dcache.srm.v2_2.TGetFileRequest;
 import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 
+import org.dcache.srm.util.Configuration.OperationParameters;
+
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.dcache.srm.util.Configuration.Operation.BRING_ONLINE;
 
 public class SrmBringOnline
 {
@@ -39,6 +43,7 @@ public class SrmBringOnline
     private final SRM srm;
     private final RequestCredential credential;
     private final Configuration configuration;
+    private final OperationParameters parameters;
     private final String clientHost;
 
     public SrmBringOnline(SRMUser user,
@@ -54,6 +59,7 @@ public class SrmBringOnline
         this.clientHost = clientHost;
         this.credential = checkNotNull(credential);
         this.configuration = srm.getConfiguration();
+        this.parameters = configuration.getParametersFor(BRING_ONLINE);
     }
 
     public SrmBringOnlineResponse getResponse()
@@ -78,7 +84,8 @@ public class SrmBringOnline
         String clientHost = getClientNetwork(request).or(this.clientHost);
         TGetFileRequest[] fileRequests = getFileRequests(request);
         URI[] surls = getSurls(fileRequests);
-        long requestTime = getRequestTime(request, configuration.getBringOnlineLifetime());
+
+        long requestTime = getRequestTime(request, parameters.getLifetime());
         long desiredLifetimeInSeconds = getDesiredLifetime(request, requestTime);
 
         BringOnlineRequest r =
@@ -88,8 +95,8 @@ public class SrmBringOnline
                         protocols,
                         requestTime,
                         desiredLifetimeInSeconds,
-                        configuration.getGetRetryTimeout(),
-                        configuration.getGetMaxNumOfRetries(),
+                        parameters.getRetryTimeout(),
+                        parameters.getMaxRetries(),
                         request.getUserRequestDescription(),
                         clientHost);
         try (JDC ignored = r.applyJdc()) {
@@ -102,7 +109,9 @@ public class SrmBringOnline
                 }
             }
             srm.schedule(r);
-            return r.getSrmBringOnlineResponse(configuration.getBringOnlineSwitchToAsynchronousModeDelay());
+            return r.getSrmBringOnlineResponse(configuration
+                    .getDeferrableParametersFor(BRING_ONLINE)
+                    .getSwitchToAsynchronousModeDelay());
         } catch (InterruptedException e) {
             throw new SRMInternalErrorException("Operation interrupted", e);
         } catch (IllegalStateTransition e) {

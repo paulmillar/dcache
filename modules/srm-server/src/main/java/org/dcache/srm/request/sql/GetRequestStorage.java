@@ -10,8 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.transaction.PlatformTransactionManager;
 
-import java.io.IOException;
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -22,10 +23,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.request.GetFileRequest;
 import org.dcache.srm.request.GetRequest;
 import org.dcache.srm.request.Job;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 import static org.dcache.srm.request.sql.Utilities.getIdentifierAsStored;
 
@@ -138,10 +140,11 @@ public class GetRequestStorage extends DatabaseContainerRequestStorage<GetReques
 
 
     /** Creates a new instance of GetRequestStorage */
-    public GetRequestStorage(Configuration.DatabaseParameters configuration)
-            throws DataAccessException, IOException
+    public GetRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager,
+            SRMUserPersistenceManager userPersistenceManager) throws DataAccessException
     {
-        super(configuration);
+        super(configuration, datasource, transactionManager, userPersistenceManager);
     }
 
     private String getProtocolsTableName() {

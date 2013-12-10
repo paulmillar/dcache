@@ -11,7 +11,9 @@ import com.google.common.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -21,10 +23,11 @@ import java.util.List;
 
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.request.ContainerRequest;
 import org.dcache.srm.request.FileRequest;
 import org.dcache.srm.request.Job;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 /**
  *
@@ -38,10 +41,11 @@ public abstract class DatabaseContainerRequestStorage<C extends ContainerRequest
     final Class<F> fileRequestType = (Class<F>) new TypeToken<F>(getClass()) {}.getRawType();
 
     /** Creates a new instance of DatabaseContainerRequestStorage */
-    public DatabaseContainerRequestStorage(Configuration.DatabaseParameters configuration)
-            throws DataAccessException
+    public DatabaseContainerRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager,
+            SRMUserPersistenceManager userPersistenceManager) throws DataAccessException
     {
-        super(configuration);
+        super(configuration, datasource, transactionManager, userPersistenceManager);
     }
 
    public abstract String getFileRequestsTableName();

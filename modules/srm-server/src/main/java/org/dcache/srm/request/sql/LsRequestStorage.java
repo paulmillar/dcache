@@ -1,18 +1,20 @@
 package org.dcache.srm.request.sql;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
-import java.io.IOException;
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.request.Job;
 import org.dcache.srm.request.LsFileRequest;
 import org.dcache.srm.request.LsRequest;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 public class LsRequestStorage extends DatabaseContainerRequestStorage<LsRequest,LsFileRequest> {
     public static final String TABLE_NAME ="lsrequests";
@@ -141,10 +143,11 @@ public class LsRequestStorage extends DatabaseContainerRequestStorage<LsRequest,
 
         private static int ADDITIONAL_FIELDS = 5;
 
-        public LsRequestStorage(Configuration.DatabaseParameters configuration)
-                throws IOException, DataAccessException
+        public LsRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager,
+            SRMUserPersistenceManager userPersistenceManager) throws DataAccessException
         {
-                super(configuration);
+                super(configuration, datasource, transactionManager, userPersistenceManager);
         }
 
         @Override

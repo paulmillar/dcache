@@ -1,7 +1,9 @@
 package org.dcache.srm.request.sql;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,7 +11,7 @@ import java.sql.SQLException;
 
 import org.dcache.srm.request.Job;
 import org.dcache.srm.request.LsFileRequest;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 public class LsFileRequestStorage extends DatabaseFileRequestStorage<LsFileRequest> {
     public static final String TABLE_NAME = "lsfilerequests";
@@ -26,10 +28,11 @@ public class LsFileRequestStorage extends DatabaseFileRequestStorage<LsFileReque
         "LASTSTATETRANSITIONTIME=? ";//10
 
         private static int ADDITIONAL_FIELDS = 1;
-        public LsFileRequestStorage(Configuration.DatabaseParameters configuration)
-                throws DataAccessException
+        public LsFileRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager)
+            throws DataAccessException
         {
-                super(configuration);
+                super(configuration, datasource, transactionManager);
         }
 
         @Override

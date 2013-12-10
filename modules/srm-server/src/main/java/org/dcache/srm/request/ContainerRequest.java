@@ -92,6 +92,7 @@ import org.dcache.srm.SRMFileRequestNotFoundException;
 import org.dcache.srm.SRMUser;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
 import org.dcache.srm.util.RequestStatusTool;
 import org.dcache.srm.v2_2.TRequestSummary;
 import org.dcache.srm.v2_2.TRequestType;
@@ -306,6 +307,8 @@ public abstract class ContainerRequest<R extends FileRequest<?>> extends Request
 
     @Override
     public abstract String getMethod();
+
+    public abstract Configuration.Operation getOperation();
 
     @Override
     public TReturnStatus abort()

@@ -18,6 +18,8 @@ import org.dcache.srm.request.GetRequest;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.srm.util.JDC;
 import org.dcache.srm.util.Tools;
 import org.dcache.srm.v2_2.ArrayOfTExtraInfo;
@@ -33,6 +35,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.Iterables.any;
 import static java.util.Arrays.asList;
+import static org.dcache.srm.util.Configuration.Operation.GET;
 
 public class SrmPrepareToGet
 {
@@ -45,6 +48,7 @@ public class SrmPrepareToGet
     private final SRM srm;
     private final RequestCredential credential;
     private final Configuration configuration;
+    private final OperationParameters parameters;
     private final String clientHost;
     private SrmPrepareToGetResponse response;
 
@@ -62,6 +66,7 @@ public class SrmPrepareToGet
         this.storage = checkNotNull(storage);
         this.configuration = checkNotNull(srm.getConfiguration());
         this.srm = checkNotNull(srm);
+        parameters = configuration.getParametersFor(GET);
     }
 
     public SrmPrepareToGetResponse getResponse()
@@ -93,7 +98,7 @@ public class SrmPrepareToGet
     {
         String[] protocols = getTransferProtocols(request);
         String clientHost = getClientHost(request).or(this.clientHost);
-        long lifetime = getLifetime(request, configuration.getGetLifetime());
+        long lifetime = getLifetime(request, parameters.getLifetime());
         String[] supportedProtocols = storage.supportedGetProtocols();
         URI[] surls = getSurls(request);
 
@@ -109,8 +114,8 @@ public class SrmPrepareToGet
                         surls,
                         protocols,
                         lifetime,
-                        configuration.getGetRetryTimeout(),
-                        configuration.getGetMaxNumOfRetries(),
+                        parameters.getRetryTimeout(),
+                        parameters.getMaxRetries(),
                         request.getUserRequestDescription(),
                         clientHost);
         try (JDC ignored = r.applyJdc()) {
@@ -123,7 +128,9 @@ public class SrmPrepareToGet
                 }
             }
             srm.schedule(r);
-            return r.getSrmPrepareToGetResponse(configuration.getGetSwitchToAsynchronousModeDelay());
+            return r.getSrmPrepareToGetResponse(configuration
+                    .getDeferrableParametersFor(GET)
+                    .getSwitchToAsynchronousModeDelay());
         }
     }
 

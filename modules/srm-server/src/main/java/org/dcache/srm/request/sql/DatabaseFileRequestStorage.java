@@ -7,13 +7,15 @@
 package org.dcache.srm.request.sql;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.dcache.srm.request.FileRequest;
-import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
 
 /**
  *
@@ -22,10 +24,11 @@ import org.dcache.srm.util.Configuration;
 public abstract class DatabaseFileRequestStorage<F extends FileRequest<?>> extends DatabaseJobStorage<F>  {
 
     /** Creates a new instance of FileRequestStorage */
-    public DatabaseFileRequestStorage(Configuration.DatabaseParameters configuration)
+    public DatabaseFileRequestStorage(OperationParameters configuration,
+            DataSource datasource,  PlatformTransactionManager transactionManager)
             throws DataAccessException
     {
-        super(configuration);
+        super(configuration, datasource, transactionManager);
     }
 
     @Override

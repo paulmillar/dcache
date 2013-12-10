@@ -124,11 +124,14 @@ import org.dcache.srm.request.sql.RequestsPropertyStorage;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.JobStorage;
 import org.dcache.srm.scheduler.JobStorageFactory;
-import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.SchedulerContainer;
 import org.dcache.srm.scheduler.SchedulerFactory;
 import org.dcache.srm.scheduler.State;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Configuration.OperationParameters;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+
+import static org.dcache.srm.util.Configuration.Operation.*;
 import org.dcache.srm.v2_2.TFileStorageType;
 
 import static com.google.common.collect.Iterables.concat;
@@ -583,13 +586,14 @@ public class SRM {
                     }
                 }
             }
-            long lifetime = configuration.getCopyLifetime();
+            long lifetime = configuration.getParametersFor(COPY).getLifetime();
             if (cred_lifetime < lifetime) {
                 logger.debug("credential lifetime is less than default lifetime, using credential lifetime =" + cred_lifetime);
                 lifetime = cred_lifetime;
             }
             // create a request object
             logger.debug("calling Request.createCopyRequest()");
+            OperationParameters parameters = configuration.getParametersFor(COPY);
             CopyRequest r = new CopyRequest(
                     user,
                     credential.getId(),
@@ -597,8 +601,8 @@ public class SRM {
                     to_urls,
                     null, // no space reservation in v1
                     lifetime,
-                    configuration.getCopyRetryTimeout(),
-                    configuration.getCopyMaxNumOfRetries(),
+                    parameters.getRetryTimeout(),
+                    parameters.getMaxRetries(),
                     SRMProtocol.V1_1,
                     TFileStorageType.PERMANENT,
                     null,
@@ -663,12 +667,13 @@ public class SRM {
             for (int i = 0; i < surls.length; i++) {
                 uris[i] = new URI(surls[i]);
             }
+            OperationParameters parameters = configuration.getParametersFor(GET);
             GetRequest r =
                     new GetRequest(user, credential.getId(),
                             uris, protocols,
-                            configuration.getGetLifetime(),
-                            configuration.getGetRetryTimeout(),
-                            configuration.getGetMaxNumOfRetries(),
+                            parameters.getLifetime(),
+                            parameters.getRetryTimeout(),
+                            parameters.getMaxRetries(),
                             null,
                             client_host);
             schedulers.schedule(r);
@@ -889,12 +894,13 @@ public class SRM {
                 return createFailedRequestStatus(errorsb.toString());
             }
             // create a new put request
+            OperationParameters parameters = configuration.getParametersFor(PUT);
             PutRequest r = new PutRequest(user,
                     credential.getId(),
                     dests_urls, sizes,
-                    wantPerm, protocols, configuration.getPutLifetime(),
-                    configuration.getPutRetryTimeout(),
-                    configuration.getPutMaxNumOfRetries(),
+                    wantPerm, protocols, parameters.getLifetime(),
+                    parameters.getRetryTimeout(),
+                    parameters.getMaxRetries(),
                     clientHost,
                     null,
                     null,
@@ -1332,25 +1338,25 @@ public class SRM {
 
     public void setPutMaxReadyJobs(int value)
     {
-        configuration.setPutMaxReadyJobs(value);
+        configuration.getDeferrableParametersFor(PUT).setMaxReadyJobs(value);
         schedulers.setMaxReadyJobs(PutFileRequest.class, value);
     }
 
     public void setGetMaxReadyJobs(int value)
     {
-        configuration.setGetMaxReadyJobs(value);
+        configuration.getDeferrableParametersFor(GET).setMaxReadyJobs(value);
         schedulers.setMaxReadyJobs(GetRequest.class, value);
     }
 
     public void setBringOnlineMaxReadyJobs(int value)
     {
-        configuration.setBringOnlineMaxReadyJobs(value);
+        configuration.getDeferrableParametersFor(BRING_ONLINE).setMaxReadyJobs(value);
         schedulers.setMaxReadyJobs(BringOnlineFileRequest.class, value);
     }
 
     public void setLsMaxReadyJobs(int value)
     {
-        configuration.setLsMaxReadyJobs(value);
+        configuration.getDeferrableParametersFor(LS).setMaxReadyJobs(value);
         schedulers.setMaxReadyJobs(LsFileRequest.class, value);
     }
 

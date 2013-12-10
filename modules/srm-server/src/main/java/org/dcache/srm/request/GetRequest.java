@@ -93,6 +93,7 @@ import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.NonFatalJobFailure;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
 import org.dcache.srm.v2_2.ArrayOfTGetRequestFileStatus;
 import org.dcache.srm.v2_2.SrmPrepareToGetResponse;
 import org.dcache.srm.v2_2.SrmStatusOfGetRequestResponse;
@@ -189,6 +190,13 @@ public final class GetRequest extends ContainerRequest<GetFileRequest> {
         this.protocols = protocols.toArray(new String[protocols.size()]);
 
     }
+
+    @Override
+    public Configuration.Operation getOperation()
+    {
+        return Configuration.Operation.GET;
+    }
+
 
     @Nonnull
     @Override

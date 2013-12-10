@@ -212,6 +212,11 @@ import org.dcache.srm.v2_2.TStatusCode;
 import dmg.cells.services.login.LoginBrokerHandler;
 
 import org.dcache.srm.request.GetFileRequest;
+import org.dcache.srm.util.Configuration.DeferrableOperationParameters;
+
+import static org.dcache.srm.util.Configuration.Operation.*;
+import org.dcache.srm.util.Configuration.Operation;
+import org.dcache.srm.util.Configuration.OperationParameters;
 import org.dcache.util.Version;
 import org.dcache.util.list.DirectoryEntry;
 import org.dcache.util.list.DirectoryListPrinter;
@@ -492,7 +497,8 @@ public final class Storage
         "always use asynchronous replies.";
     public String ac_set_switch_to_async_mode_delay_get_$_1(Args args)
     {
-        config.setGetSwitchToAsynchronousModeDelay(Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS));
+        long delay = Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS);
+        config.getDeferrableParametersFor(GET).setSwitchToAsynchronousModeDelay(delay);
         return "";
     }
 
@@ -504,7 +510,8 @@ public final class Storage
         "always use asynchronous replies.";
     public String ac_set_switch_to_async_mode_delay_put_$_1(Args args)
     {
-        config.setPutSwitchToAsynchronousModeDelay(Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS));
+        long delay = Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS);
+        config.getDeferrableParametersFor(PUT).setSwitchToAsynchronousModeDelay(delay);
         return "";
     }
 
@@ -516,7 +523,8 @@ public final class Storage
         "always use asynchronous replies.";
     public String ac_set_switch_to_async_mode_delay_ls_$_1(Args args)
     {
-        config.setLsSwitchToAsynchronousModeDelay(Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS));
+        long delay = Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS);
+        config.getDeferrableParametersFor(LS).setSwitchToAsynchronousModeDelay(delay);
         return "";
     }
 
@@ -528,18 +536,19 @@ public final class Storage
         "and use 0 to always use asynchronous replies.";
     public String ac_set_switch_to_async_mode_delay_bring_online_$_1(Args args)
     {
-        config.setBringOnlineSwitchToAsynchronousModeDelay(Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS));
+        long delay = Strings.parseTime(args.argv(0), TimeUnit.MILLISECONDS);
+        config.getDeferrableParametersFor(BRING_ONLINE).setSwitchToAsynchronousModeDelay(delay);
         return "";
     }
 
-    private static final ImmutableMap<String,String> OPTION_TO_PARAMETER_SET =
-        new ImmutableMap.Builder<String,String>()
-        .put("get", Configuration.GET_PARAMETERS)
-        .put("put", Configuration.PUT_PARAMETERS)
-        .put("ls", Configuration.LS_PARAMETERS)
-        .put("bringonline", Configuration.BRINGONLINE_PARAMETERS)
-        .put("reserve", Configuration.RESERVE_PARAMETERS)
-        .build();
+    private static final ImmutableMap<String,Operation> OPTION_TO_OPERATION =
+            new ImmutableMap.Builder<String,Operation>()
+            .put("get", GET)
+            .put("put", PUT)
+            .put("ls", LS)
+            .put("bringonline", BRING_ONLINE)
+            .put("reserve", RESERVE_SPACE)
+            .build();
 
     public final static String fh_db_history_log= " Syntax: db history log [on|off] "+
         "# show status or enable db history log ";
@@ -547,15 +556,16 @@ public final class Storage
         "# show status or enable db history log ";
     public String ac_db_history_log_$_0_1(Args args)
     {
-        Collection<String> sets = new ArrayList<>();
-        for (Map.Entry<String,String> e: OPTION_TO_PARAMETER_SET.entrySet()) {
+        Collection<Operation> sets = new HashSet<>();
+
+        for (Map.Entry<String,Operation> e: OPTION_TO_OPERATION.entrySet()) {
             if (args.hasOption(e.getKey())) {
                 sets.add(e.getValue());
             }
         }
 
         if (sets.isEmpty()) {
-            sets = OPTION_TO_PARAMETER_SET.values();
+            sets = OPTION_TO_OPERATION.values();
         }
 
         if (args.argc() > 0) {
@@ -563,15 +573,15 @@ public final class Storage
             if (!arg.equals("on") && !arg.equals("off")){
                 return "syntax error";
             }
-            for (String set: sets) {
-                config.getDatabaseParameters(set).setRequestHistoryDatabaseEnabled(arg.equals("on"));
+            for (Operation operation: sets) {
+                config.getParametersFor(operation).setRequestHistoryDatabaseEnabled(arg.equals("on"));
             }
         }
 
         StringBuilder s = new StringBuilder();
-        for (String set: sets) {
-            Configuration.DatabaseParameters parameters = config.getDatabaseParameters(set);
-            s.append("db history logging for ").append(set).append(" is ")
+        for (Operation operation: sets) {
+            OperationParameters parameters = config.getParametersFor(operation);
+            s.append("db history logging for ").append(operation).append(" is ")
                 .append((parameters.isRequestHistoryDatabaseEnabled()
                          ? "enabled"
                          : "disabled")).append("\n");

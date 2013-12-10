@@ -1,5 +1,3 @@
-// $Id$
-
 /*
 COPYRIGHT STATUS:
   Dec 1st 2001, Fermi National Accelerator Laboratory (FNAL) documents and
@@ -66,25 +64,22 @@ COPYRIGHT STATUS:
   documents or software obtained from this server.
  */
 
-/*
- * Configuration.java
- *
- * Created on April 23, 2003, 10:19 AM
- */
-
 package org.dcache.srm.util;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.w3c.dom.Comment;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.Text;
+import org.xml.sax.SAXException;
 
 import javax.sql.DataSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -94,7 +89,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -105,23 +99,40 @@ import org.dcache.srm.SRMAuthorization;
 import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.client.Transport;
 
+import static org.dcache.srm.util.Configuration.Operation.*;
 
 /**
  *
  * @author  timur
  */
-public class Configuration {
+public class Configuration
+{
+
+    /**
+     * User requests that may take time, so could require scheduling and
+     * database activity, are grouped together into one of six possible
+     * operations.
+     */
+    public enum Operation
+    {
+        LS("ls"),
+        PUT("put"),
+        GET("get"),
+        COPY("copy"),
+        BRING_ONLINE("bring online"),
+        RESERVE_SPACE("reserve space");
+
+        final String displayName;
+
+        Operation(String name)
+        {
+            this.displayName = name;
+        }
+    };
 
     private static final String XML_LABEL_TRANSPORT_CLIENT = "client_transport";
 
     private static final String INFINITY = "infinity";
-
-    public static final String LS_PARAMETERS = "ls";
-    public static final String PUT_PARAMETERS = "put";
-    public static final String GET_PARAMETERS = "get";
-    public static final String COPY_PARAMETERS = "copy";
-    public static final String BRINGONLINE_PARAMETERS = "bringonline";
-    public static final String RESERVE_PARAMETERS = "reserve";
 
     private boolean debug = false;
 
@@ -162,70 +173,6 @@ public class Configuration {
     private AbstractStorageElement storage;
     private SRMAuthorization authorization;
 
-    // scheduler parameters
-
-    private int getReqTQueueSize=1000;
-    private int getThreadPoolSize=30;
-    private int getMaxWaitingRequests=1000;
-    private int getReadyQueueSize=1000;
-    private int getMaxReadyJobs=60;
-    private int getMaxNumOfRetries=10;
-    private long getRetryTimeout=60000;
-    private int getMaxRunningBySameOwner=10;
-    private long getSwitchToAsynchronousModeDelay = 0;
-
-    private int lsReqTQueueSize=1000;
-    private int lsThreadPoolSize=30;
-    private int lsMaxWaitingRequests=1000;
-    private int lsReadyQueueSize=1000;
-    private int lsMaxReadyJobs=60;
-    private int lsMaxNumOfRetries=10;
-    private long lsRetryTimeout=60000;
-    private int lsMaxRunningBySameOwner=10;
-    private long lsSwitchToAsynchronousModeDelay = 0;
-
-    private int bringOnlineReqTQueueSize=1000;
-    private int bringOnlineThreadPoolSize=30;
-    private int bringOnlineMaxWaitingRequests=1000;
-    private int bringOnlineReadyQueueSize=1000;
-    private int bringOnlineMaxReadyJobs=60;
-    private int bringOnlineMaxNumOfRetries=10;
-    private long bringOnlineRetryTimeout=60000;
-    private int bringOnlineMaxRunningBySameOwner=10;
-    private long bringOnlineSwitchToAsynchronousModeDelay = 0;
-
-    private int putReqTQueueSize=1000;
-    private int putThreadPoolSize=30;
-    private int putMaxWaitingRequests=1000;
-    private int putReadyQueueSize=1000;
-    private int putMaxReadyJobs=60;
-    private int putMaxNumOfRetries=10;
-    private long putRetryTimeout=60000;
-    private int putMaxRunningBySameOwner=10;
-    private long putSwitchToAsynchronousModeDelay = 0;
-
-    private int reserveSpaceReqTQueueSize=1000;
-    private int reserveSpaceThreadPoolSize=30;
-    private int reserveSpaceMaxWaitingRequests=1000;
-    private int reserveSpaceReadyQueueSize=1000;
-    private int reserveSpaceMaxReadyJobs=60;
-    private int reserveSpaceMaxNumOfRetries=10;
-    private long reserveSpaceRetryTimeout=60000;
-    private int reserveSpaceMaxRunningBySameOwner=10;
-
-    private int copyReqTQueueSize=1000;
-    private int copyThreadPoolSize=30;
-    private int copyMaxWaitingRequests=1000;
-    private int copyMaxNumOfRetries=10;
-    private long copyRetryTimeout=60000;
-    private int copyMaxRunningBySameOwner=10;
-
-
-    private long getLifetime = 24*60*60*1000;
-    private long bringOnlineLifetime = 24*60*60*1000;
-    private long putLifetime = 24*60*60*1000;
-    private long copyLifetime = 24*60*60*1000;
-    private long reserveSpaceLifetime = 24*60*60*1000;
     private long defaultSpaceLifetime = 24*60*60*1000;
 
     private boolean useUrlcopyScript=false;
@@ -241,11 +188,6 @@ public class Configuration {
     private long storage_info_update_period = TimeUnit.SECONDS.toMillis(30);
     private String qosPluginClass = null;
     private String qosConfigFile = null;
-    private String getPriorityPolicyPlugin="DefaultJobAppraiser";
-    private String bringOnlinePriorityPolicyPlugin="DefaultJobAppraiser";
-    private String putPriorityPolicyPlugin="DefaultJobAppraiser";
-    private String lsPriorityPolicyPlugin="DefaultJobAppraiser";
-    private String reserveSpacePriorityPolicyPlugin="DefaultJobAppraiser";
     private Integer maxQueuedJdbcTasksNum ; //null by default
     private Integer jdbcExecutionThreadNum;//null by default
     private String credentialsDirectory="/opt/d-cache/credentials";
@@ -262,27 +204,40 @@ public class Configuration {
     private DataSource dataSource;
     private PlatformTransactionManager transactionManager;
 
-    private Map<String,DatabaseParameters> databaseParameters =
-        new HashMap<>();
+    private final ImmutableMap<Operation,OperationParameters> operations;
 
-    /** Creates a new instance of Configuration */
-    public Configuration() {
-        databaseParameters.put(PUT_PARAMETERS, new DatabaseParameters("Put"));
-        databaseParameters.put(GET_PARAMETERS, new DatabaseParameters("Get"));
-        databaseParameters.put(LS_PARAMETERS, new DatabaseParameters("Ls"));
-        databaseParameters.put(COPY_PARAMETERS, new DatabaseParameters("Copy"));
-        databaseParameters.put(BRINGONLINE_PARAMETERS, new DatabaseParameters("Bring Online"));
-        databaseParameters.put(RESERVE_PARAMETERS, new DatabaseParameters("Reserve Space"));
+    public Configuration()
+    {
+        operations = ImmutableMap.<Operation,OperationParameters>builder()
+                    .put(BRING_ONLINE, new DeferrableOperationParameters())
+                    .put(PUT, new DeferrableOperationParameters())
+                    .put(GET, new DeferrableOperationParameters())
+                    .put(LS, new DeferrableOperationParameters())
+                    .put(RESERVE_SPACE, new OperationParameters())
+                    .put(COPY, new OperationParameters())
+                    .build();
     }
 
-    public Configuration(String configuration_file) throws Exception {
+    public Configuration(Map<Operation,OperationParameters> operations)
+    {
+        this.operations = ImmutableMap.<Operation,OperationParameters>builder()
+                .putAll(operations)
+                .build();
+    }
+
+    public Configuration(String configuration_file)
+            throws ParserConfigurationException, SAXException, IOException
+    {
+        this();
         if (configuration_file != null && !configuration_file.isEmpty()) {
             read(configuration_file);
         }
     }
 
 
-    public final void read(String file) throws Exception {
+    public final void read(String file)
+            throws ParserConfigurationException, SAXException, IOException
+    {
         DocumentBuilderFactory factory =
                 DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -291,13 +246,12 @@ public class Configuration {
         for(;root != null && !"srm-configuration".equals(root.getNodeName());
         root = document.getNextSibling()) {
         }
-        if(root == null) {
-            System.err.println(" error, root element \"srm-configuration\" is not found");
-            throw new IOException();
+        if (root == null) {
+            throw new IOException("root element \"srm-configuration\" not found");
         }
 
 
-        if(root != null && root.getNodeName().equals("srm-configuration")) {
+        if (root.getNodeName().equals("srm-configuration")) {
 
             Node node = root.getFirstChild();
             for(;node != null; node = node.getNextSibling()) {
@@ -333,6 +287,16 @@ public class Configuration {
             }
         }
 
+    }
+
+    protected static void put(Document document, Node root, String name, int value, String comment)
+    {
+        put(document, root, name, Integer.toString(value), comment);
+    }
+
+    protected static void put(Document document, Node root, String name, long value, String comment)
+    {
+        put(document, root, name, Long.toString(value), comment);
     }
 
     protected static void put(Document document,Node root,String elem_name,String value, String comment_str) {
@@ -389,125 +353,141 @@ public class Configuration {
                 "timeout in seconds, how long to wait for the completeon of the transfer via external client, should the external client be used for the MSS to MSS transfers");
         put(document,root,"timeout_script",timeout_script ,
                 "location of the timeout script");
-        put(document,root,"getReqTQueueSize",Integer.toString(getReqTQueueSize),
+
+        {
+        DeferrableOperationParameters parameters =
+                (DeferrableOperationParameters) operations.get(GET);
+        put(document,root,"getReqTQueueSize", parameters.getReqTQueueSize(),
                 "getReqTQueueSize");
-        put(document,root,"getThreadPoolSize",Integer.toString(getThreadPoolSize),
+        put(document,root,"getThreadPoolSize", parameters.getThreadPoolSize(),
                 "getThreadPoolSize");
-        put(document,root,"getMaxWaitingRequests",Integer.toString(getMaxWaitingRequests),
+        put(document,root,"getMaxWaitingRequests", parameters.getMaxWaitingRequests(),
                 "getMaxWaitingRequests");
-        put(document,root,"getReadyQueueSize",Integer.toString(getReadyQueueSize),
+        put(document,root,"getReadyQueueSize", parameters.getReadyQueueSize(),
                 "getReadyQueueSize");
-        put(document,root,"getMaxReadyJobs",Integer.toString(getMaxReadyJobs),
+        put(document,root,"getMaxReadyJobs", parameters.getMaxReadyJobs(),
                 "getMaxReadyJobs");
-        put(document,root,"getMaxNumOfRetries",Integer.toString(getMaxNumOfRetries),
+        put(document,root,"getMaxNumOfRetries", parameters.getMaxRetries(),
                 "Maximum Number Of Retries for get file request");
-        put(document,root,"getRetryTimeout",Long.toString(getRetryTimeout),
+        put(document,root,"getRetryTimeout", parameters.getRetryTimeout(),
                 "get request Retry Timeout in milliseconds");
-
-        put(document,root,"getMaxRunningBySameOwner",Integer.toString(getMaxRunningBySameOwner),
+        put(document,root,"getLifetime", parameters.getLifetime(),
+                "getLifetime");
+        put(document,root,"getMaxRunningBySameOwner", parameters.getMaxRunningBySameOwner(),
                 "getMaxRunningBySameOwner");
+        }
 
-
-        put(document,root,"bringOnlineReqTQueueSize",Integer.toString(bringOnlineReqTQueueSize),
+        {
+        DeferrableOperationParameters parameters =
+                (DeferrableOperationParameters) operations.get(BRING_ONLINE);
+        put(document,root,"bringOnlineReqTQueueSize", parameters.getReqTQueueSize(),
                 "bringOnlineReqTQueueSize");
-        put(document,root,"bringOnlineThreadPoolSize",Integer.toString(bringOnlineThreadPoolSize),
+        put(document,root,"bringOnlineThreadPoolSize", parameters.getThreadPoolSize(),
                 "bringOnlineThreadPoolSize");
-        put(document,root,"bringOnlineMaxWaitingRequests",Integer.toString(bringOnlineMaxWaitingRequests),
+        put(document,root,"bringOnlineMaxWaitingRequests", parameters.getMaxWaitingRequests(),
                 "bringOnlineMaxWaitingRequests");
-        put(document,root,"bringOnlineReadyQueueSize",Integer.toString(bringOnlineReadyQueueSize),
+        put(document,root,"bringOnlineReadyQueueSize", parameters.getReadyQueueSize(),
                 "bringOnlineReadyQueueSize");
-        put(document,root,"bringOnlineMaxReadyJobs",Integer.toString(bringOnlineMaxReadyJobs),
+        put(document,root,"bringOnlineMaxReadyJobs", parameters.getMaxReadyJobs(),
                 "bringOnlineMaxReadyJobs");
-        put(document,root,"bringOnlineMaxNumOfRetries",Integer.toString(bringOnlineMaxNumOfRetries),
+        put(document,root,"bringOnlineMaxNumOfRetries", parameters.getMaxRetries(),
                 "Maximum Number Of Retries for bringOnline file request");
-        put(document,root,"bringOnlineRetryTimeout",Long.toString(bringOnlineRetryTimeout),
+        put(document,root,"bringOnlineRetryTimeout", parameters.getRetryTimeout(),
                 "bringOnline request Retry Timeout in milliseconds");
-
-        put(document,root,"bringOnlineMaxRunningBySameOwner",Integer.toString(bringOnlineMaxRunningBySameOwner),
+        put(document,root,"bringOnlineMaxRunningBySameOwner",
+                parameters.getMaxRunningBySameOwner(),
                 "bringOnlineMaxRunningBySameOwner");
+        put(document,root,"bringOnlineLifetime", parameters.getLifetime(),
+                "bringOnlineLifetime");
+        }
 
-        put(document,root,"lsReqTQueueSize",Integer.toString(lsReqTQueueSize),
+        {
+        DeferrableOperationParameters tParameters =
+                (DeferrableOperationParameters) operations.get(LS);
+        put(document,root,"lsReqTQueueSize", tParameters.getReqTQueueSize(),
                 "lsReqTQueueSize");
-        put(document,root,"lsThreadPoolSize",Integer.toString(lsThreadPoolSize),
+        put(document,root,"lsThreadPoolSize", tParameters.getThreadPoolSize(),
                 "lsThreadPoolSize");
-        put(document,root,"lsMaxWaitingRequests",Integer.toString(lsMaxWaitingRequests),
+        put(document,root,"lsMaxWaitingRequests", tParameters.getMaxWaitingRequests(),
                 "lsMaxWaitingRequests");
-        put(document,root,"lsReadyQueueSize",Integer.toString(lsReadyQueueSize),
+        put(document,root,"lsReadyQueueSize", tParameters.getReadyQueueSize(),
                 "lsReadyQueueSize");
-        put(document,root,"lsMaxReadyJobs",Integer.toString(lsMaxReadyJobs),
+        put(document,root,"lsMaxReadyJobs", tParameters.getMaxReadyJobs(),
                 "lsMaxReadyJobs");
-        put(document,root,"lsMaxNumOfRetries",Integer.toString(lsMaxNumOfRetries),
+        put(document,root,"lsMaxNumOfRetries", tParameters.getMaxRetries(),
                 "Maximum Number Of Retries for ls file request");
-        put(document,root,"lsRetryTimeout",Long.toString(lsRetryTimeout),
+        put(document,root,"lsRetryTimeout", tParameters.getRetryTimeout(),
                 "ls request Retry Timeout in milliseconds");
-
-        put(document,root,"lsMaxRunningBySameOwner",Integer.toString(lsMaxRunningBySameOwner),
+        put(document,root,"lsMaxRunningBySameOwner", tParameters.getMaxRunningBySameOwner(),
                 "lsMaxRunningBySameOwner");
+        }
 
-
-        put(document,root,"putReqTQueueSize",Integer.toString(putReqTQueueSize),
+        {
+        DeferrableOperationParameters parameters =
+                (DeferrableOperationParameters) operations.get(PUT);
+        put(document,root,"putReqTQueueSize", parameters.getReqTQueueSize(),
                 "putReqTQueueSize");
-        put(document,root,"putThreadPoolSize",Integer.toString(putThreadPoolSize),
+        put(document,root,"putThreadPoolSize", parameters.getThreadPoolSize(),
                 "putThreadPoolSize");
-        put(document,root,"putMaxWaitingRequests",Integer.toString(putMaxWaitingRequests),
+        put(document,root,"putMaxWaitingRequests", parameters.getMaxWaitingRequests(),
                 "putMaxWaitingRequests");
-        put(document,root,"putReadyQueueSize",Integer.toString(putReadyQueueSize),
+        put(document,root,"putReadyQueueSize", parameters.getReadyQueueSize(),
                 "putReadyQueueSize");
-        put(document,root,"putMaxReadyJobs",Integer.toString(putMaxReadyJobs),
+        put(document,root,"putMaxReadyJobs", parameters.getMaxReadyJobs(),
                 "putMaxReadyJobs");
-        put(document,root,"putMaxNumOfRetries",Integer.toString(putMaxNumOfRetries),
+        put(document,root,"putMaxNumOfRetries", parameters.getMaxRetries(),
                 "Maximum Number Of Retries for put file request");
-        put(document,root,"putRetryTimeout",Long.toString(putRetryTimeout),
+        put(document,root,"putRetryTimeout", parameters.getRetryTimeout(),
                 "put request Retry Timeout in milliseconds");
-
-        put(document,root,"putMaxRunningBySameOwner",Integer.toString(putMaxRunningBySameOwner),
+        put(document,root,"putLifetime", parameters.getLifetime(),
+                "putLifetime");
+        put(document,root,"putMaxRunningBySameOwner", parameters.getMaxRunningBySameOwner(),
                 "putMaxRunningBySameOwner");
+        }
 
-
-        put(document,root,"reserveSpaceReqTQueueSize",Integer.toString(reserveSpaceReqTQueueSize),
+        {
+        DeferrableOperationParameters parameters =
+                (DeferrableOperationParameters) operations.get(RESERVE_SPACE);
+        put(document,root,"reserveSpaceReqTQueueSize", parameters.getReqTQueueSize(),
                 "reserveSpaceReqTQueueSize");
-        put(document,root,"reserveSpaceThreadPoolSize",Integer.toString(reserveSpaceThreadPoolSize),
+        put(document,root,"reserveSpaceThreadPoolSize", parameters.getThreadPoolSize(),
                 "reserveSpaceThreadPoolSize");
-        put(document,root,"reserveSpaceMaxWaitingRequests",Integer.toString(reserveSpaceMaxWaitingRequests),
+        put(document,root,"reserveSpaceMaxWaitingRequests", parameters.getMaxWaitingRequests(),
                 "reserveSpaceMaxWaitingRequests");
-        put(document,root,"reserveSpaceReadyQueueSize",Integer.toString(reserveSpaceReadyQueueSize),
+        put(document,root,"reserveSpaceReadyQueueSize", parameters.getReadyQueueSize(),
                 "reserveSpaceReadyQueueSize");
-        put(document,root,"reserveSpaceMaxReadyJobs",Integer.toString(reserveSpaceMaxReadyJobs),
+        put(document,root,"reserveSpaceMaxReadyJobs", parameters.getMaxReadyJobs(),
                 "reserveSpaceMaxReadyJobs");
-        put(document,root,"reserveSpaceMaxNumOfRetries",Integer.toString(reserveSpaceMaxNumOfRetries),
+        put(document,root,"reserveSpaceMaxNumOfRetries", parameters.getMaxRetries(),
                 "Maximum Number Of Retries for reserveSpace file request");
-        put(document,root,"reserveSpaceRetryTimeout",Long.toString(reserveSpaceRetryTimeout),
+        put(document,root,"reserveSpaceRetryTimeout", parameters.getRetryTimeout(),
                 "reserveSpace request Retry Timeout in milliseconds");
-
-        put(document,root,"reserveSpaceMaxRunningBySameOwner",Integer.toString(reserveSpaceMaxRunningBySameOwner),
+        put(document,root,"reserveSpaceLifetime", parameters.getLifetime(),
+                "reserveSpaceLifetime");
+        put(document,root,"reserveSpaceMaxRunningBySameOwner",
+                parameters.getMaxRunningBySameOwner(),
                 "reserveSpaceMaxRunningBySameOwner");
+        }
 
-
-        put(document,root,"copyReqTQueueSize",Integer.toString(copyReqTQueueSize),
+        {
+        OperationParameters parameters = operations.get(COPY);
+        put(document,root,"copyReqTQueueSize", parameters.getReqTQueueSize(),
                 "copyReqTQueueSize");
-        put(document,root,"copyThreadPoolSize",Integer.toString(copyThreadPoolSize),
+        put(document,root,"copyThreadPoolSize", parameters.getThreadPoolSize(),
                 "copyThreadPoolSize");
-        put(document,root,"copyMaxWaitingRequests",Integer.toString(copyMaxWaitingRequests),
+        put(document,root,"copyMaxWaitingRequests", parameters.getMaxWaitingRequests(),
                 "copyMaxWaitingRequests");
-        put(document,root,"copyMaxNumOfRetries",Integer.toString(copyMaxNumOfRetries),
+        put(document,root,"copyMaxNumOfRetries", parameters.getMaxRetries(),
                 "Maximum Number Of Retries for copy file request");
-        put(document,root,"copyRetryTimeout",Long.toString(copyRetryTimeout),
+        put(document,root,"copyRetryTimeout", parameters.getRetryTimeout(),
                 "copy request Retry Timeout in milliseconds");
 
-        put(document,root,"copyMaxRunningBySameOwner",Integer.toString(copyMaxRunningBySameOwner),
+        put(document,root,"copyMaxRunningBySameOwner",
+                parameters.getMaxRunningBySameOwner(),
                 "copyMaxRunningBySameOwner");
+        put(document,root,"copyLifetime", parameters.getLifetime(), "copyLifetime");
+        }
 
-
-        put(document,root,"getLifetime",Long.toString(getLifetime),
-                "getLifetime");
-        put(document,root,"bringOnlineLifetime",Long.toString(bringOnlineLifetime),
-                "bringOnlineLifetime");
-        put(document,root,"putLifetime",Long.toString(putLifetime),
-                "putLifetime");
-        put(document,root,"copyLifetime",Long.toString(copyLifetime),
-                "copyLifetime");
-        put(document,root,"reserveSpaceLifetime",Long.toString(reserveSpaceLifetime),
-                "reserveSpaceLifetime");
         put(document,root,"defaultSpaceLifetime",Long.toString(defaultSpaceLifetime),
                 "defaultSpaceLifetime");
         put(document,root,"useUrlcopyScript", Boolean.toString(useUrlcopyScript),
@@ -581,130 +561,137 @@ public class Configuration {
             timeout_script = value;
             break;
         case "getReqTQueueSize":
-            getReqTQueueSize = Integer.parseInt(value);
+            operations.get(GET).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "getThreadPoolSize":
-            getThreadPoolSize = Integer.parseInt(value);
+            operations.get(GET).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "getMaxWaitingRequests":
-            getMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(GET).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "getReadyQueueSize":
-            getReadyQueueSize = Integer.parseInt(value);
+            getDeferrableParametersFor(GET)
+                    .setReadyQueueSize(Integer.parseInt(value));
             break;
         case "getMaxReadyJobs":
-            getMaxReadyJobs = Integer.parseInt(value);
+            getDeferrableParametersFor(GET).setMaxReadyJobs(Integer.parseInt(value));
             break;
         case "getMaxNumOfRetries":
-            getMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(GET).setMaxRetries(Integer.parseInt(value));
             break;
         case "getRetryTimeout":
-            getRetryTimeout = Long.parseLong(value);
+            operations.get(GET).setRetryTimeout(Long.parseLong(value));
             break;
         case "getMaxRunningBySameOwner":
-            getMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(GET).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         case "bringOnlineReqTQueueSize":
-            bringOnlineReqTQueueSize = Integer.parseInt(value);
+            operations.get(BRING_ONLINE).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "bringOnlineThreadPoolSize":
-            bringOnlineThreadPoolSize = Integer.parseInt(value);
+            operations.get(BRING_ONLINE).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "bringOnlineMaxWaitingRequests":
-            bringOnlineMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(BRING_ONLINE).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "bringOnlineReadyQueueSize":
-            bringOnlineReadyQueueSize = Integer.parseInt(value);
+            getDeferrableParametersFor(BRING_ONLINE)
+                    .setReadyQueueSize(Integer.parseInt(value));
             break;
         case "bringOnlineMaxReadyJobs":
-            bringOnlineMaxReadyJobs = Integer.parseInt(value);
+            getDeferrableParametersFor(BRING_ONLINE)
+                    .setMaxReadyJobs(Integer.parseInt(value));
             break;
         case "bringOnlineMaxNumOfRetries":
-            bringOnlineMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(BRING_ONLINE).setMaxRetries(Integer.parseInt(value));
             break;
         case "bringOnlineRetryTimeout":
-            bringOnlineRetryTimeout = Long.parseLong(value);
+            operations.get(BRING_ONLINE).setRetryTimeout(Long.parseLong(value));
             break;
         case "bringOnlineMaxRunningBySameOwner":
-            bringOnlineMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(BRING_ONLINE).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         case "lsReqTQueueSize":
-            lsReqTQueueSize = Integer.parseInt(value);
+            operations.get(LS).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "lsThreadPoolSize":
-            lsThreadPoolSize = Integer.parseInt(value);
+            operations.get(LS).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "lsMaxWaitingRequests":
-            lsMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(LS).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "lsReadyQueueSize":
-            lsReadyQueueSize = Integer.parseInt(value);
+            getDeferrableParametersFor(LS)
+                    .setReadyQueueSize(Integer.parseInt(value));
             break;
         case "lsMaxReadyJobs":
-            lsMaxReadyJobs = Integer.parseInt(value);
+            getDeferrableParametersFor(LS)
+                    .setMaxReadyJobs(Integer.parseInt(value));
             break;
         case "lsMaxNumOfRetries":
-            lsMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(LS).setMaxRetries(Integer.parseInt(value));
             break;
         case "lsRetryTimeout":
-            lsRetryTimeout = Long.parseLong(value);
+            operations.get(LS).setRetryTimeout(Long.parseLong(value));
             break;
         case "lsMaxRunningBySameOwner":
-            lsMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(LS).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         case "putReqTQueueSize":
-            putReqTQueueSize = Integer.parseInt(value);
+            operations.get(PUT).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "putThreadPoolSize":
-            putThreadPoolSize = Integer.parseInt(value);
+            operations.get(PUT).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "putMaxWaitingRequests":
-            putMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(PUT).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "putReadyQueueSize":
-            putReadyQueueSize = Integer.parseInt(value);
+            getDeferrableParametersFor(PUT)
+                    .setReadyQueueSize(Integer.parseInt(value));
             break;
         case "putMaxReadyJobs":
-            putMaxReadyJobs = Integer.parseInt(value);
+            getDeferrableParametersFor(PUT)
+                    .setMaxReadyJobs(Integer.parseInt(value));
             break;
         case "putMaxNumOfRetries":
-            putMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(PUT).setMaxRetries(Integer.parseInt(value));
             break;
         case "putRetryTimeout":
-            putRetryTimeout = Long.parseLong(value);
+            operations.get(PUT).setRetryTimeout(Long.parseLong(value));
             break;
         case "putMaxRunningBySameOwner":
-            putMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(PUT).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         case "copyReqTQueueSize":
-            copyReqTQueueSize = Integer.parseInt(value);
+            operations.get(COPY).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "copyThreadPoolSize":
-            copyThreadPoolSize = Integer.parseInt(value);
+            operations.get(COPY).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "copyMaxWaitingRequests":
-            copyMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(COPY).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "copyMaxNumOfRetries":
-            copyMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(COPY).setMaxRetries(Integer.parseInt(value));
             break;
         case "copyRetryTimeout":
-            copyRetryTimeout = Long.parseLong(value);
+            operations.get(COPY).setRetryTimeout(Long.parseLong(value));
             break;
         case "copyMaxRunningBySameOwner":
-            copyMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(COPY).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         case "getLifetime":
-            getLifetime = Long.parseLong(value);
+            operations.get(GET).setLifetime(Long.parseLong(value));
             break;
         case "bringOnlineLifetime":
-            bringOnlineLifetime = Long.parseLong(value);
+            operations.get(BRING_ONLINE).setLifetime(Long.parseLong(value));
             break;
         case "putLifetime":
-            putLifetime = Long.parseLong(value);
+            operations.get(PUT).setLifetime(Long.parseLong(value));
             break;
         case "copyLifetime":
-            copyLifetime = Long.parseLong(value);
+            operations.get(COPY).setLifetime(Long.parseLong(value));
             break;
         case "defaultSpaceLifetime":
             defaultSpaceLifetime = Long.parseLong(value);
@@ -752,28 +739,30 @@ public class Configuration {
             clientTransport = Transport.transportFor(value).name();
             break;
         case "reserveSpaceReqTQueueSize":
-            reserveSpaceReqTQueueSize = Integer.parseInt(value);
+            operations.get(RESERVE_SPACE).setReqTQueueSize(Integer.parseInt(value));
             break;
         case "reserveSpaceThreadPoolSize":
-            reserveSpaceThreadPoolSize = Integer.parseInt(value);
+            operations.get(RESERVE_SPACE).setThreadPoolSize(Integer.parseInt(value));
             break;
         case "reserveSpaceMaxWaitingRequests":
-            reserveSpaceMaxWaitingRequests = Integer.parseInt(value);
+            operations.get(RESERVE_SPACE).setMaxWaitingRequests(Integer.parseInt(value));
             break;
         case "reserveSpaceReadyQueueSize":
-            reserveSpaceReadyQueueSize = Integer.parseInt(value);
+            getDeferrableParametersFor(RESERVE_SPACE)
+                    .setReadyQueueSize(Integer.parseInt(value));
             break;
         case "reserveSpaceMaxReadyJobs":
-            reserveSpaceMaxReadyJobs = Integer.parseInt(value);
+            getDeferrableParametersFor(RESERVE_SPACE)
+                    .setMaxReadyJobs(Integer.parseInt(value));
             break;
         case "reserveSpaceMaxNumOfRetries":
-            reserveSpaceMaxNumOfRetries = Integer.parseInt(value);
+            operations.get(RESERVE_SPACE).setMaxRetries(Integer.parseInt(value));
             break;
         case "reserveSpaceRetryTimeout":
-            reserveSpaceRetryTimeout = Long.parseLong(value);
+            operations.get(RESERVE_SPACE).setRetryTimeout(Long.parseLong(value));
             break;
         case "reserveSpaceMaxRunningBySameOwner":
-            reserveSpaceMaxRunningBySameOwner = Integer.parseInt(value);
+            operations.get(RESERVE_SPACE).setMaxRunningBySameOwner(Integer.parseInt(value));
             break;
         }
     }
@@ -1027,7 +1016,7 @@ public class Configuration {
         this.authorization = authorization;
     }
 
-    private String timeToString(long value)
+    private static String timeToString(long value)
     {
         return (value == Long.MAX_VALUE) ? INFINITY : String.valueOf(value);
     }
@@ -1037,10 +1026,6 @@ public class Configuration {
         StringBuilder sb = new StringBuilder();
         sb.append("SRM Configuration:");
         sb.append("\n\t\"defaultSpaceLifetime\"  request lifetime: ").append(this.defaultSpaceLifetime );
-        sb.append("\n\t\"get\"  request lifetime: ").append(this.getLifetime );
-        sb.append("\n\t\"bringOnline\"  request lifetime: ").append(this.bringOnlineLifetime );
-        sb.append("\n\t\"put\"  request lifetime: ").append(this.putLifetime );
-        sb.append("\n\t\"copy\" request lifetime: ").append(this.copyLifetime);
         sb.append("\n\tdebug=").append(this.debug);
         sb.append("\n\tgsissl=").append(this.gsissl);
         sb.append("\n\tgridftp buffer_size=").append(this.buffer_size);
@@ -1063,81 +1048,13 @@ public class Configuration {
         sb.append("\n\tuseHttpForSrmCopy=").append(this.useHttpForSrmCopy);
         sb.append("\n\tuseDcapForSrmCopy=").append(this.useDcapForSrmCopy);
         sb.append("\n\tuseFtpForSrmCopy=").append(this.useFtpForSrmCopy);
-        sb.append("\n\t\t *** GetRequests Scheduler  Parameters **");
-        sb.append("\n\t\t request Lifetime in miliseconds =").append(this.getLifetime);
-        sb.append("\n\t\t max thread queue size =").append(this.getReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.getThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.getMaxWaitingRequests);
-        sb.append("\n\t\t max ready queue size =").append(this.getReadyQueueSize);
-        sb.append("\n\t\t max number of ready file requests =").append(this.getMaxReadyJobs);
-        sb.append("\n\t\t maximum number of retries = ").append(this.getMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.getRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.getMaxRunningBySameOwner);
-        sb.append("\n\t\t switch to async mode delay=").append(timeToString(this.getSwitchToAsynchronousModeDelay));
 
-        sb.append("\n\t\t *** BringOnlineRequests Scheduler  Parameters **");
-        sb.append("\n\t\t request Lifetime in miliseconds =").append(this.bringOnlineLifetime);
-        sb.append("\n\t\t max thread queue size =").append(this.bringOnlineReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.bringOnlineThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.bringOnlineMaxWaitingRequests);
-        sb.append("\n\t\t max ready queue size =").append(this.bringOnlineReadyQueueSize);
-        sb.append("\n\t\t max number of ready file requests =").append(this.bringOnlineMaxReadyJobs);
-        sb.append("\n\t\t maximum number of retries = ").append(this.bringOnlineMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.bringOnlineRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.bringOnlineMaxRunningBySameOwner);
-        sb.append("\n\t\t switch to async mode delay=").append(timeToString(this.bringOnlineSwitchToAsynchronousModeDelay));
-
-        sb.append("\n\t\t *** LsRequests Scheduler  Parameters **");
-        sb.append("\n\t\t max thread queue size =").append(this.lsReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.lsThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.lsMaxWaitingRequests);
-        sb.append("\n\t\t max ready queue size =").append(this.lsReadyQueueSize);
-        sb.append("\n\t\t max number of ready file requests =").append(this.lsMaxReadyJobs);
-        sb.append("\n\t\t maximum number of retries = ").append(this.lsMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.lsRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.lsMaxRunningBySameOwner);
-        sb.append("\n\t\t switch to async mode delay=").append(timeToString(this.lsSwitchToAsynchronousModeDelay));
-
-        sb.append("\n\t\t *** PutRequests Scheduler  Parameters **");
-        sb.append("\n\t\t request Lifetime in miliseconds =").append(this.putLifetime);
-        sb.append("\n\t\t max thread queue size =").append(this.putReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.putThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.putMaxWaitingRequests);
-        sb.append("\n\t\t max ready queue size =").append(this.putReadyQueueSize);
-        sb.append("\n\t\t max number of ready file requests =").append(this.putMaxReadyJobs);
-        sb.append("\n\t\t maximum number of retries = ").append(this.putMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.putRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.putMaxRunningBySameOwner);
-        sb.append("\n\t\t switch to async mode delay=").append(timeToString(this.putSwitchToAsynchronousModeDelay));
-
-        sb.append("\n\t\t *** ReserveSpaceRequests Scheduler  Parameters **");
-        sb.append("\n\t\t request Lifetime in miliseconds =").append(this.reserveSpaceLifetime);
-        sb.append("\n\t\t max thread queue size =").append(this.reserveSpaceReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.reserveSpaceThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.reserveSpaceMaxWaitingRequests);
-        sb.append("\n\t\t max ready queue size =").append(this.reserveSpaceReadyQueueSize);
-        sb.append("\n\t\t max number of ready file requests =").append(this.reserveSpaceMaxReadyJobs);
-        sb.append("\n\t\t maximum number of retries = ").append(this.reserveSpaceMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.reserveSpaceRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.reserveSpaceMaxRunningBySameOwner);
-
-        sb.append("\n\t\t *** CopyRequests Scheduler  Parameters **");
-        sb.append("\n\t\t request Lifetime in miliseconds =").append(this.copyLifetime);
-        sb.append("\n\t\t max thread queue size =").append(this.copyReqTQueueSize);
-        sb.append("\n\t\t max number of threads =").append(this.copyThreadPoolSize);
-        sb.append("\n\t\t max number of waiting file requests =").append(this.copyMaxWaitingRequests);
-        sb.append("\n\t\t maximum number of retries = ").append(this.copyMaxNumOfRetries);
-        sb.append("\n\t\t retry timeout in miliseconds =").append(this.copyRetryTimeout);
-        sb.append("\n\t\t maximum number of jobs running created");
-        sb.append("\n\t\t by the same owner if other jobs are queued =").append(this.copyMaxRunningBySameOwner);
-
-        for (DatabaseParameters parameters: databaseParameters.values()) {
-            sb.append(parameters);
+        for (Map.Entry<Operation,OperationParameters> entry :
+                operations.entrySet()) {
+            OperationParameters parameters = entry.getValue();
+            Operation operation = entry.getKey();
+            sb.append("\n\t\t *** ").append(operation.displayName).append(" Parameters **");
+            sb.append(parameters.toString());
         }
 
         sb.append("\n\treserve_space_implicitely=").append(this.reserve_space_implicitely);
@@ -1164,54 +1081,6 @@ public class Configuration {
         this.parallel_streams = parallel_streams;
     }
 
-
-    /** Getter for property getLifetime.
-     * @return Value of property getLifetime.
-     *
-     */
-    public long getGetLifetime() {
-        return getLifetime;
-    }
-
-    /** Setter for property getLifetime.
-     * @param getLifetime New value of property getLifetime.
-     *
-     */
-    public void setGetLifetime(long getLifetime) {
-        this.getLifetime = getLifetime;
-    }
-
-    /** Getter for property putLifetime.
-     * @return Value of property putLifetime.
-     *
-     */
-    public long getPutLifetime() {
-        return putLifetime;
-    }
-
-    /** Setter for property putLifetime.
-     * @param putLifetime New value of property putLifetime.
-     *
-     */
-    public void setPutLifetime(long putLifetime) {
-        this.putLifetime = putLifetime;
-    }
-
-    /** Getter for property copyLifetime.
-     * @return Value of property copyLifetime.
-     *
-     */
-    public long getCopyLifetime() {
-        return copyLifetime;
-    }
-
-    /** Setter for property copyLifetime.
-     * @param copyLifetime New value of property copyLifetime.
-     *
-     */
-    public void setCopyLifetime(long copyLifetime) {
-        this.copyLifetime = copyLifetime;
-    }
 
     /** Getter for property useUrlcopyScript.
      * @return Value of property useUrlcopyScript.
@@ -1360,492 +1229,6 @@ public class Configuration {
         this.nextRequestIdStorageTable = nextRequestIdStorageTable;
     }
 
-    /**
-     * Getter for property getReqTQueueSize.
-     * @return Value of property getReqTQueueSize.
-     */
-    public int getGetReqTQueueSize() {
-        return getReqTQueueSize;
-    }
-
-    /**
-     * Setter for property getReqTQueueSize.
-     * @param getReqTQueueSize New value of property getReqTQueueSize.
-     */
-    public void setGetReqTQueueSize(int getReqTQueueSize) {
-        this.getReqTQueueSize = getReqTQueueSize;
-    }
-
-    /**
-     * Getter for property getThreadPoolSize.
-     * @return Value of property getThreadPoolSize.
-     */
-    public int getGetThreadPoolSize() {
-        return getThreadPoolSize;
-    }
-
-    /**
-     * Setter for property getThreadPoolSize.
-     * @param getThreadPoolSize New value of property getThreadPoolSize.
-     */
-    public void setGetThreadPoolSize(int getThreadPoolSize) {
-        this.getThreadPoolSize = getThreadPoolSize;
-    }
-
-    /**
-     * Getter for property getMaxWaitingRequests.
-     * @return Value of property getMaxWaitingRequests.
-     */
-    public int getGetMaxWaitingRequests() {
-        return getMaxWaitingRequests;
-    }
-
-    /**
-     * Setter for property getMaxWaitingRequests.
-     * @param getMaxWaitingRequests New value of property getMaxWaitingRequests.
-     */
-    public void setGetMaxWaitingRequests(int getMaxWaitingRequests) {
-        this.getMaxWaitingRequests = getMaxWaitingRequests;
-    }
-
-    /**
-     * Getter for property getReadyQueueSize.
-     * @return Value of property getReadyQueueSize.
-     */
-    public int getGetReadyQueueSize() {
-        return getReadyQueueSize;
-    }
-
-    /**
-     * Setter for property getReadyQueueSize.
-     * @param getReadyQueueSize New value of property getReadyQueueSize.
-     */
-    public void setGetReadyQueueSize(int getReadyQueueSize) {
-        this.getReadyQueueSize = getReadyQueueSize;
-    }
-
-    /**
-     * Getter for property getMaxReadyJobs.
-     * @return Value of property getMaxReadyJobs.
-     */
-    public int getGetMaxReadyJobs() {
-        return getMaxReadyJobs;
-    }
-
-    /**
-     * Setter for property getMaxReadyJobs.
-     * @param getMaxReadyJobs New value of property getMaxReadyJobs.
-     */
-    public void setGetMaxReadyJobs(int getMaxReadyJobs) {
-        this.getMaxReadyJobs = getMaxReadyJobs;
-    }
-
-    /**
-     * Getter for property getMaxNumOfRetries.
-     * @return Value of property getMaxNumOfRetries.
-     */
-    public int getGetMaxNumOfRetries() {
-        return getMaxNumOfRetries;
-    }
-
-    /**
-     * Setter for property getMaxNumOfRetries.
-     * @param getMaxNumOfRetries New value of property getMaxNumOfRetries.
-     */
-    public void setGetMaxNumOfRetries(int getMaxNumOfRetries) {
-        this.getMaxNumOfRetries = getMaxNumOfRetries;
-    }
-
-    /**
-     * Getter for property getRetryTimeout.
-     * @return Value of property getRetryTimeout.
-     */
-    public long getGetRetryTimeout() {
-        return getRetryTimeout;
-    }
-
-    /**
-     * Setter for property getRetryTimeout.
-     * @param getRetryTimeout New value of property getRetryTimeout.
-     */
-    public void setGetRetryTimeout(long getRetryTimeout) {
-        this.getRetryTimeout = getRetryTimeout;
-    }
-
-    /**
-     * Getter for property getMaxRunningBySameOwner.
-     * @return Value of property getMaxRunningBySameOwner.
-     */
-    public int getGetMaxRunningBySameOwner() {
-        return getMaxRunningBySameOwner;
-    }
-
-    /**
-     * Setter for property getMaxRunningBySameOwner.
-     * @param getMaxRunningBySameOwner New value of property getMaxRunningBySameOwner.
-     */
-    public void setGetMaxRunningBySameOwner(int getMaxRunningBySameOwner) {
-        this.getMaxRunningBySameOwner = getMaxRunningBySameOwner;
-    }
-
-    /**
-     * Getter for property putReqTQueueSize.
-     * @return Value of property putReqTQueueSize.
-     */
-    public int getPutReqTQueueSize() {
-        return putReqTQueueSize;
-    }
-
-    /**
-     * Setter for property putReqTQueueSize.
-     * @param putReqTQueueSize New value of property putReqTQueueSize.
-     */
-    public void setPutReqTQueueSize(int putReqTQueueSize) {
-        this.putReqTQueueSize = putReqTQueueSize;
-    }
-
-    /**
-     * Getter for property putThreadPoolSize.
-     * @return Value of property putThreadPoolSize.
-     */
-    public int getPutThreadPoolSize() {
-        return putThreadPoolSize;
-    }
-
-    /**
-     * Setter for property putThreadPoolSize.
-     * @param putThreadPoolSize New value of property putThreadPoolSize.
-     */
-    public void setPutThreadPoolSize(int putThreadPoolSize) {
-        this.putThreadPoolSize = putThreadPoolSize;
-    }
-
-    /**
-     * Getter for property putMaxWaitingRequests.
-     * @return Value of property putMaxWaitingRequests.
-     */
-    public int getPutMaxWaitingRequests() {
-        return putMaxWaitingRequests;
-    }
-
-    /**
-     * Setter for property putMaxWaitingRequests.
-     * @param putMaxWaitingRequests New value of property putMaxWaitingRequests.
-     */
-    public void setPutMaxWaitingRequests(int putMaxWaitingRequests) {
-        this.putMaxWaitingRequests = putMaxWaitingRequests;
-    }
-
-    /**
-     * Getter for property putReadyQueueSize.
-     * @return Value of property putReadyQueueSize.
-     */
-    public int getPutReadyQueueSize() {
-        return putReadyQueueSize;
-    }
-
-    /**
-     * Setter for property putReadyQueueSize.
-     * @param putReadyQueueSize New value of property putReadyQueueSize.
-     */
-    public void setPutReadyQueueSize(int putReadyQueueSize) {
-        this.putReadyQueueSize = putReadyQueueSize;
-    }
-
-    /**
-     * Getter for property putMaxReadyJobs.
-     * @return Value of property putMaxReadyJobs.
-     */
-    public int getPutMaxReadyJobs() {
-        return putMaxReadyJobs;
-    }
-
-    /**
-     * Setter for property putMaxReadyJobs.
-     * @param putMaxReadyJobs New value of property putMaxReadyJobs.
-     */
-    public void setPutMaxReadyJobs(int putMaxReadyJobs) {
-        this.putMaxReadyJobs = putMaxReadyJobs;
-    }
-
-    /**
-     * Getter for property putMaxNumOfRetries.
-     * @return Value of property putMaxNumOfRetries.
-     */
-    public int getPutMaxNumOfRetries() {
-        return putMaxNumOfRetries;
-    }
-
-    /**
-     * Setter for property putMaxNumOfRetries.
-     * @param putMaxNumOfRetries New value of property putMaxNumOfRetries.
-     */
-    public void setPutMaxNumOfRetries(int putMaxNumOfRetries) {
-        this.putMaxNumOfRetries = putMaxNumOfRetries;
-    }
-
-    /**
-     * Getter for property putRetryTimeout.
-     * @return Value of property putRetryTimeout.
-     */
-    public long getPutRetryTimeout() {
-        return putRetryTimeout;
-    }
-
-    /**
-     * Setter for property putRetryTimeout.
-     * @param putRetryTimeout New value of property putRetryTimeout.
-     */
-    public void setPutRetryTimeout(long putRetryTimeout) {
-        this.putRetryTimeout = putRetryTimeout;
-    }
-
-    /**
-     * Getter for property putMaxRunningBySameOwner.
-     * @return Value of property putMaxRunningBySameOwner.
-     */
-    public int getPutMaxRunningBySameOwner() {
-        return putMaxRunningBySameOwner;
-    }
-
-    /**
-     * Setter for property putMaxRunningBySameOwner.
-     * @param putMaxRunningBySameOwner New value of property putMaxRunningBySameOwner.
-     */
-    public void setPutMaxRunningBySameOwner(int putMaxRunningBySameOwner) {
-        this.putMaxRunningBySameOwner = putMaxRunningBySameOwner;
-    }
-
-    /**
-     * Getter for property copyReqTQueueSize.
-     * @return Value of property copyReqTQueueSize.
-     */
-    public int getCopyReqTQueueSize() {
-        return copyReqTQueueSize;
-    }
-
-    /**
-     * Setter for property copyReqTQueueSize.
-     * @param copyReqTQueueSize New value of property copyReqTQueueSize.
-     */
-    public void setCopyReqTQueueSize(int copyReqTQueueSize) {
-        this.copyReqTQueueSize = copyReqTQueueSize;
-    }
-
-    /**
-     * Getter for property copyThreadPoolSize.
-     * @return Value of property copyThreadPoolSize.
-     */
-    public int getCopyThreadPoolSize() {
-        return copyThreadPoolSize;
-    }
-
-    /**
-     * Setter for property copyThreadPoolSize.
-     * @param copyThreadPoolSize New value of property copyThreadPoolSize.
-     */
-    public void setCopyThreadPoolSize(int copyThreadPoolSize) {
-        this.copyThreadPoolSize = copyThreadPoolSize;
-    }
-
-    /**
-     * Getter for property copyMaxWaitingRequests.
-     * @return Value of property copyMaxWaitingRequests.
-     */
-    public int getCopyMaxWaitingRequests() {
-        return copyMaxWaitingRequests;
-    }
-
-    /**
-     * Setter for property copyMaxWaitingRequests.
-     * @param copyMaxWaitingRequests New value of property copyMaxWaitingRequests.
-     */
-    public void setCopyMaxWaitingRequests(int copyMaxWaitingRequests) {
-        this.copyMaxWaitingRequests = copyMaxWaitingRequests;
-    }
-
-    /**
-     * Getter for property copyMaxNumOfRetries.
-     * @return Value of property copyMaxNumOfRetries.
-     */
-    public int getCopyMaxNumOfRetries() {
-        return copyMaxNumOfRetries;
-    }
-
-    /**
-     * Setter for property copyMaxNumOfRetries.
-     * @param copyMaxNumOfRetries New value of property copyMaxNumOfRetries.
-     */
-    public void setCopyMaxNumOfRetries(int copyMaxNumOfRetries) {
-        this.copyMaxNumOfRetries = copyMaxNumOfRetries;
-    }
-
-    /**
-     * Getter for property copyRetryTimeout.
-     * @return Value of property copyRetryTimeout.
-     */
-    public long getCopyRetryTimeout() {
-        return copyRetryTimeout;
-    }
-
-    /**
-     * Setter for property copyRetryTimeout.
-     * @param copyRetryTimeout New value of property copyRetryTimeout.
-     */
-    public void setCopyRetryTimeout(long copyRetryTimeout) {
-        this.copyRetryTimeout = copyRetryTimeout;
-    }
-
-    /**
-     * Getter for property copyMaxRunningBySameOwner.
-     * @return Value of property copyMaxRunningBySameOwner.
-     */
-    public int getCopyMaxRunningBySameOwner() {
-        return copyMaxRunningBySameOwner;
-    }
-
-    /**
-     * Setter for property copyMaxRunningBySameOwner.
-     * @param copyMaxRunningBySameOwner New value of property copyMaxRunningBySameOwner.
-     */
-    public void setCopyMaxRunningBySameOwner(int copyMaxRunningBySameOwner) {
-        this.copyMaxRunningBySameOwner = copyMaxRunningBySameOwner;
-    }
-
-
-
-    /**
-     * Getter for property reserveSpaceReadyQueueSize.
-     * @return Value of property reserveSpaceReadyQueueSize.
-     */
-    public int getReserveSpaceReadyQueueSize() {
-        return reserveSpaceReadyQueueSize;
-    }
-
-    /**
-     * Setter for property reserveSpaceReadyQueueSize.
-     * @param reserveSpaceReadyQueueSize New value of property reserveSpaceReadyQueueSize.
-     */
-    public void setReserveSpaceReadyQueueSize(int reserveSpaceReadyQueueSize) {
-        this.reserveSpaceReadyQueueSize = reserveSpaceReadyQueueSize;
-    }
-
-    /**
-     * Getter for property reserveSpaceMaxReadyJobs.
-     * @return Value of property reserveSpaceMaxReadyJobs.
-     */
-    public int getReserveSpaceMaxReadyJobs() {
-        return reserveSpaceMaxReadyJobs;
-    }
-
-    /**
-     * Setter for property reserveSpaceMaxReadyJobs.
-     * @param reserveSpaceMaxReadyJobs New value of property reserveSpaceMaxReadyJobs.
-     */
-    public void setReserveSpaceMaxReadyJobs(int reserveSpaceMaxReadyJobs) {
-        this.reserveSpaceMaxReadyJobs = reserveSpaceMaxReadyJobs;
-    }
-
-
-
-
-    /**
-     * Getter for property reserveSpaceReqTQueueSize.
-     * @return Value of property reserveSpaceReqTQueueSize.
-     */
-    public int getReserveSpaceReqTQueueSize() {
-        return reserveSpaceReqTQueueSize;
-    }
-
-    /**
-     * Setter for property reserveSpaceReqTQueueSize.
-     * @param reserveSpaceReqTQueueSize New value of property reserveSpaceReqTQueueSize.
-     */
-    public void setReserveSpaceReqTQueueSize(int reserveSpaceReqTQueueSize) {
-        this.reserveSpaceReqTQueueSize = reserveSpaceReqTQueueSize;
-    }
-
-    /**
-     * Getter for property reserveSpaceThreadPoolSize.
-     * @return Value of property reserveSpaceThreadPoolSize.
-     */
-    public int getReserveSpaceThreadPoolSize() {
-        return reserveSpaceThreadPoolSize;
-    }
-
-    /**
-     * Setter for property reserveSpaceThreadPoolSize.
-     * @param reserveSpaceThreadPoolSize New value of property reserveSpaceThreadPoolSize.
-     */
-    public void setReserveSpaceThreadPoolSize(int reserveSpaceThreadPoolSize) {
-        this.reserveSpaceThreadPoolSize = reserveSpaceThreadPoolSize;
-    }
-
-    /**
-     * Getter for property reserveSpaceMaxWaitingRequests.
-     * @return Value of property reserveSpaceMaxWaitingRequests.
-     */
-    public int getReserveSpaceMaxWaitingRequests() {
-        return reserveSpaceMaxWaitingRequests;
-    }
-
-    /**
-     * Setter for property reserveSpaceMaxWaitingRequests.
-     * @param reserveSpaceMaxWaitingRequests New value of property reserveSpaceMaxWaitingRequests.
-     */
-    public void setReserveSpaceMaxWaitingRequests(int reserveSpaceMaxWaitingRequests) {
-        this.reserveSpaceMaxWaitingRequests = reserveSpaceMaxWaitingRequests;
-    }
-
-    /**
-     * Getter for property reserveSpaceMaxNumOfRetries.
-     * @return Value of property reserveSpaceMaxNumOfRetries.
-     */
-    public int getReserveSpaceMaxNumOfRetries() {
-        return reserveSpaceMaxNumOfRetries;
-    }
-
-    /**
-     * Setter for property reserveSpaceMaxNumOfRetries.
-     * @param reserveSpaceMaxNumOfRetries New value of property reserveSpaceMaxNumOfRetries.
-     */
-    public void setReserveSpaceMaxNumOfRetries(int reserveSpaceMaxNumOfRetries) {
-        this.reserveSpaceMaxNumOfRetries = reserveSpaceMaxNumOfRetries;
-    }
-
-    /**
-     * Getter for property reserveSpaceRetryTimeout.
-     * @return Value of property reserveSpaceRetryTimeout.
-     */
-    public long getReserveSpaceRetryTimeout() {
-        return reserveSpaceRetryTimeout;
-    }
-
-    /**
-     * Setter for property reserveSpaceRetryTimeout.
-     * @param reserveSpaceRetryTimeout New value of property reserveSpaceRetryTimeout.
-     */
-    public void setReserveSpaceRetryTimeout(long reserveSpaceRetryTimeout) {
-        this.reserveSpaceRetryTimeout = reserveSpaceRetryTimeout;
-    }
-
-    /**
-     * Getter for property reserveSpaceMaxRunningBySameOwner.
-     * @return Value of property reserveSpaceMaxRunningBySameOwner.
-     */
-    public int getReserveSpaceMaxRunningBySameOwner() {
-        return reserveSpaceMaxRunningBySameOwner;
-    }
-
-    /**
-     * Setter for property reserveSpaceMaxRunningBySameOwner.
-     * @param reserveSpaceMaxRunningBySameOwner New value of property reserveSpaceMaxRunningBySameOwner.
-     */
-    public void setReserveSpaceMaxRunningBySameOwner(int reserveSpaceMaxRunningBySameOwner) {
-        this.reserveSpaceMaxRunningBySameOwner = reserveSpaceMaxRunningBySameOwner;
-    }
-
-
     public static void main( String[] args) throws Exception {
         if(args == null || args.length !=2 ||
                 args[0].equalsIgnoreCase("-h")  ||
@@ -1942,10 +1325,10 @@ public class Configuration {
         this.qosPluginClass = Strings.emptyToNull(qosPluginClass);
     }
     public String getQosConfigFile() {
-    	return qosConfigFile;
+        return qosConfigFile;
     }
     public void setQosConfigFile(String qosConfigFile) {
-    	this.qosConfigFile = Strings.emptyToNull(qosConfigFile);
+        this.qosConfigFile = Strings.emptyToNull(qosConfigFile);
     }
 
     public long getDefaultSpaceLifetime() {
@@ -1954,38 +1337,6 @@ public class Configuration {
 
     public void setDefaultSpaceLifetime(long defaultSpaceLifetime) {
         this.defaultSpaceLifetime = defaultSpaceLifetime;
-    }
-
-    public void setGetPriorityPolicyPlugin(String txt) {
-        getPriorityPolicyPlugin=txt;
-    }
-
-    public String getGetPriorityPolicyPlugin() {
-        return getPriorityPolicyPlugin;
-    }
-
-    public void setPutPriorityPolicyPlugin(String txt) {
-        putPriorityPolicyPlugin=txt;
-    }
-
-    public String getPutPriorityPolicyPlugin() {
-        return putPriorityPolicyPlugin;
-    }
-
-    public void setCopyPriorityPolicyPlugin(String txt) {
-        putPriorityPolicyPlugin=txt;
-    }
-
-    public String getCopyPriorityPolicyPlugin() {
-        return putPriorityPolicyPlugin;
-    }
-
-    public void setReserveSpacePriorityPolicyPlugin(String txt) {
-        putPriorityPolicyPlugin=txt;
-    }
-
-    public String getReserveSpacePriorityPolicyPlugin() {
-        return putPriorityPolicyPlugin;
     }
 
      public Integer getJdbcExecutionThreadNum() {
@@ -2028,46 +1379,6 @@ public class Configuration {
 	    sizeOfSingleRemoveBatch=size;
     }
 
-    public long getGetSwitchToAsynchronousModeDelay()
-    {
-        return getSwitchToAsynchronousModeDelay;
-    }
-
-    public void setGetSwitchToAsynchronousModeDelay(long time)
-    {
-        getSwitchToAsynchronousModeDelay = time;
-    }
-
-    public long getPutSwitchToAsynchronousModeDelay()
-    {
-        return putSwitchToAsynchronousModeDelay;
-    }
-
-    public void setPutSwitchToAsynchronousModeDelay(long time)
-    {
-        putSwitchToAsynchronousModeDelay = time;
-    }
-
-    public long getLsSwitchToAsynchronousModeDelay()
-    {
-        return lsSwitchToAsynchronousModeDelay;
-    }
-
-    public void setLsSwitchToAsynchronousModeDelay(long time)
-    {
-        lsSwitchToAsynchronousModeDelay = time;
-    }
-
-    public long getBringOnlineSwitchToAsynchronousModeDelay()
-    {
-        return bringOnlineSwitchToAsynchronousModeDelay;
-    }
-
-    public void setBringOnlineSwitchToAsynchronousModeDelay(long time)
-    {
-        bringOnlineSwitchToAsynchronousModeDelay = time;
-    }
-
     public int getMaxNumberOfLsLevels() {
 	    return maxNumberOfLsLevels;
     }
@@ -2099,158 +1410,6 @@ public class Configuration {
 
     public void setSrmUserPersistenceManager(SRMUserPersistenceManager srmUserPersistenceManager) {
         this.srmUserPersistenceManager = srmUserPersistenceManager;
-    }
-
-    public int getBringOnlineReqTQueueSize() {
-        return bringOnlineReqTQueueSize;
-    }
-
-    public void setBringOnlineReqTQueueSize(int bringOnlineReqTQueueSize) {
-        this.bringOnlineReqTQueueSize = bringOnlineReqTQueueSize;
-    }
-
-    public int getBringOnlineThreadPoolSize() {
-        return bringOnlineThreadPoolSize;
-    }
-
-    public void setBringOnlineThreadPoolSize(int bringOnlineThreadPoolSize) {
-        this.bringOnlineThreadPoolSize = bringOnlineThreadPoolSize;
-    }
-
-    public int getBringOnlineMaxWaitingRequests() {
-        return bringOnlineMaxWaitingRequests;
-    }
-
-    public void setBringOnlineMaxWaitingRequests(int bringOnlineMaxWaitingRequests) {
-        this.bringOnlineMaxWaitingRequests = bringOnlineMaxWaitingRequests;
-    }
-
-    public int getBringOnlineReadyQueueSize() {
-        return bringOnlineReadyQueueSize;
-    }
-
-    public void setBringOnlineReadyQueueSize(int bringOnlineReadyQueueSize) {
-        this.bringOnlineReadyQueueSize = bringOnlineReadyQueueSize;
-    }
-
-    public int getBringOnlineMaxReadyJobs() {
-        return bringOnlineMaxReadyJobs;
-    }
-
-    public void setBringOnlineMaxReadyJobs(int bringOnlineMaxReadyJobs) {
-        this.bringOnlineMaxReadyJobs = bringOnlineMaxReadyJobs;
-    }
-
-    public int getBringOnlineMaxNumOfRetries() {
-        return bringOnlineMaxNumOfRetries;
-    }
-
-    public void setBringOnlineMaxNumOfRetries(int bringOnlineMaxNumOfRetries) {
-        this.bringOnlineMaxNumOfRetries = bringOnlineMaxNumOfRetries;
-    }
-
-    public long getBringOnlineRetryTimeout() {
-        return bringOnlineRetryTimeout;
-    }
-
-    public void setBringOnlineRetryTimeout(long bringOnlineRetryTimeout) {
-        this.bringOnlineRetryTimeout = bringOnlineRetryTimeout;
-    }
-
-    public int getBringOnlineMaxRunningBySameOwner() {
-        return bringOnlineMaxRunningBySameOwner;
-    }
-
-    public void setBringOnlineMaxRunningBySameOwner(int bringOnlineMaxRunningBySameOwner) {
-        this.bringOnlineMaxRunningBySameOwner = bringOnlineMaxRunningBySameOwner;
-    }
-
-    public long getBringOnlineLifetime() {
-        return bringOnlineLifetime;
-    }
-
-    public void setBringOnlineLifetime(long bringOnlineLifetime) {
-        this.bringOnlineLifetime = bringOnlineLifetime;
-    }
-
-    public String getBringOnlinePriorityPolicyPlugin() {
-        return bringOnlinePriorityPolicyPlugin;
-    }
-
-    public void setBringOnlinePriorityPolicyPlugin(String bringOnlinePriorityPolicyPlugin) {
-        this.bringOnlinePriorityPolicyPlugin = bringOnlinePriorityPolicyPlugin;
-    }
-
-    public int getLsReqTQueueSize() {
-        return lsReqTQueueSize;
-    }
-
-    public void setLsReqTQueueSize(int lsReqTQueueSize) {
-        this.lsReqTQueueSize = lsReqTQueueSize;
-    }
-
-    public int getLsThreadPoolSize() {
-        return lsThreadPoolSize;
-    }
-
-    public void setLsThreadPoolSize(int lsThreadPoolSize) {
-        this.lsThreadPoolSize = lsThreadPoolSize;
-    }
-
-    public int getLsMaxWaitingRequests() {
-        return lsMaxWaitingRequests;
-    }
-
-    public void setLsMaxWaitingRequests(int lsMaxWaitingRequests) {
-        this.lsMaxWaitingRequests = lsMaxWaitingRequests;
-    }
-
-    public int getLsReadyQueueSize() {
-        return lsReadyQueueSize;
-    }
-
-    public void setLsReadyQueueSize(int lsReadyQueueSize) {
-        this.lsReadyQueueSize = lsReadyQueueSize;
-    }
-
-    public int getLsMaxReadyJobs() {
-        return lsMaxReadyJobs;
-    }
-
-    public void setLsMaxReadyJobs(int lsMaxReadyJobs) {
-        this.lsMaxReadyJobs = lsMaxReadyJobs;
-    }
-
-    public int getLsMaxNumOfRetries() {
-        return lsMaxNumOfRetries;
-    }
-
-    public void setLsMaxNumOfRetries(int lsMaxNumOfRetries) {
-        this.lsMaxNumOfRetries = lsMaxNumOfRetries;
-    }
-
-    public long getLsRetryTimeout() {
-        return lsRetryTimeout;
-    }
-
-    public void setLsRetryTimeout(long lsRetryTimeout) {
-        this.lsRetryTimeout = lsRetryTimeout;
-    }
-
-    public int getLsMaxRunningBySameOwner() {
-        return lsMaxRunningBySameOwner;
-    }
-
-    public void setLsMaxRunningBySameOwner(int lsMaxRunningBySameOwner) {
-        this.lsMaxRunningBySameOwner = lsMaxRunningBySameOwner;
-    }
-
-    public String getLsPriorityPolicyPlugin() {
-        return lsPriorityPolicyPlugin;
-    }
-
-    public void setLsPriorityPolicyPlugin(String lsPriorityPolicyPlugin) {
-        this.lsPriorityPolicyPlugin = lsPriorityPolicyPlugin;
     }
 
     /**
@@ -2321,48 +1480,40 @@ public class Configuration {
         clientTransport = Transport.transportFor(name).name();
     }
 
-    public DatabaseParameters getDatabaseParametersForList() {
-        return databaseParameters.get(LS_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParametersForGet() {
-        return databaseParameters.get(GET_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParametersForPut() {
-        return databaseParameters.get(PUT_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParametersForBringOnline() {
-        return databaseParameters.get(BRINGONLINE_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParametersForCopy() {
-        return databaseParameters.get(COPY_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParametersForReserve() {
-        return databaseParameters.get(RESERVE_PARAMETERS);
-    }
-
-    public DatabaseParameters getDatabaseParameters(String name) {
-        return databaseParameters.get(name);
-    }
-
-    public class DatabaseParameters
+    public DeferrableOperationParameters getDeferrableParametersFor(Operation operation)
     {
-        private final String name;
+        return (DeferrableOperationParameters) operations.get(operation);
+    }
+
+    public OperationParameters getParametersFor(Operation operation)
+    {
+        return operations.get(operation);
+    }
+
+
+    /**
+     * Set of parameters surrounding a particular operation group.  FIXME
+     * lifetime value is not used for LS.
+     */
+    public static class OperationParameters
+    {
+        // Scheduler-related parameters
+        private long lifetime = 24*60*60*1000;
+        private int reqTQueueSize = 1000;
+        private int threadPoolSize = 30;
+        private int maxWaitingRequests = 1000;
+        private int maxNumOfRetries = 10;
+        private long retryTimeout = 60000;
+        private int maxRunningBySameOwner = 10;
+        private String priorityPolicyPlugin = "DefaultJobAppraiser";
+
+        // DB-related parameters
         private boolean databaseEnabled = true;
         private boolean requestHistoryDatabaseEnabled = false;
         private boolean storeCompletedRequestsOnly = false;
         private int keepRequestHistoryPeriod = 30;
         private long expiredRequestRemovalPeriod = 3600;
         private boolean cleanPendingRequestsOnRestart = false;
-
-        public DatabaseParameters(String name)
-        {
-            this.name = name;
-        }
 
         public boolean isDatabaseEnabled() {
             return databaseEnabled;
@@ -2412,31 +1563,160 @@ public class Configuration {
             cleanPendingRequestsOnRestart = value;
         }
 
-        public SRMUserPersistenceManager getSrmUserPersistenceManager() {
-            return Configuration.this.getSrmUserPersistenceManager();
-        }
-
         @Override
-        public String toString() {
+        public String toString()
+        {
             StringBuilder sb = new StringBuilder();
-            sb.append("\n\t\t*** ").append(name).append(" Store Parameters ***");
-            sb.append("\n\t\tdatabaseEnabled=").append(databaseEnabled);
-            sb.append("\n\t\tstoreCompletedRequestsOnly=").append(storeCompletedRequestsOnly);
-            sb.append("\n\t\trequestHistoryDatabaseEnabled=").append(requestHistoryDatabaseEnabled);
-            sb.append("\n\t\tcleanPendingRequestsOnRestart=").append(cleanPendingRequestsOnRestart);
-            sb.append("\n\t\tkeepRequestHistoryPeriod=").append(keepRequestHistoryPeriod).append(" days");
-            sb.append("\n\t\texpiredRequestRemovalPeriod=").append(expiredRequestRemovalPeriod).append(" seconds");
+            sb.append("databaseEnabled=").append(databaseEnabled).append('\n');
+            sb.append("storeCompletedRequestsOnly=").append(storeCompletedRequestsOnly).append('\n');
+            sb.append("requestHistoryDatabaseEnabled=").append(requestHistoryDatabaseEnabled).append('\n');
+            sb.append("cleanPendingRequestsOnRestart=").append(cleanPendingRequestsOnRestart).append('\n');
+            sb.append("keepRequestHistoryPeriod=").append(keepRequestHistoryPeriod).append(" days\n");
+            sb.append("expiredRequestRemovalPeriod=").append(expiredRequestRemovalPeriod).append(" seconds\n");
+            sb.append("request Lifetime in milliseconds =").append(lifetime).append('\n');
+            sb.append("max thread queue size =").append(reqTQueueSize).append('\n');
+            sb.append("max number of threads =").append(threadPoolSize).append('\n');
+            sb.append("max number of waiting file requests =").append(maxWaitingRequests).append('\n');
+            sb.append("maximum number of retries = ").append(maxNumOfRetries).append('\n');
+            sb.append("retry timeout in miliseconds =").append(retryTimeout).append('\n');
+            sb.append("maximum number of jobs running created").append('\n');
+            sb.append("by the same owner if other jobs are queued =").append(maxRunningBySameOwner).append('\n');
             return sb.toString();
         }
 
-        public DataSource getDataSource()
+        public long getLifetime()
         {
-            return Configuration.this.getDataSource();
+            return lifetime;
         }
 
-        public PlatformTransactionManager getTransactionManager()
+        public void setLifetime(long lifetime)
         {
-            return Configuration.this.getTransactionManager();
+            this.lifetime = lifetime;
+        }
+
+        public int getReqTQueueSize()
+        {
+            return reqTQueueSize;
+        }
+
+        public void setReqTQueueSize(int size)
+        {
+            reqTQueueSize = size;
+        }
+
+        public int getThreadPoolSize()
+        {
+            return threadPoolSize;
+        }
+
+        public void setThreadPoolSize(int size)
+        {
+            threadPoolSize = size;
+        }
+
+        public int getMaxWaitingRequests()
+        {
+            return maxWaitingRequests;
+        }
+
+        public void setMaxWaitingRequests(int max)
+        {
+            maxWaitingRequests = max;
+        }
+
+        public int getMaxRetries()
+        {
+            return maxNumOfRetries;
+        }
+
+        public void setMaxRetries(int max)
+        {
+            maxNumOfRetries = max;
+        }
+
+        public long getRetryTimeout()
+        {
+            return retryTimeout;
+        }
+
+        public void setRetryTimeout(long timeout)
+        {
+            retryTimeout = timeout;
+        }
+
+        public int getMaxRunningBySameOwner()
+        {
+            return maxRunningBySameOwner;
+        }
+
+        public void setMaxRunningBySameOwner(int max)
+        {
+            maxRunningBySameOwner = max;
+        }
+
+        public String getPriorityPolicyPlugin()
+        {
+            return priorityPolicyPlugin;
+        }
+
+        public void setPriorityPolicyPlugin(String name)
+        {
+            priorityPolicyPlugin = name;
+        }
+    }
+
+    /**
+     * Configuration for operations that are throttled and support deferring
+     * the result of an operation.
+     */
+    public static class DeferrableOperationParameters extends OperationParameters
+    {
+        private int readyQueueSize = 1000;
+        private int maxReadyJobs = 60;
+        private long switchToAsynchronousModeDelay = 0;
+
+        public int getReadyQueueSize()
+        {
+            return readyQueueSize;
+        }
+
+        public void setReadyQueueSize(int value)
+        {
+            readyQueueSize = value;
+        }
+
+        public int getMaxReadyJobs()
+        {
+            return maxReadyJobs;
+        }
+
+        public void setMaxReadyJobs(int value)
+        {
+            maxReadyJobs = value;
+        }
+
+        public void setSwitchToAsynchronousModeDelay(long delay)
+        {
+            switchToAsynchronousModeDelay = delay;
+        }
+
+        public long getSwitchToAsynchronousModeDelay()
+        {
+            return switchToAsynchronousModeDelay;
+        }
+
+        @Override
+        public String toString()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append(super.toString());
+            sb.append("max ready queue size =").append(readyQueueSize).append('\n');
+            sb.append("max number of ready file requests =").append(maxReadyJobs).append('\n');
+            sb.append("switch to async mode delay=");
+            sb.append(timeToString(switchToAsynchronousModeDelay)).append('\n');
+
+            return sb.toString();
         }
     }
 }
