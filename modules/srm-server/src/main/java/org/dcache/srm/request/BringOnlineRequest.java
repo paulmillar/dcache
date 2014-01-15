@@ -227,7 +227,11 @@ public final class BringOnlineRequest extends ContainerRequest<BringOnlineFileRe
         saveJob(true);
 
         for (BringOnlineFileRequest request : getFileRequests()) {
-            request.scheduleWith(scheduler);
+            if (scheduler.isSchedulable(request)) {
+                request.scheduleWith(scheduler);
+            } else {
+                logger.debug("not scheduling file {}", request);
+            }
         }
     }
 

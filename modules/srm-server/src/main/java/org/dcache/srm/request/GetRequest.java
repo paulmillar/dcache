@@ -218,7 +218,11 @@ public final class GetRequest extends ContainerRequest<GetFileRequest> {
         saveJob(true);
 
         for (GetFileRequest request : getFileRequests()) {
-            request.scheduleWith(scheduler);
+            if (scheduler.isSchedulable(request)) {
+                request.scheduleWith(scheduler);
+            } else {
+                logger.debug("not scheduling file {}", request);
+            }
         }
     }
 

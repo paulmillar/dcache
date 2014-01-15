@@ -73,6 +73,7 @@ import com.google.common.util.concurrent.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -91,6 +92,7 @@ import org.dcache.srm.util.JDC;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static org.dcache.srm.scheduler.State.*;
 
 public final class Scheduler
 {
@@ -100,6 +102,12 @@ public final class Scheduler
     public static final int ON_RESTART_FAIL_REQUEST = 1;
     public static final int ON_RESTART_RESTORE_REQUEST = 2;
     public static final int ON_RESTART_WAIT_FOR_UPDATE_REQUEST = 3;
+
+
+    // The set of states that schedule will not throw IllegalStateException
+    private static final EnumSet<State> SCHEDULABLE = EnumSet.of(PENDING,
+            RESTORED, ASYNCWAIT, RETRYWAIT, RUNNINGWITHOUTTHREAD);
+
 
     public int restorePolicy = ON_RESTART_WAIT_FOR_UPDATE_REQUEST;
     // thread queue variables
@@ -228,6 +236,11 @@ public final class Scheduler
         pooledExecutor.shutdownNow();
     }
 
+    public boolean isSchedulable(Job job)
+    {
+        return SCHEDULABLE.contains(job.getState());
+    }
+
 
     public void schedule(Job job)
             throws IllegalStateException,
@@ -237,12 +250,12 @@ public final class Scheduler
         checkState(running, "scheduler is not running");
         LOGGER.trace("schedule is called for job with id={} in state={}", job.getId(), job.getState());
 
+        job.setScheduler(this.id, timeStamp);
+
         job.wlock();
         try {
             switch (job.getState()) {
             case PENDING:
-                job.setScheduler(this.id, timeStamp);
-                // fall through
             case RESTORED:
                 if (getTotalTQueued() >= getMaxThreadQueueSize()) {
                     job.setState(State.FAILED, "Too many jobs in the queue.");

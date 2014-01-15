@@ -234,7 +234,11 @@ public final class PutRequest extends ContainerRequest<PutFileRequest> {
         saveJob(true);
 
         for (PutFileRequest request : getFileRequests()) {
-            request.scheduleWith(scheduler);
+            if (scheduler.isSchedulable(request)) {
+                request.scheduleWith(scheduler);
+            } else {
+                logger.debug("not scheduling file {}", request);
+            }
         }
     }
 

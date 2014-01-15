@@ -159,7 +159,11 @@ public final class LsRequest extends ContainerRequest<LsFileRequest> {
             saveJob(true);
 
             for (LsFileRequest request : getFileRequests()) {
-                request.scheduleWith(scheduler);
+                if (scheduler.isSchedulable(request)) {
+                    request.scheduleWith(scheduler);
+                } else {
+                    logger.debug("not scheduling file {}", request);
+                }
             }
         }
 

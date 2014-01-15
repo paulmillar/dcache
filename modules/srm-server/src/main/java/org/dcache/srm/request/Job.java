@@ -73,6 +73,7 @@ COPYRIGHT STATUS:
 package org.dcache.srm.request;
 
 import com.google.common.collect.Iterables;
+import com.sun.org.apache.bcel.internal.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -1057,11 +1058,7 @@ public abstract class Job  {
             IllegalStateTransition
     {
         wlock();
-        try{
-            if(!State.PENDING.equals(state)) {
-                throw new IllegalStateException("State is not pending");
-            }
-            setScheduler(scheduler.getId(), 0);
+        try {
             scheduler.schedule(this);
         } finally {
             wunlock();
