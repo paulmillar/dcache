@@ -522,46 +522,47 @@ public final class PutFileRequest extends FileRequest<PutRequest> {
 
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        logger.debug("State changed from "+oldState+" to "+getState());
-        if(state == State.READY) {
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
+
+        logger.debug("State changed to {}", getState());
+
+        if (newState == State.READY) {
             try {
                 getContainerRequest().resetRetryDeltaTime();
             } catch (SRMInvalidRequestException ire) {
                 logger.error(ire.toString());
             }
         }
+
         SRMUser user;
-         try {
-             user = getUser();
-         }catch(SRMInvalidRequestException ire) {
-             logger.error(ire.toString());
-             return;
-         }
-        if(state.isFinal()) {
-            logger.debug("space reservation is "+getSpaceReservationId());
-
-            if ( getSpaceReservationId() != null &&
-                 isSpaceMarkedAsBeingUsed() ) {
-                SrmCancelUseOfSpaceCallbacks callbacks =
-                        new PutCancelUseOfSpaceCallbacks(getId());
-                getStorage().srmUnmarkSpaceAsBeingUsed(user,getSpaceReservationId(),getSurl(),
-                        callbacks);
-
-            }
-            if(getSpaceReservationId() != null && isWeReservedSpace()) {
-                logger.debug("storage.releaseSpace("+getSpaceReservationId()+"\"");
-                SrmReleaseSpaceCallback callbacks =
-                        new PutReleaseSpaceCallbacks(this.getId());
-                getStorage().srmReleaseSpace(  user,getSpaceReservationId(),
-                        null, //release all of space we reserved
-                        callbacks);
-
-            }
+        try {
+            user = getUser();
+        } catch (SRMInvalidRequestException ire) {
+            logger.error(ire.toString());
+            return;
         }
 
-        super.stateChanged(oldState);
+        if (newState.isFinal()) {
+            logger.debug("space reservation is "+getSpaceReservationId());
+
+            if (getSpaceReservationId() != null && isSpaceMarkedAsBeingUsed()) {
+                SrmCancelUseOfSpaceCallbacks callbacks =
+                        new PutCancelUseOfSpaceCallbacks(getId());
+                getStorage().srmUnmarkSpaceAsBeingUsed(user,
+                        getSpaceReservationId(), getSurl(), callbacks);
+            }
+
+            if (getSpaceReservationId() != null && isWeReservedSpace()) {
+                logger.debug("storage.releaseSpace({})", getSpaceReservationId());
+                SrmReleaseSpaceCallback callbacks =
+                        new PutReleaseSpaceCallbacks(this.getId());
+                getStorage().srmReleaseSpace(user, getSpaceReservationId(),
+                        null, //release all of space we reserved
+                        callbacks);
+            }
+        }
     }
 
     private void computeTurl() throws SRMException

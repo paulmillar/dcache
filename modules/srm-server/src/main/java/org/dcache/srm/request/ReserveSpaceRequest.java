@@ -225,12 +225,6 @@ public final class ReserveSpaceRequest extends Request {
         }
     }
 
-
-    @Override
-    protected void stateChanged(State oldState) {
-    }
-
-
     @Override
     public void run() throws NonFatalJobFailure, FatalJobFailure {
         try{

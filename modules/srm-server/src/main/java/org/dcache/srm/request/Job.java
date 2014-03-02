@@ -313,17 +313,20 @@ public abstract class Job  {
     /**
      * Changes the state of this job to a new state.
      */
-    public final void setState(State newState, String description)
+    public void setState(State newState, String description)
             throws IllegalStateTransition
     {
         wlock();
         try {
-            if (newState == this.state) {
-                return;
-            }
             if (!isValidTransition(this.state, newState)) {
-                throw new IllegalStateTransition(
-                        "Illegal state transition from " + this.state + " to " + newState,
+                String previousTransition = "";
+                if (!jobHistory.isEmpty()) {
+                    JobHistory lastItem = jobHistory.get(jobHistory.size()-1);
+                    previousTransition = " (" + lastItem.getDescription() + ") ";
+                }
+
+                throw new IllegalStateTransition("Illegal state transition " +
+                        "from " + this.state + previousTransition + " to " + newState,
                         this.state, newState);
             }
             State oldState = this.state;
@@ -341,7 +344,6 @@ public abstract class Job  {
             if (!newState.isFinal() && schedulerId == null) {
                 throw new IllegalStateTransition("Scheduler ID is null");
             }
-            stateChanged(oldState);
             saveJob();
         } finally {
             wunlock();
@@ -533,12 +535,6 @@ public abstract class Job  {
     }
 
     public abstract void run() throws NonFatalJobFailure, FatalJobFailure;
-
-    //implementation should not block in this method
-    // this method should make sure that the job is saved in the
-    // job's storage (instance of Jon.JobStorage (possibly in a database )
-    protected abstract void stateChanged(State oldState);
-
 
 
     /** Getter for property numberOfRetries.

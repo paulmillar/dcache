@@ -259,16 +259,18 @@ public final class BringOnlineRequest extends ContainerRequest<BringOnlineFileRe
     }
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        if (state.isFinal()) {
-            logger.debug("Get request state changed to {}", state);
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
+
+        if (newState.isFinal()) {
             for (BringOnlineFileRequest fr: getFileRequests()) {
                 fr.wlock();
                 try {
-                    if (!fr.getState().isFinal()) {
-                        logger.debug("Changing fr#{} to {}", fr.getId(), state);
-                        fr.setState(state, "Changing file state because request state has changed.");
+                    State frState = fr.getState();
+                    if (frState != newState && !frState.isFinal()) {
+                        logger.debug("Changing fr#{} to {}", fr.getId(), newState);
+                        fr.setState(newState, "Changing file state because request state has changed.");
                     }
                 } catch (IllegalStateTransition e) {
                     logger.error(e.getMessage());

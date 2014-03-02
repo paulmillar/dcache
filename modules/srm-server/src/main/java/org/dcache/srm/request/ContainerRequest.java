@@ -433,7 +433,9 @@ public abstract class ContainerRequest<R extends FileRequest<?>> extends Request
                 rs.state = "Failed";
                 try
                 {
-                    setState(State.FAILED, rs.errorMessage);
+                    if (getState() != State.FAILED) {
+                        setState(State.FAILED, rs.errorMessage);
+                    }
                     stopUpdating();
                 }
                 catch(IllegalStateTransition ist)
@@ -449,7 +451,12 @@ public abstract class ContainerRequest<R extends FileRequest<?>> extends Request
             // all requests are done
             try
             {
-                setState(State.DONE,"All files are done.");
+                // CopyRequest does setState(State.DONE,..) in run method, other
+                // subclasses rely on setting state to State.DONE here, as a
+                // side-effect of getRequestStatus
+                if (getState() != State.DONE) {
+                    setState(State.DONE,"All files are done.");
+                }
                 stopUpdating();
             }
             catch(IllegalStateTransition ist)
@@ -465,7 +472,9 @@ public abstract class ContainerRequest<R extends FileRequest<?>> extends Request
             stopUpdating();
             try
             {
-                setState(State.FAILED, "Request state is unknown or no files in request!!!");
+                if (getState() != State.FAILED) {
+                    setState(State.FAILED, "Request state is unknown or no files in request!!!");
+                }
             }
             catch(IllegalStateTransition ist)
             {

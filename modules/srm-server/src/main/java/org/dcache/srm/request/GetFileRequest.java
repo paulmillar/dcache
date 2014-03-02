@@ -449,10 +449,11 @@ public final class GetFileRequest extends FileRequest<GetRequest> {
     }
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        logger.debug("State changed from "+oldState+" to "+getState());
-        if(state == State.READY) {
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
+
+        if (newState == State.READY) {
             try {
                 getContainerRequest().resetRetryDeltaTime();
             } catch (SRMInvalidRequestException ire) {
@@ -460,22 +461,21 @@ public final class GetFileRequest extends FileRequest<GetRequest> {
             }
         }
 
-        if(state.isFinal()) {
-            if(getFileId() != null && getPinId() != null) {
+        if (newState.isFinal()) {
+            if (getFileId() != null && getPinId() != null) {
                 UnpinCallbacks callbacks = new TheUnpinCallbacks(this.getId());
-                logger.info("state changed to final state, unpinning fileId= "+ getFileId()+" pinId = "+getPinId());
+                logger.info("state changed to final state, unpinning fileId={}, pinId={}",
+                        getFileId(), getPinId());
                 SRMUser user;
                 try {
                     user = getUser();
                 } catch (SRMInvalidRequestException ire) {
-                    logger.error(ire.toString()) ;
+                    logger.error("{}", ire.toString());
                     return;
                 }
-                getStorage().unPinFile(user,getFileId(),callbacks, getPinId());
+                getStorage().unPinFile(user, getFileId(), callbacks, getPinId());
             }
         }
-
-        super.stateChanged(oldState);
     }
 
     private void computeTurl() throws SRMException

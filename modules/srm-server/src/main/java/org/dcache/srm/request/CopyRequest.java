@@ -945,33 +945,29 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest> impleme
     }
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        if (state.isFinal()) {
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
 
+        if (newState.isFinal()) {
             TurlGetterPutter a_getter_putter = getGetter_putter();
             if(a_getter_putter != null) {
                 logger.debug("copyRequest getter_putter is non null, stopping");
                 a_getter_putter.stop();
             }
-            logger.debug("copy request state changed to "+state);
+            logger.debug("copy request state changed to {}", newState);
             for (CopyFileRequest request : getFileRequests()) {
                 try {
-                    State fr_state = request.getState();
-                    if(!(fr_state.isFinal()))
-                    {
-
-                        logger.debug("changing fr#"+request.getId()+" to "+state);
-                            request.setState(state,"Request state changed, changing file state.");
+                    State frState = request.getState();
+                    if (frState != newState && !frState.isFinal()) {
+                        logger.debug("changing fr#{} to {}", request.getId(), newState);
+                        request.setState(newState,"Request state changed, changing file state.");
                     }
-                }
-                catch(IllegalStateTransition ist) {
+                } catch(IllegalStateTransition ist) {
                     logger.error("Illegal State Transition : " +ist.getMessage());
                 }
             }
-
         }
-
     }
 
     @Override

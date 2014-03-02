@@ -318,19 +318,19 @@ public final class PutRequest extends ContainerRequest<PutFileRequest> {
     }
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        if(state.isFinal()) {
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
 
-            logger.debug("put request state changed to {}", state);
+        if (newState.isFinal()) {
+            logger.debug("put request state changed to {}", newState);
             for (PutFileRequest request : getFileRequests()) {
                 request.wlock();
                 try {
-                    State fr_state = request.getState();
-                    if(!fr_state.isFinal())
-                    {
-                        logger.debug("changing fr#{} to {}", request.getId(), state);
-                        request.setState(state, "Changing file state because request state has changed.");
+                    State frState = request.getState();
+                    if (frState != newState && !frState.isFinal()) {
+                        logger.debug("changing fr#{} to {}", request.getId(), newState);
+                        request.setState(newState, "Changing file state because request state has changed.");
                     }
                 } catch (IllegalStateTransition ist) {
                     logger.error(ist.getMessage());
@@ -338,9 +338,7 @@ public final class PutRequest extends ContainerRequest<PutFileRequest> {
                     request.wunlock();
                 }
             }
-
         }
-
     }
 
     /**

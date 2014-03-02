@@ -174,23 +174,25 @@ public final class LsRequest extends ContainerRequest<LsFileRequest> {
         }
 
         @Override
-        protected void stateChanged(State oldState) {
-                State state = getState();
-                if(state.isFinal()) {
-                        for (LsFileRequest fr : getFileRequests() ) {
-                                fr.wlock();
-                                try {
-                                        State fr_state = fr.getState();
-                                        if(!fr_state.isFinal()) {
-                                                fr.setState(state, "Changing file state because request state has changed.");
-                                        }
-                                } catch(IllegalStateTransition ist) {
-                                        logger.error("Illegal State Transition : " +ist.getMessage());
-                                } finally {
-                                    fr.wunlock();
-                                }
+        public void setState(State newState, String description) throws IllegalStateTransition
+        {
+            super.setState(newState, description);
+
+            if (newState.isFinal()) {
+                for (LsFileRequest fr : getFileRequests() ) {
+                    fr.wlock();
+                    try {
+                        State frState = fr.getState();
+                        if (frState != newState && !frState.isFinal()) {
+                            fr.setState(newState, "Changing file state because request state has changed.");
                         }
+                    } catch(IllegalStateTransition ist) {
+                        logger.error("Illegal State Transition : " +ist.getMessage());
+                    } finally {
+                        fr.wunlock();
+                    }
                 }
+            }
         }
 
         /**

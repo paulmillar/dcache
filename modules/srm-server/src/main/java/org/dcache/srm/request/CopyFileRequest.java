@@ -1024,43 +1024,48 @@ public final class CopyFileRequest extends FileRequest<CopyRequest> {
             }
 	}
 
-	@Override
-        protected void stateChanged(State oldState) {
-		State state = getState();
-		if(state.isFinal()) {
-                        if (getTransferId() != null && state != State.DONE) {
-				getStorage().killRemoteTransfer(getTransferId());
-			}
-                        SRMUser user ;
-                        try {
-                            user = getUser();
-                        } catch (SRMInvalidRequestException ire) {
-                            logger.error(ire.toString());
-                            return;
-                        }
-			if(getSpaceReservationId() != null && isWeReservedSpace()) {
-				logger.debug("storage.releaseSpace("+getSpaceReservationId()+"\"");
-				SrmReleaseSpaceCallback callbacks = new TheReleaseSpaceCallbacks(this.getId());
-				getStorage().srmReleaseSpace(  user,getSpaceReservationId(),
-							  null,
-							  callbacks);
-			}
-			if(getSpaceReservationId() != null &&
-			   isSpaceMarkedAsBeingUsed() ) {
-				SrmCancelUseOfSpaceCallbacks callbacks =
-					new CopyCancelUseOfSpaceCallbacks(getId());
-				getStorage().srmUnmarkSpaceAsBeingUsed(user,getSpaceReservationId(),getTo_surl(),callbacks);
-			}
-			if( getRemoteRequestId() != null ) {
-				if(getLocal_from_path() != null ) {
-					remoteFileRequestDone(getTo_surl(),getRemoteRequestId(), getRemoteFileId());
-				}
-				else {
-					remoteFileRequestDone(getFrom_surl(),getRemoteRequestId(), getRemoteFileId());
-				}
-			}
-		}
-	}
+    @Override
+    public void setState(State newState, String description) throws IllegalStateTransition
+    {
+        super.setState(newState, description);
+
+        if (newState.isFinal()) {
+            if (getTransferId() != null && newState != State.DONE) {
+                getStorage().killRemoteTransfer(getTransferId());
+            }
+            SRMUser user;
+            try {
+                user = getUser();
+            } catch (SRMInvalidRequestException ire) {
+                logger.error(ire.toString());
+                return;
+            }
+
+            if (getSpaceReservationId() != null && isWeReservedSpace()) {
+                logger.debug("storage.releaseSpace({})", getSpaceReservationId());
+                SrmReleaseSpaceCallback callbacks = new TheReleaseSpaceCallbacks(this.getId());
+                getStorage().srmReleaseSpace(user,getSpaceReservationId(),
+                        null, callbacks);
+            }
+
+            if (getSpaceReservationId() != null && isSpaceMarkedAsBeingUsed()) {
+                SrmCancelUseOfSpaceCallbacks callbacks =
+                        new CopyCancelUseOfSpaceCallbacks(getId());
+                getStorage().srmUnmarkSpaceAsBeingUsed(user,
+                        getSpaceReservationId(), getTo_surl(), callbacks);
+            }
+
+            if (getRemoteRequestId() != null) {
+                if (getLocal_from_path() != null ) {
+                    remoteFileRequestDone(getTo_surl(), getRemoteRequestId(),
+                            getRemoteFileId());
+                } else {
+                    remoteFileRequestDone(getFrom_surl(), getRemoteRequestId(),
+                            getRemoteFileId());
+                }
+            }
+        }
+    }
 
     @Override
     public boolean isTouchingSurl(URI surl)

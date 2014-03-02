@@ -407,31 +407,36 @@ public final class BringOnlineFileRequest extends FileRequest<BringOnlineRequest
     }
 
     @Override
-    protected void stateChanged(State oldState) {
-        State state = getState();
-        logger.debug("State changed from "+oldState+" to "+getState());
-        if(state == State.READY) {
+    public void setState(State newState, String description)
+            throws IllegalStateTransition
+    {
+        super.setState(newState, description);
+
+        switch (newState)
+        {
+        case READY:
             try {
                 getContainerRequest().resetRetryDeltaTime();
+            } catch (SRMInvalidRequestException e) {
+                logger.error(e.toString());
             }
-            catch (SRMInvalidRequestException ire) {
-                logger.error(ire.toString());
-            }
-        }
-        if(state == State.CANCELED || state == State.FAILED ) {
+            break;
+
+        case CANCELED:
+        case FAILED:
             if(getFileId() != null && getPinId() != null) {
-                UnpinCallbacks callbacks = new TheUnpinCallbacks(this.getId());
-                logger.info("state changed to final state, unpinning fileId= "+ getFileId()+" pinId = "+getPinId());
+                UnpinCallbacks callbacks = new TheUnpinCallbacks(getId());
+                logger.info("failed or canceled: unpinning fileId={}, pinId={}",
+                        getFileId(), getPinId());
                 try {
-                    getStorage().unPinFile(getUser(),getFileId(),callbacks, getPinId());
-                }
-                catch (SRMInvalidRequestException ire) {
+                    getStorage().unPinFile(getUser(), getFileId(),
+                            callbacks, getPinId());
+                } catch (SRMInvalidRequestException ire) {
                     logger.error(ire.toString());
-                    return;
                 }
             }
+            break;
         }
-        super.stateChanged(oldState);
     }
 
     @Override

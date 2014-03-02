@@ -275,8 +275,10 @@ public abstract class FileRequest<R extends ContainerRequest> extends Job {
     }
 
     @Override
-    protected void stateChanged(State oldState)
+    public void setState(State newState, String description) throws IllegalStateTransition
     {
+        super.setState(newState, description);
+
         try {
             getContainerRequest().fileRequestStateChanged(this);
         } catch (SRMInvalidRequestException ire) {
