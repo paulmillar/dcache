@@ -278,7 +278,13 @@ public class ConfigurationProperties
             // the entire property checking logic.
             _problemConsumer.info("Property " + name + " is not a standard property");
         }
-        checkDataValid(key, value);
+
+        // Skip over checking validity of default value if it's a reference.  We
+        // don't know if the target property has been loaded yet, so can't
+        // validate it.
+        if (!value.startsWith("${") || !value.endsWith("}")) {
+            checkDataValid(key, value);
+        }
     }
 
     private void checkKeyValid(AnnotatedKey existingKey, AnnotatedKey key)

@@ -531,6 +531,12 @@ public class ConfigurationPropertiesTests {
         _properties.put(ONE_OF_PROPERTY_NAME, "value-C");
     }
 
+    @Test
+    public void testNewOneOfDeclaredAsExistingOneOf() {
+        _properties.put("(one-of?value-A|value-B|value-C)test",
+                propertyReference(ONE_OF_PROPERTY_NAME));
+    }
+
     /*
      * Support methods
      */
