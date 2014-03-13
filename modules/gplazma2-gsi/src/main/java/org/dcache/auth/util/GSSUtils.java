@@ -1,10 +1,5 @@
 package org.dcache.auth.util;
 
-import org.glite.voms.PKIStore;
-import org.glite.voms.PKIVerifier;
-import org.glite.voms.VOMSAttribute;
-import org.glite.voms.VOMSValidator;
-import org.glite.voms.ac.ACValidator;
 import org.globus.gsi.gssapi.GSSConstants;
 import org.globus.gsi.gssapi.auth.AuthorizationException;
 import org.gridforum.jgss.ExtendedGSSContext;

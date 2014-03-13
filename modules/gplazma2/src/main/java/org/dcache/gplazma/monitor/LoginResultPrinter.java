@@ -7,7 +7,8 @@ import com.google.common.collect.ImmutableMap;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Sequence;
-import org.glite.voms.ac.AttributeCertificate;
+import org.bouncycastle.asn1.x509.AttributeCertificate;
+import org.italiangrid.voms.VOMSAttribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.security.rsa.RSAPublicKeyImpl;
@@ -22,7 +23,6 @@ import java.security.PublicKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -55,6 +55,7 @@ import static org.dcache.gplazma.configuration.ConfigurationItemControl.*;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.FAIL;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
 import static org.dcache.utils.Bytes.toHexString;
+import static org.italiangrid.voms.asn1.VOMSACUtils.deserializeVOMSAttributes;
 
 /**
  * This class takes a LoginResult and provides an ASCII-art description
@@ -448,14 +449,7 @@ public class LoginResultPrinter
 
             for(Enumeration<ASN1Sequence> e2=acSequence2.getObjects();
                     e2.hasMoreElements(); ) {
-                ASN1Sequence acSequence3 = e2.nextElement();
-
-                try {
-                    certificates.add(new AttributeCertificate(acSequence3));
-                } catch( IOException e) {
-                    _log.debug("Problem decoding AttributeCertificate: {}",
-                            e.getMessage());
-                }
+                certificates.add(new AttributeCertificate(e2.nextElement()));
             }
         }
 
@@ -476,15 +470,16 @@ public class LoginResultPrinter
 
     private String attributeCertificateInfoFor(AttributeCertificate certificate)
     {
+        VOMSAttribute attribute = deserializeVOMSAttributes(certificate);
+        X500Principal principal = attribute.getIssuer();
+
         StringBuilder sb = new StringBuilder();
-
-        sb.append(certificate.getIssuerX509().getName()).append('\n');
-        sb.append("  +--Validity: ").append(validityStatementFor(certificate)).append('\n');
-
+        sb.append(principal.getName()).append('\n');
+        sb.append("  +--Validity: ").append(validityStatementFor(attribute)).append('\n');
         String oid = certificate.getSignatureAlgorithm().getObjectId().toString();
         sb.append("  +--Algorithm: ").append(nameForOid(oid)).append('\n');
 
-        String fqanInfo = fqanInfoFor(certificate);
+        String fqanInfo = fqanInfoFor(attribute);
         if(!fqanInfo.isEmpty()) {
             sb.append("  +--FQANs: ").append(fqanInfo).append('\n');
         }
@@ -492,10 +487,10 @@ public class LoginResultPrinter
         return sb.toString();
     }
 
-    private static String fqanInfoFor(AttributeCertificate certificate)
-    {
-        List<?> fqans = certificate.getListOfFQAN();
 
+    private static String fqanInfoFor(VOMSAttribute attribute)
+    {
+        List<String> fqans = attribute.getFQANs();
         if(fqans.size() > 0) {
             StringBuilder sb = new StringBuilder();
 
@@ -519,7 +514,7 @@ public class LoginResultPrinter
     private static String nameForOid(String oid)
     {
         String name = OID_TO_NAME.get(oid);
-        if(name == null) {
+        if (name == null) {
             name = oid;
         }
         return name;
@@ -565,15 +560,11 @@ public class LoginResultPrinter
         return validityStatementFor(notBefore, notAfter);
     }
 
-    private String validityStatementFor(AttributeCertificate certificate)
+    private String validityStatementFor(VOMSAttribute attribute)
     {
-        try {
-            Date notBefore = certificate.getNotBefore();
-            Date notAfter = certificate.getNotAfter();
-            return validityStatementFor(notBefore, notAfter);
-        } catch(ParseException e) {
-            return "problem parsing validity info (" + e.getMessage() + ")";
-        }
+        Date notBefore = attribute.getNotBefore();
+        Date notAfter = attribute.getNotAfter();
+        return validityStatementFor(notBefore, notAfter);
     }
 
     private String validityStatementFor(Date notBefore, Date notAfter)
