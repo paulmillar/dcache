@@ -40,6 +40,9 @@ import org.snia.cdmiserver.model.Capability;
 import org.snia.cdmiserver.util.ObjectID;
 import org.springframework.web.context.ServletContextAware;
 
+import javax.annotation.Resource;
+import javax.xml.ws.WebServiceContext;
+
 /**
  * <p>
  * Concrete implementation of {@link CapabilityObjectDao} using the local filesystem as the backing
@@ -77,6 +80,20 @@ public class DCacheCapabilityDaoImpl implements CapabilityDao, ServletContextAwa
     private final String CONTAINERobjectID = ObjectID.getObjectID(8);  //TODO? Might need to replaced by real ObjectID
     private final String DEFAULTobjectID = ObjectID.getObjectID(8);  //TODO? Might need to replaced by real ObjectID
     private final String OBJECTobjectID = ObjectID.getObjectID(8);  //TODO? Might need to replaced by real ObjectID
+
+    @Resource
+    private WebServiceContext context;
+
+    public DCacheCapabilityDaoImpl()
+    {
+        _log.warn("DCacheCapabilityDaoImpl created");
+    }
+
+    public void start()
+    {
+        _log.warn("Start called");
+        _log.warn("  context is: {}", context);
+    }
 
     public void setCapabilityDao(CapabilityDao capabilityDao)
     {

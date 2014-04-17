@@ -60,8 +60,20 @@
         <property name="maxQueued" value="${cdmi.limits.jetty.threads.queued.max}" />
     </bean>
 
+
+    <bean id="setter" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+	<property name="targetObject" ref="servlet-context-handler"/>
+	<property name="targetMethod" value="setInitParameter"/>
+	<property name="arguments">
+	    <list>
+		<value>contextConfigLocation</value>
+		<value>classpath:org/dcache/cdmi/cxf-jsr-config.xml</value>
+	    </list>
+	</property>
+    </bean>
+
     <bean id="server" class="org.eclipse.jetty.server.Server"
-          init-method="start" destroy-method="stop">
+          init-method="start" destroy-method="stop" depends-on="setter">
         <description>Jetty server hosting the CDMI web application</description>
         <property name="gracefulShutdown" value="${cdmi.limits.jetty.graceful-shutdown}" />
         <property name="threadPool" ref="thread-pool" />
@@ -77,54 +89,67 @@
             <bean id="handlers" class="org.eclipse.jetty.server.handler.HandlerCollection">
                 <property name="handlers">
                     <list>
-                        <bean class="org.eclipse.jetty.servlet.ServletContextHandler">
-                            <property name="contextPath" value="/" />  <!-- here -->
-                            <property name="servletHandler">
-                                <bean class="org.eclipse.jetty.servlet.ServletHandler">
-                                    <property name="servlets">
-                                        <list>
-                                            <bean class="org.eclipse.jetty.servlet.ServletHolder">
-                                                <property name="name" value="DefaultServlet" />
-                                                <property name="servlet">
-                                                    <bean class="org.apache.cxf.transport.servlet.CXFServlet" />
-                                                </property>
-                                                <property name="initParameters">
-                                                    <map>
-                                                        <entry key="contextConfigLocation" value="classpath:cxf-jsr-config.xml" />
-                                                    </map>
-                                                </property>
-                                            </bean>
-                                        </list>
-                                    </property>
-                                    <property name="servletMappings">
-                                        <list>
-                                            <bean class="org.eclipse.jetty.servlet.ServletMapping">
-                                                <property name="servletName" value="DefaultServlet" />
-                                                <property name="pathSpec" value="/*" />
-                                            </bean>
-                                        </list>
-                                    </property>
-                                </bean>
-                            </property>
-                            <property name="attributes">
-                                <bean class="org.eclipse.jetty.util.AttributesMap">
-                                    <constructor-arg>
-                                        <map>
-                                            <entry key="org.dcache.cdmi.pnfsstub" value-ref="pnfs-stub" />
-                                            <entry key="org.dcache.cdmi.lister" value-ref="list-handler" />
-                                            <entry key="org.dcache.cdmi.poolmgrstub" value-ref="pool-manager-stub" />
-                                            <entry key="org.dcache.cdmi.poolstub" value-ref="pool-stub" />
-                                            <entry key="org.dcache.cdmi.billingstub" value-ref="billing-stub" />
-                                        </map>
-                                    </constructor-arg>
-                                </bean>
-                            </property>
-                        </bean>
+                        <ref bean="servlet-context-handler"/>
                         <bean class="org.eclipse.jetty.server.handler.DefaultHandler" />
                     </list>
                 </property>
             </bean>
         </property>
+    </bean>
+
+
+
+    <!-- class="org.eclipse.jetty.servlet.ServletContextHandler" -->
+    <bean name="servlet-context-handler" class="org.dcache.cdmi.BirminghamScrewdriver">
+	<property name="contextPath" value="/"/>
+	<property name="servletHandler">
+	    <bean class="org.eclipse.jetty.servlet.ServletHandler">
+		<property name="servlets">
+		    <list>
+			<bean class="org.eclipse.jetty.servlet.ServletHolder">
+			    <property name="name" value="CXFServlet" />
+			    <property name="servlet">
+				<bean class="org.apache.cxf.transport.servlet.CXFServlet"/>
+			    </property>
+			    <property name="initParameters">
+				<map>
+<!--
+				    <entry key="config-location"
+-->
+				    <entry key="contextConfigLocation"
+					   value="classpath:org/dcache/cdmi/cxf-jsr-config.xml"/>
+				</map>
+			    </property>
+			</bean>
+		    </list>
+		</property>
+		<property name="servletMappings">
+		    <list>
+			<bean class="org.eclipse.jetty.servlet.ServletMapping">
+			    <property name="servletName" value="CXFServlet" />
+			    <property name="pathSpec" value="/*" />
+			</bean>
+		    </list>
+		</property>
+	    </bean>
+	</property>
+	<property name="attributes">
+	    <bean class="org.eclipse.jetty.util.AttributesMap">
+		<constructor-arg>
+		    <map>
+			<entry key="org.dcache.cdmi.pnfsstub" value-ref="pnfs-stub" />
+			<entry key="org.dcache.cdmi.lister" value-ref="list-handler" />
+			<entry key="org.dcache.cdmi.poolmgrstub" value-ref="pool-manager-stub" />
+			<entry key="org.dcache.cdmi.poolstub" value-ref="pool-stub" />
+			<entry key="org.dcache.cdmi.billingstub" value-ref="billing-stub" />
+		    </map>
+		</constructor-arg>
+	    </bean>
+	</property>
+
+	<property name="eventListeners">
+	    <bean class="org.springframework.web.context.ContextLoaderListener"/>
+	</property>
     </bean>
 
 </beans>

@@ -143,10 +143,7 @@ public class DCacheDataObjectDaoImpl extends AbstractCellComponent
 
     public DCacheDataObjectDaoImpl()
     {
-        _log.debug("Re-Init DCacheDataObjectDaoImpl...");
-        if (listDirectoryHandler == null) {
-            init();
-        }
+        _log.warn("DCacheDataObjectDaoImpl created");
     }
 
     // ---------------------------------------------------- ContainerDao Methods

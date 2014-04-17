@@ -52,9 +52,11 @@
 
     <!-- Apache CXF Core Configuration -->
 
+<!--
     <import resource="classpath:META-INF/cxf/cxf.xml"/>
     <import resource="classpath:META-INF/cxf/cxf-extension-jaxrs-binding.xml"/>
     <import resource="classpath:META-INF/cxf/cxf-servlet.xml"/>
+-->
 
     <!-- Apache CXF Server Configuration -->
 
@@ -118,6 +120,7 @@
         <property name="containerDao" ref="containerDao"/>
     </bean>
 
-    <bean id="capabilityDao" class="org.dcache.cdmi.dao.impl.DCacheCapabilityDaoImpl"/>
+    <bean id="capabilityDao" class="org.dcache.cdmi.dao.impl.DCacheCapabilityDaoImpl"
+	  init-method="start"/>
 
 </beans>

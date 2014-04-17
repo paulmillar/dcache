@@ -141,9 +141,9 @@ public class DCacheContainerDaoImpl extends AbstractCellComponent
 
     public DCacheContainerDaoImpl()
     {
-        _log.debug("Re-Init DCacheContainerDaoImpl...");
-        if (listDirectoryHandler == null) {
-            init();
+        _log.warn("DCacheContainerDaoImpl created");
+        for(StackTraceElement e : Thread.currentThread().getStackTrace()) {
+            _log.warn(e.toString());
         }
     }
 
