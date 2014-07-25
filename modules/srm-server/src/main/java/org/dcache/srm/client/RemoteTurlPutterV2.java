@@ -87,7 +87,6 @@ import java.util.HashMap;
 import diskCacheV111.srm.RequestFileStatus;
 import diskCacheV111.srm.RequestStatus;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.util.RequestStatusTool;
@@ -124,32 +123,25 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
 {
     private static final Logger logger =
         LoggerFactory.getLogger(RemoteTurlPutterV2.class);
-    private ISRM srmv2;
+
+    private final String targetSpaceToken;
+    private final HashMap<String,Integer> pendingSurlsToIndex = new HashMap<>();
+    private final Transport transport;
+    private final long requestLifetime;
+    private final TFileStorageType storageType;
+    private final TRetentionPolicy retentionPolicy;
+    private final TAccessLatency accessLatency;
+    private final TOverwriteMode overwriteMode;
+
+    private ISRM clientStub;
     private String requestToken;
-    private String targetSpaceToken;
-    private HashMap<String,Integer> pendingSurlsToIndex = new HashMap<>();
-    SrmPrepareToPutResponse srmPrepareToPutResponse;
-    final Transport transport;
+    private SrmPrepareToPutResponse srmPrepareToPutResponse;
 
-    protected String SURLs[];
-    protected int number_of_file_reqs;
-    protected boolean createdMap;
-    long[] sizes;
-    long retry_timout;
-    long requestLifetime;
-    int retry_num;
-    private TFileStorageType storageType;
-    private TRetentionPolicy retentionPolicy;
-    private TAccessLatency accessLatency;
-    private TOverwriteMode overwriteMode;
-
-    public RemoteTurlPutterV2(AbstractStorageElement storage,
-                              RequestCredential credential, String[] SURLs,
-                              long sizes[],
+    public RemoteTurlPutterV2(RequestCredential credential, String[] SURLs,
                               String[] protocols,
                               PropertyChangeListener listener,
-                              long retry_timeout,
-                              int retry_num ,
+                              long timeout,
+                              int maxRetries ,
                               long requestLifetime,
                               TFileStorageType storageType,
                               TRetentionPolicy retentionPolicy,
@@ -157,13 +149,8 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
                               TOverwriteMode overwriteMode,
                               String targetSpaceToken,
                               Transport transport) {
-        super(storage,credential,protocols);
-        this.SURLs = SURLs;
-        this.number_of_file_reqs = SURLs.length;
+        super(credential, SURLs, protocols, timeout, maxRetries);
         addListener(listener);
-        this.sizes = sizes;
-        this.retry_num = retry_num;
-        this.retry_timout = retry_timeout;
         this.requestLifetime = requestLifetime;
         this.storageType = storageType;
         this.accessLatency = accessLatency;
@@ -180,7 +167,7 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
         srmPutDoneRequest.setRequestToken(requestToken);
         srmPutDoneRequest.setArrayOfSURLs(new ArrayOfAnyURI(surlArray));
         SrmPutDoneResponse srmPutDoneResponse =
-            srmv2.srmPutDone(srmPutDoneRequest);
+            clientStub.srmPutDone(srmPutDoneRequest);
         TReturnStatus returnStatus = srmPutDoneResponse.getReturnStatus();
         if(returnStatus == null) {
             logger.error("srmPutDone return status is null");
@@ -191,16 +178,13 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
 
     @Override
     public void getInitialRequest() throws SRMException {
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
         try {
-            SrmUrl srmUrl = new SrmUrl(SURLs[0]);
-            srmv2 = new SRMClientV2(srmUrl,
-                    credential.getDelegatedCredential(),
-                    retry_timout,
-                    retry_num,
+            clientStub = new SRMClientV2(getSrmUrl(),
+                    getCredential(), timeout, maxRetries,
                     true,
                     true,
                     transport);
@@ -230,7 +214,7 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
 
             transferParameters.setAccessPattern(TAccessPattern.TRANSFER_MODE);
             transferParameters.setConnectionType(TConnectionType.WAN);
-            transferParameters.setArrayOfTransferProtocols(new ArrayOfString(protocols));
+            transferParameters.setArrayOfTransferProtocols(new ArrayOfString(getProtocols()));
             srmPrepareToPutRequest.setTransferParameters(transferParameters);
             srmPrepareToPutRequest.setArrayOfFileRequests(
                     new ArrayOfTPutFileRequest(fileRequests));
@@ -238,7 +222,7 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
             srmPrepareToPutRequest.setDesiredTotalRequestTime((int)requestLifetime);
             srmPrepareToPutRequest.setOverwriteOption(overwriteMode);
             srmPrepareToPutRequest.setTargetSpaceToken(targetSpaceToken);
-            srmPrepareToPutResponse = srmv2.srmPrepareToPut(srmPrepareToPutRequest);
+            srmPrepareToPutResponse = clientStub.srmPrepareToPut(srmPrepareToPutRequest);
         }
         catch(IOException | InterruptedException | ServiceException e) {
             logger.error("failed to connect to {} {}",SURLs[0],e.getMessage());
@@ -250,7 +234,7 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
 
     @Override
     public void run() {
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
@@ -389,7 +373,7 @@ public final class RemoteTurlPutterV2 extends TurlGetterPutter
                             new ArrayOfAnyURI(surlArray));
                 }
                 SrmStatusOfPutRequestResponse srmStatusOfPutRequestResponse =
-                    srmv2.srmStatusOfPutRequest(srmStatusOfPutRequestRequest);
+                    clientStub.srmStatusOfPutRequest(srmStatusOfPutRequestRequest);
                 if(srmStatusOfPutRequestResponse == null) {
                     throw new IOException(" null srmStatusOfPutRequestResponse");
                 }

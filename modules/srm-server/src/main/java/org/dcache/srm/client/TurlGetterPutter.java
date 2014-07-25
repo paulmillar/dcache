@@ -72,22 +72,35 @@ COPYRIGHT STATUS:
 
 package org.dcache.srm.client;
 
+import org.ietf.jgss.GSSCredential;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.net.MalformedURLException;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.request.RequestCredential;
+import org.dcache.srm.util.SrmUrl;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 /**
  *
  * @author  timur
  */
 public abstract class TurlGetterPutter implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(TurlGetterPutter.class);
-    private PropertyChangeSupport changeSupport = new PropertyChangeSupport(this);
+
+    private final PropertyChangeSupport changeSupport = new PropertyChangeSupport(this);
+    private final GSSCredential credential;
+    private final String[] protocols;
+
+    protected final String SURLs[];
+    protected final long timeout;
+    protected final int maxRetries;
+
+    private volatile boolean stopped;
 
     public void notifyOfTURL(String SURL,String TURL,String requestId, String fileId,Long size) {
         logger.debug("notifyOfTURL( surl="+SURL+" , turl="+TURL+")");
@@ -106,27 +119,18 @@ public abstract class TurlGetterPutter implements Runnable {
         changeSupport.addPropertyChangeListener(listener);
     }
 
-    protected AbstractStorageElement storage;
-    protected RequestCredential credential;
-    protected String[] protocols;
-
-    private boolean stopped;
-
-
     /** Creates a new instance of RemoteTurlGetter */
-    public TurlGetterPutter(AbstractStorageElement storage,
-                            RequestCredential credential,
-                            String[] protocols) {
-        this.storage = storage;
-        this.credential = credential;
-        this.protocols = protocols;
+    public TurlGetterPutter(RequestCredential credential,
+                            String SURLs[],
+                            String[] protocols, long timeout, int maxRetries) {
+        this.credential = credential.getDelegatedCredential();
+        this.protocols = checkNotNull(protocols);
+        this.SURLs = checkNotNull(SURLs);
+        this.timeout = timeout;
+        this.maxRetries = maxRetries;
     }
 
-
     public abstract void getInitialRequest() throws SRMException;
-
-
-
 
     /**
      * Getter for property stopped.
@@ -141,6 +145,21 @@ public abstract class TurlGetterPutter implements Runnable {
      * @param stopped New value of property stopped.
      */
     public void stop() {
-        this.stopped = true;
+        stopped = true;
+    }
+
+    protected GSSCredential getCredential()
+    {
+        return credential;
+    }
+
+    protected String[] getProtocols()
+    {
+        return this.protocols;
+    }
+
+    protected SrmUrl getSrmUrl() throws MalformedURLException
+    {
+        return new SrmUrl(SURLs[0]);
     }
 }

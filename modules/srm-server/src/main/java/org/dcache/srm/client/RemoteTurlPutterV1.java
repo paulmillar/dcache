@@ -81,7 +81,6 @@ import java.util.Arrays;
 
 import diskCacheV111.srm.RequestStatus;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.request.RequestCredential;
 
 /**
@@ -90,18 +89,14 @@ import org.dcache.srm.request.RequestCredential;
  */
 public final class RemoteTurlPutterV1 extends TurlGetterPutterV1
 {
-    private static final Logger logger = LoggerFactory.getLogger(RemoteTurlPutterV1.class);
+    private final long[] sizes;
 
-    long[] sizes;
-
-
-    public RemoteTurlPutterV1(AbstractStorageElement storage,
-                              RequestCredential credential, String[] SURLs,
+    public RemoteTurlPutterV1(RequestCredential credential, String[] SURLs,
                               long sizes[],
                               String[] protocols,PropertyChangeListener listener,
                               long retry_timeout,int retry_num,
                               Transport transport) {
-        super(storage,credential,SURLs,protocols, retry_timeout,retry_num, transport);
+        super(credential,SURLs,protocols, retry_timeout,retry_num, transport);
         addListener(listener);
         this.sizes = sizes;
     }
@@ -109,10 +104,8 @@ public final class RemoteTurlPutterV1 extends TurlGetterPutterV1
     @Override
     protected RequestStatus getInitialRequestStatus()
     throws IOException,InterruptedException {
-        boolean[] wantperm =
-            new boolean[number_of_file_reqs];
+        boolean[] wantperm = new boolean[SURLs.length];
         Arrays.fill(wantperm,true);
-        logger.debug("SURLs[0] is "+SURLs[0]);
-        return remoteSRM.put(SURLs,SURLs,sizes,wantperm,protocols);
+        return clientStub.put(SURLs,SURLs,sizes,wantperm, getProtocols());
     }
 }

@@ -72,37 +72,29 @@ COPYRIGHT STATUS:
 
 package org.dcache.srm.client;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.beans.PropertyChangeListener;
 import java.io.IOException;
 
 import diskCacheV111.srm.RequestStatus;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.request.RequestCredential;
 /**
  *
  * @author  timur
  */
 public final class RemoteTurlGetterV1 extends TurlGetterPutterV1 {
-    private static final Logger logger =
-        LoggerFactory.getLogger(RemoteTurlGetterV1.class);
 
-    public RemoteTurlGetterV1(AbstractStorageElement storage,
-                              RequestCredential credential,String[] surls,
+    public RemoteTurlGetterV1(RequestCredential credential,String[] surls,
                               String[] protocols,PropertyChangeListener listener,
-                              long retry_timeout,int retry_num,
+                              long timeout,int maxRetries,
                               Transport transport) {
-        super(storage,credential,surls,protocols, retry_timeout,retry_num, transport);
+        super(credential,surls,protocols, timeout, maxRetries, transport);
         addListener(listener);
     }
 
     @Override
     protected RequestStatus getInitialRequestStatus()
     throws IOException,InterruptedException{
-        logger.debug("SURLs[0] is "+SURLs[0]);
-        return remoteSRM.get(SURLs,protocols);
+        return clientStub.get(SURLs, getProtocols());
     }
 }

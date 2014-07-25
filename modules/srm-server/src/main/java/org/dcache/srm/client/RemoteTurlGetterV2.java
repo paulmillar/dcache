@@ -81,7 +81,6 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.HashMap;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.util.RequestStatusTool;
@@ -104,6 +103,7 @@ import org.dcache.srm.v2_2.TGetRequestFileStatus;
 import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 import org.dcache.srm.v2_2.TTransferParameters;
+
 /**
  *
  * @author  timur
@@ -111,30 +111,19 @@ import org.dcache.srm.v2_2.TTransferParameters;
 public final class RemoteTurlGetterV2 extends TurlGetterPutter {
     private static final Logger logger = LoggerFactory.getLogger(RemoteTurlGetterV2.class);
 
-    private ISRM srmv2;
-    protected String SURLs[];
-    private HashMap<String,Integer> pendingSurlsToIndex = new HashMap<>();
-    protected int number_of_file_reqs;
-    protected boolean createdMap;
-    private String requestToken;
-    private long lifetime;
-    SrmPrepareToGetResponse srmPrepareToGetResponse;
+    private final HashMap<String,Integer> pendingSurlsToIndex = new HashMap<>();
+    private final long lifetime;
     private final Transport transport;
 
-    long retry_timout;
-    int retry_num;
+    private ISRM clientStub;
+    private String requestToken;
+    private SrmPrepareToGetResponse response;
 
-
-    public RemoteTurlGetterV2(AbstractStorageElement storage,
-                              RequestCredential credential,String[] SURLs,
+    public RemoteTurlGetterV2(RequestCredential credential,String[] SURLs,
                               String[] protocols,PropertyChangeListener listener,
-                              long retry_timeout,int retry_num , long lifetime,
+                              long timeout,int maxRetries , long lifetime,
                               Transport transport) {
-        super(storage,credential,protocols);
-        this.SURLs = SURLs;
-        this.number_of_file_reqs = SURLs.length;
-        this.retry_num = retry_num;
-        this.retry_timout = retry_timeout;
+        super(credential, SURLs, protocols, timeout, maxRetries);
         this.lifetime = lifetime;
         this.transport = transport;
         addListener(listener);
@@ -150,7 +139,7 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
             new URI[] { new URI(surl)};
         srmReleaseFilesRequest.setArrayOfSURLs(new ArrayOfAnyURI(surlArray));
         SrmReleaseFilesResponse srmReleaseFilesResponse =
-            srmv2.srmReleaseFiles(srmReleaseFilesRequest);
+            clientStub.srmReleaseFiles(srmReleaseFilesRequest);
         TReturnStatus returnStatus = srmReleaseFilesResponse.getReturnStatus();
         if(returnStatus == null) {
             logger.error("srmReleaseFiles return status is null");
@@ -163,17 +152,14 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
     @Override
     public  void getInitialRequest() throws SRMException
     {
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
         logger.debug("SURLs[0] is "+SURLs[0]);
         try {
-            SrmUrl srmUrl = new SrmUrl(SURLs[0]);
-            srmv2 = new SRMClientV2(srmUrl,
-                    credential.getDelegatedCredential(),
-                    retry_timout,
-                    retry_num,
+            clientStub = new SRMClientV2(getSrmUrl(),
+                    getCredential(), timeout, maxRetries,
                     true,
                     true,
                     transport);
@@ -181,8 +167,7 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
             TGetFileRequest fileRequests[] = new TGetFileRequest[len];
             for(int i = 0; i < len; ++i) {
                 URI surl = new URI(SURLs[i]);
-                fileRequests[i] = new TGetFileRequest();
-                fileRequests[i].setSourceSURL(surl);
+                fileRequests[i] = new TGetFileRequest(surl, null);
                 pendingSurlsToIndex.put(SURLs[i],i);
             }
 
@@ -193,17 +178,16 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
 
             transferParameters.setAccessPattern(TAccessPattern.TRANSFER_MODE);
             transferParameters.setConnectionType(TConnectionType.WAN);
-            transferParameters.setArrayOfTransferProtocols(new ArrayOfString(protocols));
+            transferParameters.setArrayOfTransferProtocols(new ArrayOfString(getProtocols()));
             srmPrepareToGetRequest.setTransferParameters(transferParameters);
             // we do not want to do this
             // we do not know which storage type to use and
             // it is read anyway
 
             ArrayOfTGetFileRequest arrayOfTGetFileRequest =
-                new ArrayOfTGetFileRequest ();
-            arrayOfTGetFileRequest.setRequestArray(fileRequests);
+                new ArrayOfTGetFileRequest(fileRequests);
             srmPrepareToGetRequest.setArrayOfFileRequests(arrayOfTGetFileRequest);
-            srmPrepareToGetResponse = srmv2.srmPrepareToGet(srmPrepareToGetRequest);
+            response = clientStub.srmPrepareToGet(srmPrepareToGetRequest);
         }
         catch(Exception e) {
             logger.error("failed to connect to {} {}",SURLs[0],e.getMessage());
@@ -214,16 +198,16 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
     @Override
     public void run() {
 
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
         try {
             int len = SURLs.length;
-            if(srmPrepareToGetResponse == null) {
+            if(response == null) {
                 throw new IOException(" null srmPrepareToGetResponse");
             }
-            TReturnStatus status = srmPrepareToGetResponse.getReturnStatus();
+            TReturnStatus status = response.getReturnStatus();
             if(status == null) {
                 throw new IOException(" null return status");
             }
@@ -235,10 +219,10 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
                 throw new IOException("srmPrepareToGet submission failed, unexpected or failed status : "+
                         statusCode+" explanation="+status.getExplanation());
             }
-            requestToken = srmPrepareToGetResponse.getRequestToken();
+            requestToken = response.getRequestToken();
             logger.debug(" srm returned requestToken = "+requestToken);
             ArrayOfTGetRequestFileStatus arrayOfTGetRequestFileStatus  =
-                srmPrepareToGetResponse.getArrayOfFileStatuses();
+                response.getArrayOfFileStatuses();
             if(arrayOfTGetRequestFileStatus == null  ) {
                 throw new IOException("returned GetRequestFileStatuses is an empty array");
             }
@@ -359,7 +343,7 @@ public final class RemoteTurlGetterV2 extends TurlGetterPutter {
                     srmStatusOfGetRequestRequest.setArrayOfSourceSURLs(new ArrayOfAnyURI(surlArray));
                 }
                 SrmStatusOfGetRequestResponse srmStatusOfGetRequestResponse =
-                    srmv2.srmStatusOfGetRequest(srmStatusOfGetRequestRequest);
+                    clientStub.srmStatusOfGetRequest(srmStatusOfGetRequestRequest);
                 if(srmStatusOfGetRequestResponse == null) {
                     throw new IOException(" null srmStatusOfGetRequestResponse");
                 }

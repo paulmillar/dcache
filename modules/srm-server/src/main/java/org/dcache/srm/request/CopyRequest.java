@@ -150,7 +150,7 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
     private SrmUrl destinationUrls[];
     private int fileCount;
 
-    private String[] protocols;
+    private final String[] protocols;
     private SRMProtocol callerSrmProtocol;
     private SRMProtocol remoteSrmProtocol;
     private TFileStorageType storageType;
@@ -462,16 +462,16 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
 
             if (getCallerSrmProtocol() == null || getCallerSrmProtocol() == SRMProtocol.V1_1) {
                 try {
-                    setRemoteTurlClient(new RemoteTurlGetterV1(getStorage(),
-                            credential, remoteSurlsUniqueArray, getProtocols(),
+                    setRemoteTurlClient(new RemoteTurlGetterV1(credential,
+                            remoteSurlsUniqueArray, getProtocols(),
                             this, getConfiguration().getCopyRetryTimeout(), 2,
                             clientTransport));
                     getRemoteTurlClient().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V1_1);
                  } catch (SRMException e) {
                     LOG.error("connecting to server using version 1.1 protocol failed, trying version 2.1.1");
-                    setRemoteTurlClient(new RemoteTurlGetterV2(getStorage(),
-                            credential, remoteSurlsUniqueArray, getProtocols(),
+                    setRemoteTurlClient(new RemoteTurlGetterV2(credential,
+                            remoteSurlsUniqueArray, getProtocols(),
                             this, getConfiguration().getCopyRetryTimeout(), 2,
                             this.getRemainingLifetime(), clientTransport));
                     getRemoteTurlClient().getInitialRequest();
@@ -479,16 +479,16 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
                  }
             } else if (getCallerSrmProtocol() == SRMProtocol.V2_1) {
                 try {
-                    setRemoteTurlClient(new RemoteTurlGetterV2(getStorage(),
-                            credential, remoteSurlsUniqueArray, getProtocols(),
+                    setRemoteTurlClient(new RemoteTurlGetterV2(credential,
+                            remoteSurlsUniqueArray, getProtocols(),
                             this, getConfiguration().getCopyRetryTimeout(), 2,
                             this.getRemainingLifetime(), clientTransport));
                     getRemoteTurlClient().getInitialRequest();
                     setRemoteSrmProtocol(SRMProtocol.V2_1);
                 } catch (SRMException e) {
                     LOG.error("connecting to server using version 2.1.1 protocol failed, trying version 1.1");
-                    setRemoteTurlClient(new RemoteTurlGetterV1(getStorage(),
-                            credential, remoteSurlsUniqueArray, getProtocols(),
+                    setRemoteTurlClient(new RemoteTurlGetterV1(credential,
+                            remoteSurlsUniqueArray, getProtocols(),
                             this, getConfiguration().getCopyRetryTimeout(), 2,
                             clientTransport));
                     getRemoteTurlClient().getInitialRequest();
@@ -594,16 +594,16 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
         RequestCredential credential = getCredential();
         if (getCallerSrmProtocol() == null || getCallerSrmProtocol() == SRMProtocol.V1_1) {
             try {
-                setRemoteTurlClient(new RemoteTurlPutterV1(getStorage(),
-                        credential, destinationSurls, sizes, getProtocols(), this,
+                setRemoteTurlClient(new RemoteTurlPutterV1(credential,
+                        destinationSurls, sizes, getProtocols(), this,
                         getConfiguration().getCopyRetryTimeout(), 2,
                         clientTransport));
                 getRemoteTurlClient().getInitialRequest();
                 setRemoteSrmProtocol(SRMProtocol.V1_1);
              } catch (SRMException srme) {
                  LOG.error("connecting with SRM v1.1 failed, trying with v2.2");
-                 setRemoteTurlClient(new RemoteTurlPutterV2(getStorage(),
-                         credential, destinationSurls, sizes, getProtocols(), this,
+                 setRemoteTurlClient(new RemoteTurlPutterV2(credential,
+                         destinationSurls, getProtocols(), this,
                          getConfiguration().getCopyRetryTimeout(), 2,
                          this.getRemainingLifetime(), getStorageType(),
                          getTargetRetentionPolicy(), getTargetAccessLatency(),
@@ -614,8 +614,8 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
              }
         } else if (getCallerSrmProtocol() == SRMProtocol.V2_1) {
             try {
-                setRemoteTurlClient(new RemoteTurlPutterV2(getStorage(),
-                        credential, destinationSurls, sizes, getProtocols(), this,
+                setRemoteTurlClient(new RemoteTurlPutterV2(credential,
+                        destinationSurls, getProtocols(), this,
                         getConfiguration().getCopyRetryTimeout(), 2,
                         this.getRemainingLifetime(), getStorageType(),
                         getTargetRetentionPolicy(), getTargetAccessLatency(),
@@ -625,8 +625,8 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
                 setRemoteSrmProtocol(SRMProtocol.V2_1);
              } catch (SRMException srme) {
                  LOG.error("connecting with SRM v2.2 failed, trying with SRM v1.1");
-                setRemoteTurlClient(new RemoteTurlPutterV1(getStorage(),
-                        credential, destinationSurls, sizes, getProtocols(), this,
+                setRemoteTurlClient(new RemoteTurlPutterV1(credential,
+                        destinationSurls, sizes, getProtocols(), this,
                         getConfiguration().getCopyRetryTimeout(), 2,
                         clientTransport));
                 getRemoteTurlClient().getInitialRequest();

@@ -84,7 +84,6 @@ import diskCacheV111.srm.ISRM;
 import diskCacheV111.srm.RequestFileStatus;
 import diskCacheV111.srm.RequestStatus;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.util.SrmUrl;
@@ -96,54 +95,41 @@ public abstract class TurlGetterPutterV1 extends TurlGetterPutter {
     private static final Logger logger =
         LoggerFactory.getLogger(TurlGetterPutterV1.class);
 
-    protected ISRM remoteSRM;
     private final Object sync = new Object();
-    protected RequestStatus rs;
+    private final Transport transport;
 
     // this is the set of remote file IDs that are not "Ready" yet
     // this object will be used for synchronization of all hash sets and maps
     // used in this class
-    private  final Collection<Integer> fileIDs = new HashSet<>();
+    private final Collection<Integer> fileIDs = new HashSet<>();
 
     // The map between remote file IDs and corresponding RequestFileStatuses
-    private Map<Integer, RequestFileStatus> fileIDsMap = new HashMap<>();
+    private final Map<Integer, RequestFileStatus> fileIDsMap = new HashMap<>();
 
-    // This two maps give the correspondence between local file IDs
-    // and a remote file IDs
-    protected String SURLs[];
+    protected ISRM clientStub;
+    protected RequestStatus rs;
     protected int requestID;
-    protected int number_of_file_reqs;
-    protected boolean createdMap;
-    private long retry_timout;
-    private int retry_num;
-    private final Transport transport;
 
     /** Creates a new instance of RemoteTurlGetter */
-    public TurlGetterPutterV1(AbstractStorageElement storage,
-                              RequestCredential credential, String[] SURLs,
-                              String[] protocols,long retry_timeout,int retry_num,
+    public TurlGetterPutterV1(RequestCredential credential, String[] SURLs,
+                              String[] protocols,long timeout,int maxRetries,
                               Transport transport) {
-        super(storage,credential, protocols);
-        this.SURLs = SURLs;
-        this.number_of_file_reqs = SURLs.length;
-        this.retry_num = retry_num;
-        this.retry_timout = retry_timeout;
-        logger.debug("TurlGetterPutter, number_of_file_reqs = "+number_of_file_reqs);
+        super(credential, SURLs, protocols, timeout, maxRetries);
+        logger.debug("TurlGetterPutter, number_of_file_reqs = {}", SURLs.length);
         this.transport = transport;
     }
 
     @Override
     public void getInitialRequest() throws SRMException {
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
         try {
             //use new client using the Apache Axis SOAP tool
-            remoteSRM = new SRMClientV1(
-                    new SrmUrl(SURLs[0]),
-                    credential.getDelegatedCredential(),
-                    retry_timout,retry_num,true,true,
+            clientStub = new SRMClientV1(getSrmUrl(),
+                    getCredential(),
+                    timeout, maxRetries, true, true,
                     transport);
         }
         catch(Exception e) {
@@ -164,7 +150,7 @@ public abstract class TurlGetterPutterV1 extends TurlGetterPutter {
     @Override
     public void run() {
 
-        if(number_of_file_reqs == 0) {
+        if (SURLs.length == 0) {
             logger.debug("number_of_file_reqs is 0, nothing to do");
             return;
         }
@@ -177,20 +163,18 @@ public abstract class TurlGetterPutterV1 extends TurlGetterPutter {
         }
         requestID = rs.requestId;
         RequestFileStatus[] frs = rs.fileStatuses;
-        if(frs.length != this.number_of_file_reqs) {
+        if (frs.length != SURLs.length) {
             notifyOfFailure("run(): wrong number of RequestFileStatuses "+frs.length+
-                    " should be "+number_of_file_reqs);
+                    " should be "+SURLs.length);
             return;
         }
 
         synchronized(fileIDs) {
-            for(int i = 0; i<number_of_file_reqs;++i) {
+            for (int i = 0; i < SURLs.length; ++i) {
                 Integer fileId = frs[i].fileId;
                 fileIDs.add(fileId);
-
                 fileIDsMap.put(fileId,frs[i]);
             }
-            createdMap = true;
         }
 
         logger.debug("getFromRemoteSRM() : received requestStatus, waiting");
@@ -382,9 +366,9 @@ public abstract class TurlGetterPutterV1 extends TurlGetterPutter {
                     return;
                 }
 
-                if(rs.fileStatuses.length != number_of_file_reqs) {
+                if (rs.fileStatuses.length != SURLs.length) {
                     String err= "incorrect number of RequestFileStatuses"+
-                    "in RequestStatus expected "+number_of_file_reqs+" received "+rs.fileStatuses.length;
+                    "in RequestStatus expected " + SURLs.length + " received " + rs.fileStatuses.length;
                     notifyOfFailure(err);
                     return;
                 }
@@ -410,12 +394,12 @@ public abstract class TurlGetterPutterV1 extends TurlGetterPutter {
     protected abstract RequestStatus getInitialRequestStatus() throws Exception;
 
     protected RequestStatus getRequestStatus(int requestID) {
-        return remoteSRM.getRequestStatus(requestID);
+        return clientStub.getRequestStatus(requestID);
     }
 
     private  boolean setFileStatus(int requestID,int fileId,String status) {
 
-        RequestStatus srm_status = remoteSRM.setFileStatus(requestID,fileId,status);
+        RequestStatus srm_status = clientStub.setFileStatus(requestID,fileId,status);
 
         //we are just verifying that the requestId and fileId are valid
         //meaning that the setFileStatus message was received
