@@ -15,5 +15,5 @@ CLASSPATH="$jar_dir/*" java -Dlog=${DELEGATION_LOG:-warn} \
     -DwantLog4jSetup=n \
     $logbackDefn \
     -XX:+TieredCompilation \
-    -XX:TieredStopAtLevel=0 \
+    -XX:TieredStopAtLevel=1 \
     org.dcache.srm.shell.SrmShell "$@"
