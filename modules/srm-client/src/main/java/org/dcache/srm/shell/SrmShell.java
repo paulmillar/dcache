@@ -179,7 +179,11 @@ public class SrmShell extends ShellApplication
     @Override
     protected String getPrompt()
     {
-        return pwd + "# ";
+        String uri = pwd.toString();
+        if (pwd.getPath().length() > 1) {
+            uri = uri.substring(0, uri.length()-1);
+        }
+        return uri + " # ";
     }
 
     @Override
