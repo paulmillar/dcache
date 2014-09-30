@@ -18,11 +18,19 @@ package org.dcache.srm.client;
 import org.apache.axis.SimpleTargetedChain;
 import org.apache.axis.client.Stub;
 import org.apache.axis.configuration.SimpleProvider;
-import org.apache.axis.transport.http.HTTPSender;
-import org.globus.axis.transport.GSIHTTPSender;
+import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.params.HttpConnectionParams;
+import org.apache.commons.httpclient.protocol.Protocol;
 import org.globus.axis.transport.GSIHTTPTransport;
+import org.globus.axis.transport.commons.CommonsSSLSocketFactory;
+import org.globus.axis.transport.commons.HTTPSSender;
+import org.globus.axis.transport.commons.HTTPSender;
 import org.globus.axis.util.Util;
+import org.globus.gsi.GSIConstants;
+import org.globus.gsi.gssapi.GSSConstants;
+import org.globus.gsi.gssapi.net.GssSocket;
 import org.globus.util.GlobusURL;
+import org.gridforum.jgss.ExtendedGSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.slf4j.Logger;
@@ -34,7 +42,9 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 
 import org.dcache.srm.v2_2.ISRM;
@@ -211,13 +221,32 @@ public class SRMClientV2 implements ISRM {
             service_url += "/"+webservice_path;
         }
         Util.registerTransport();
+
         SimpleProvider provider =
             new SimpleProvider();
         SimpleTargetedChain c;
-        c = new SimpleTargetedChain(new GSIHTTPSender());
-        provider.deployTransport("httpg", c);
-        c = new SimpleTargetedChain(new  HTTPSender());
+        c = new SimpleTargetedChain(new HTTPSSender());
+        provider.deployTransport("https", c);
+        c = new SimpleTargetedChain(new HTTPSender());
         provider.deployTransport("http", c);
+
+        Protocol protocol =
+                new Protocol("https", new CommonsSSLSocketFactory() {
+                    @Override
+                    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
+                                               HttpConnectionParams params) throws IOException, UnknownHostException, ConnectTimeoutException
+                    {
+                        Socket socket = super.createSocket(host, port, localAddress, localPort, params);
+                        try {
+                            ((ExtendedGSSContext) ((GssSocket) socket).getContext()).setOption(GSSConstants.GSS_MODE, GSIConstants.MODE_GSI);
+                        } catch (GSSException e) {
+                            throw new IOException(e.getMessage(), e);
+                        }
+                        return socket;
+                    }
+                }, 443);
+        Protocol.registerProtocol("https", protocol);
+
         SRMServiceLocator sl = new SRMServiceLocator(provider);
         URL url = new URL(service_url);
         logger.debug("connecting to srm at {}",service_url);

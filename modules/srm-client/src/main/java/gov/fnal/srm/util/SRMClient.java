@@ -186,7 +186,7 @@ public abstract class SRMClient {
             dsay("got proxy of type "+srm.getClass());
 
         } catch (Exception srme) {
-            throw new IOException(srme.toString());
+            throw new IOException(srme.toString(), srme);
         }
         if(srm == null) {
             throw new IOException("can not get manager connection");

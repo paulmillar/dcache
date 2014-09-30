@@ -15,7 +15,7 @@ public final class TransportUtil {
         if(transport == Transport.TCP) {
             return "http";
         } else {
-            return "httpg";
+            return "https";
         }
         /* TODO We return httpg for Transport.SSL since we're using JGlobus libraries.
          * When using standard libraries for SSL, this should be changed to
