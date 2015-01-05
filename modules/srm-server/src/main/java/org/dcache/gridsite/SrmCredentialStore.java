@@ -204,4 +204,10 @@ public class SrmCredentialStore implements CredentialStore
 
         return credential != null ? credential.getDelegatedCredential() : null;
     }
+
+    @Override
+    public void list(CredentialAcceptor acceptor)
+    {
+//        _store.
+    }
 }

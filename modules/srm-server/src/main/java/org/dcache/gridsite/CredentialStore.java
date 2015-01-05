@@ -78,4 +78,13 @@ public interface CredentialStore
      */
     public GSSCredential search(String dn, String fqan);
 
+    /**
+     * List all delegated credentials.
+     */
+    public void list(CredentialAcceptor printer);
+
+    public interface CredentialAcceptor
+    {
+        public void accept(DelegationIdentity id, GSSCredential credential);
+    }
 }

@@ -102,7 +102,12 @@ import org.dcache.srm.util.Configuration;
 import org.dcache.util.Glob;
 
 import static com.google.common.collect.Iterables.getFirst;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Set;
+import static org.dcache.srm.request.RequestCredentialStorage.ListOption.FETCH_CREDENTIAL;
 import static org.dcache.srm.request.sql.Utilities.getIdentifierAsStored;
+import org.springframework.jdbc.core.RowCallbackHandler;
 
 public class DatabaseRequestCredentialStorage implements RequestCredentialStorage {
     private static final Logger logger =
@@ -421,5 +426,20 @@ public class DatabaseRequestCredentialStorage implements RequestCredentialStorag
         } else {
             return getRequestCredentialByCondition(SEARCH_BY_NAME, name);
         }
+    }
+
+    @Override
+    public void listRequestCredentials(Set<ListOption> options,
+            CredentialAcceptor acceptor)
+    {
+        jdbcTemplate.query("SELECT * FROM " + requestCredentialTableName +
+                " ORDER BY credentialexpiration", (ResultSet rs) ->
+                        acceptor.accept(rs.getLong("id"),
+                                rs.getString("credentialname"), rs.getString("role"),
+                                new Date(rs.getLong("creationtime")),
+                                new Date(rs.getLong("credentialexpiration")),
+                                options.contains(FETCH_CREDENTIAL) ?
+                                        read(rs.getString("delegatedcredentials")) :
+                                        null));
     }
 }

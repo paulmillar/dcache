@@ -6,6 +6,7 @@ import com.google.common.primitives.Ints;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -376,6 +377,81 @@ public class ColumnWriter
             } else {
                 out.format(FORMAT, value);
             }
+        }
+    }
+
+    private static class RelativeDateColumn extends DateColumn
+    {
+        public RelativeDateColumn(String name)
+        {
+            super (name);
+        }
+
+        @Override
+        public int width(Object value)
+        {
+            return WIDTH_OF_FORMAT + 3 + relativeValue(value).length();
+        }
+
+        @Override
+        public void render(Object value, int actualWidth, PrintWriter out)
+        {
+            if (value == null) {
+                while (actualWidth-- > 0) {
+                    out.append(' ');
+                }
+            } else {
+                StringBuilder sb = new StringBuilder();
+//                sb.append(super.render(value, actualWidth, out))
+            }
+        }
+
+        private StringBuilder relativeValue(Object value)
+        {
+            long when = inMillis(value);
+            long diff = when - System.currentTimeMillis();
+            StringBuilder sb = new StringBuilder();
+            if (diff > 0) {
+                sb.append("in ");
+            }
+
+            describe(sb, Math.abs(diff));
+
+            if (diff < 0 ) {
+                sb.append(" ago");
+            }
+
+            return sb;
+        }
+
+        private long inMillis(Object value)
+        {
+            if (value instanceof Date) {
+                return ((Date)value).getTime();
+            } else {
+                throw new IllegalArgumentException("Cannot convert object of type " +
+                        value.getClass().getCanonicalName() + " into millisecond timestamp");
+            }
+        }
+
+        private StringBuilder describe(StringBuilder sb, long duration)
+        {
+            long seconds = duration / 1_000;
+            long minutes = seconds / 60;
+            long hours = minutes / 60;
+            long days = hours / 24;
+            if (days >= 2) {
+                sb.append(days).append(" days");
+            } else if (hours >= 2) {
+                sb.append(hours).append(" hours");
+            } else if (minutes >= 2) {
+                sb.append(minutes).append(" minutes");
+            } else if (seconds >= 2) {
+                sb.append(seconds).append(" s");
+            } else {
+                sb.append(duration).append(" ms");
+            }
+            return sb;
         }
     }
 

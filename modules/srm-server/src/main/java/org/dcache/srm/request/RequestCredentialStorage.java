@@ -73,8 +73,12 @@ COPYRIGHT STATUS:
 package org.dcache.srm.request;
 
 import java.io.IOException;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Set;
 
 import org.dcache.util.Glob;
+import org.ietf.jgss.GSSCredential;
 
 
 /**
@@ -116,4 +120,21 @@ public interface RequestCredentialStorage {
      */
     public boolean deleteRequestCredential(String credentialName, String role)
             throws IOException;
+
+    /**
+     * List all known delegated credentials.  If FETCH_CREDENTIAL is not
+     * specified then credential is null.
+     */
+    public void listRequestCredentials(Set<ListOption> options, CredentialAcceptor acceptor);
+
+    public interface CredentialAcceptor
+    {
+        public void accept(long id, String name, String role, Date creation,
+                Date expiry, GSSCredential credential);
+    }
+
+    public enum ListOption {
+        /** Fetch each credential into memory. */
+        FETCH_CREDENTIAL
+    }
 }

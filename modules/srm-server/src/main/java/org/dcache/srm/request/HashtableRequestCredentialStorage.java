@@ -68,10 +68,13 @@ package org.dcache.srm.request;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+import java.util.Date;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import static org.dcache.srm.request.RequestCredentialStorage.ListOption.FETCH_CREDENTIAL;
 
 import org.dcache.util.Glob;
 
@@ -166,5 +169,17 @@ public class HashtableRequestCredentialStorage
     public boolean deleteRequestCredential(String name, String role)
     {
         return Iterables.removeIf(store.values(), isMatching(name, role));
+    }
+
+    @Override
+    public void listRequestCredentials(Set<ListOption> options,
+            CredentialAcceptor acceptor)
+    {
+        store.forEach((id,requestCredential) -> acceptor.accept(id,
+                requestCredential.getCredentialName(), requestCredential.getRole(),
+                new Date(requestCredential.getCreationtime()),
+                new Date(requestCredential.getDelegatedCredentialExpiration()),
+                options.contains(FETCH_CREDENTIAL) ?
+                        requestCredential.getDelegatedCredential() : null));
     }
 }

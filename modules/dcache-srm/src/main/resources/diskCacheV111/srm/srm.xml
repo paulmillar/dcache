@@ -602,6 +602,13 @@
     <property name="srm" ref="srm"/>
   </bean>
 
+  
+  <bean id="credential-cli" class="org.dcache.gridsite.CredentialAdminInterface">
+    <description>Admin interface for managing the SRM credential store</description>
+    <property name="credentialStore" ref="srm-credential-store"/>
+  </bean>
+
+  
   <bean id="thread-pool" class="org.eclipse.jetty.util.thread.QueuedThreadPool">
       <!-- Note that Jetty manages the lifecycle of this thread pool -->
       <description>Thread pool used by Jetty for request processing</description>

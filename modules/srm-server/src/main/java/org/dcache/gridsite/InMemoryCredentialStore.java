@@ -186,4 +186,11 @@ public class InMemoryCredentialStore implements CredentialStore
 
         return bestCredential;
     }
+
+    @Override
+    public void list(CredentialAcceptor acceptor)
+    {
+        _storage.entrySet().stream().
+                forEach(entry -> acceptor.accept(entry.getKey(), entry.getValue()));
+    }
 }
