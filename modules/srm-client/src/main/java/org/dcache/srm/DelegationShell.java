@@ -109,6 +109,7 @@ public class DelegationShell extends ShellApplication
     private String _prompt = "$ ";
     private Delegation _client;
     private GridSiteVersionPolicy _versionPolicy = GridSiteVersionPolicy.PROBE;
+    private boolean _isDebugEnabled;
 
     public static void main(String[] arguments) throws Throwable
     {
@@ -193,6 +194,9 @@ public class DelegationShell extends ShellApplication
         } catch (RemoteException e) {
             throwIfProblemWithUrl(e);
             throwIfProblemLocalEnvironment(e);
+            if (_isDebugEnabled) {
+                System.out.println("GridSite v2 probe failed: " + e);
+            }
             return false;
         }
     }
@@ -212,6 +216,9 @@ public class DelegationShell extends ShellApplication
         } catch (RemoteException e) {
             throwIfProblemWithUrl(e);
             throwIfProblemLocalEnvironment(e);
+            if (_isDebugEnabled) {
+                System.out.println("GridSite v2 probe failed: " + e);
+            }
         }
         return false;
     }
@@ -683,6 +690,22 @@ public class DelegationShell extends ShellApplication
                 relative = (remaining / 86400) + " days";
             }
             return df.format(termination) + " (" + relative + ")";
+        }
+    }
+
+    @Command(name = "set debug", hint="control additional debug output",
+            description = "This command controls whether additional inforamtion  " +
+                    "is shown when certain commands fail.")
+    public class SetDebug implements Callable<Serializable>
+    {
+        @Argument
+        boolean enabled;
+
+        @Override
+        public Serializable call() throws Exception
+        {
+            _isDebugEnabled = enabled;
+            return "";
         }
     }
 
