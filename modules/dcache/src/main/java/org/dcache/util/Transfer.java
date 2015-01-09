@@ -51,6 +51,7 @@ import dmg.util.TimebasedCounter;
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.cells.CellStub;
 import org.dcache.commons.util.NDC;
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.vehicles.FileAttributes;
@@ -298,6 +299,14 @@ public class Transfer implements Comparable<Transfer>
     public synchronized void setPnfsId(PnfsId pnfsid)
     {
         _fileAttributes.setPnfsId(pnfsid);
+    }
+
+    /**
+     * Returns true iff the file exists but is currently being uploaded.
+     */
+    public synchronized ContentsState getContentsState()
+    {
+        return _fileAttributes.getContentsState();
     }
 
     /**
@@ -653,7 +662,7 @@ public class Transfer implements Comparable<Transfer>
         setStatus("PnfsManager: Fetching storage info");
         try {
             Set<FileAttribute> request =
-                EnumSet.of(PNFSID, TYPE, STORAGEINFO, SIZE);
+                EnumSet.of(PNFSID, TYPE, STORAGEINFO, SIZE, CONTENTS_STATE);
             request.addAll(_additionalAttributes);
             request.addAll(PoolMgrSelectReadPoolMsg.getRequiredAttributes());
             Set<AccessMask> mask = EnumSet.of(AccessMask.READ_DATA);
@@ -814,29 +823,36 @@ public class Transfer implements Comparable<Transfer>
                 setPool(reply.getPoolName());
                 setPoolAddress(reply.getPoolAddress());
                 setFileAttributes(reply.getFileAttributes());
-            } else if (!_fileAttributes.getStorageInfo().isCreatedOnly()) {
-                EnumSet<RequestContainerV5.RequestState> allowedStates =
-                    _checkStagePermission.canPerformStaging(_subject, fileAttributes.getStorageInfo())
-                    ? RequestContainerV5.allStates
-                    : RequestContainerV5.allStatesExceptStage;
-
-                PoolMgrSelectReadPoolMsg request =
-                    new PoolMgrSelectReadPoolMsg(fileAttributes,
-                                                 protocolInfo,
-                                                 getReadPoolSelectionContext(),
-                                                 allowedStates);
-                request.setId(_id);
-                request.setSubject(_subject);
-                request.setPnfsPath(_path);
-
-                PoolMgrSelectReadPoolMsg reply =
-                    _poolManager.sendAndWait(request, timeout);
-                setPool(reply.getPoolName());
-                setPoolAddress(reply.getPoolAddress());
-                setFileAttributes(reply.getFileAttributes());
-                setReadPoolSelectionContext(reply.getContext());
             } else {
-                throw new FileIsNewCacheException();
+                switch (_fileAttributes.getContentsState()) {
+                case IMMUTABLE:
+                    EnumSet<RequestContainerV5.RequestState> allowedStates =
+                        _checkStagePermission.canPerformStaging(_subject, fileAttributes.getStorageInfo())
+                        ? RequestContainerV5.allStates
+                        : RequestContainerV5.allStatesExceptStage;
+
+                    PoolMgrSelectReadPoolMsg request =
+                        new PoolMgrSelectReadPoolMsg(fileAttributes,
+                                                     protocolInfo,
+                                                     getReadPoolSelectionContext(),
+                                                     allowedStates);
+                    request.setId(_id);
+                    request.setSubject(_subject);
+                    request.setPnfsPath(_path);
+
+                    PoolMgrSelectReadPoolMsg reply =
+                        _poolManager.sendAndWait(request, timeout);
+                    setPool(reply.getPoolName());
+                    setPoolAddress(reply.getPoolAddress());
+                    setFileAttributes(reply.getFileAttributes());
+                    setReadPoolSelectionContext(reply.getContext());
+                    break;
+                case BEING_WRITTEN:
+                    throw new FileIsNewCacheException();
+                case LOST:
+                    // REVISIT: do we need a specific execption type here?
+                    throw new CacheException("File is lost");
+                }
             }
         } catch (IOException e) {
             throw new CacheException(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,

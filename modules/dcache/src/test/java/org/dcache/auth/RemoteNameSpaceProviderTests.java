@@ -1067,12 +1067,6 @@ public class RemoteNameSpaceProviderTests
             return this;
         }
 
-        public StorageInfoBuilder isNew(boolean isNew)
-        {
-            _info.setIsNew(isNew);
-            return this;
-        }
-
         public StorageInfoBuilder key(String key, String value)
         {
             _info.setKey(key, value);

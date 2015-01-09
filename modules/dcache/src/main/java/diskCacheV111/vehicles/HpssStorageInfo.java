@@ -12,16 +12,12 @@ public class HpssStorageInfo extends GenericStorageInfo {
       setHsm("hpss");
       _store = store ;
       _group = group ;
-      setIsNew(true) ;
-
    }
    public HpssStorageInfo( String store , String group , String bfid ){
        setHsm("hpss");
       _store = store ;
       _group = group ;
       setBitfileId(bfid) ;
-      setIsNew(false) ;
-
    }
    @Override
    public String getStorageClass() {

@@ -215,18 +215,6 @@ public class StorageInfoTest {
     }
 
     @Test
-    public void testNotEqualsByIsNew() throws Exception {
-
-        StorageInfo storageInfo = new GenericStorageInfo("osm", "h1:raw");
-        StorageInfo otherInfo = new GenericStorageInfo("osm", "h1:raw");
-
-        storageInfo.setIsNew(false);
-        otherInfo.setIsNew(true);
-
-        assertFalse("not equal by isNew storageInfo pass", storageInfo.equals(otherInfo) );
-    }
-
-    @Test
     public void testNotEqualsByBitfileId() throws Exception {
 
         StorageInfo storageInfo = new GenericStorageInfo("osm", "h1:raw");

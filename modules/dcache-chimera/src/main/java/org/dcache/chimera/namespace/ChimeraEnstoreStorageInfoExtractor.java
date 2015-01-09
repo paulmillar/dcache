@@ -34,8 +34,6 @@ public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExt
     @Override
     public StorageInfo getFileStorageInfo(ExtendedInode inode) throws CacheException {
         EnstoreStorageInfo info;
-        Stat stat;
-        ExtendedInode level2 = inode.getLevel(2);
         try {
             List<String> locations = inode.getLocations(StorageGenericLocation.TAPE);
             EnstoreStorageInfo parentStorageInfo = (EnstoreStorageInfo) getDirStorageInfo(inode);
@@ -46,7 +44,6 @@ public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExt
                 InodeStorageInformation inodeStorageInfo = inode.getFs().getStorageInfo(inode);
                 info = new EnstoreStorageInfo(parentStorageInfo.getStorageGroup(),
                                               parentStorageInfo.getFileFamily());
-                info.setIsNew(false);
                 for(String location: locations) {
                     UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(location);
                     try {
@@ -75,8 +72,6 @@ public class ChimeraEnstoreStorageInfoExtractor extends ChimeraHsmStorageInfoExt
                     }
                 }
             }
-            stat = inode.stat();
-            info.setIsNew((stat.getSize() == 0) && (!level2.exists()));
         }
         catch (ChimeraFsException e) {
             throw new CacheException(e.getMessage());

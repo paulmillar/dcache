@@ -37,6 +37,7 @@ import diskCacheV111.vehicles.ProtocolInfo;
 
 import dmg.cells.nucleus.CellMessage;
 
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.poolmanager.Partition;
@@ -483,6 +484,11 @@ public class PoolMonitorV5
         if (attributes.getFileType() == FileType.DIR ||
             attributes.getSize() == 0) {
             return FileLocality.NONE;
+        }
+
+        if (attributes.isDefined(CONTENTS_STATE) &&
+                attributes.getContentsState() == ContentsState.LOST) {
+            return FileLocality.UNAVAILABLE;
         }
 
         PoolPreferenceLevel[] levels =

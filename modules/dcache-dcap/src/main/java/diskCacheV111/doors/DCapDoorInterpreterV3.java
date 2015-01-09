@@ -82,6 +82,7 @@ import org.dcache.chimera.UnixPermission;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pinmanager.PinManagerPinMessage;
 import org.dcache.auth.CachingLoginStrategy;
+import org.dcache.namespace.ContentsState;
 import org.dcache.services.login.RemoteLoginStrategy;
 import org.dcache.util.Args;
 import org.dcache.vehicles.FileAttributes;
@@ -1070,7 +1071,8 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
             super(sessionId, commandId, args);
 
             _attributes = EnumSet.of(OWNER, OWNER_GROUP, MODE, TYPE, SIZE,
-                    CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME, PNFSID);
+                    CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME, PNFSID,
+                    CONTENTS_STATE);
             if (!metaDataOnly) {
                 _attributes.add(STORAGEINFO);
             }
@@ -1995,7 +1997,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
                 return ;
             }
 
-            if (_fileAttributes.getStorageInfo().isCreatedOnly() || _overwrite || _truncate ||
+            if (_fileAttributes.getContentsState() == ContentsState.BEING_WRITTEN || _overwrite || _truncate ||
             ( _isHsmRequest && ( _ioMode.indexOf( 'w' ) >= 0 ) ) ){
                 if(_readOnly) {
                     sendReply("fileAttributesAvailable", 1,"Only read-only access allowed" );

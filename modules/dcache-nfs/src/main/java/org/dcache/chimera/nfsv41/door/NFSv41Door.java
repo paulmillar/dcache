@@ -48,6 +48,7 @@ import dmg.cells.services.login.LoginManagerChildrenInfo;
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.Option;
+
 import java.io.Serializable;
 import java.util.concurrent.Callable;
 
@@ -62,6 +63,7 @@ import org.dcache.chimera.nfsv41.door.proxy.ProxyIoMdsOpFactory;
 import org.dcache.chimera.nfsv41.mover.NFS4ProtocolInfo;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
 import org.dcache.commons.util.NDC;
+import org.dcache.namespace.ContentsState;
 import org.dcache.nfs.ChimeraNFSException;
 import org.dcache.nfs.ExportFile;
 import org.dcache.nfs.status.DelayException;
@@ -512,7 +514,7 @@ public class NFSv41Door extends AbstractCellComponent implements
     {
 
 
-        if ((iomode == layoutiomode4.LAYOUTIOMODE4_READ) || !transfer.getStorageInfo().isCreatedOnly()) {
+        if ((iomode == layoutiomode4.LAYOUTIOMODE4_READ) || transfer.getContentsState() == ContentsState.IMMUTABLE) {
             _log.debug("looking for read pool for {}", transfer.getPnfsId());
             transfer.setWrite(false);
         } else {

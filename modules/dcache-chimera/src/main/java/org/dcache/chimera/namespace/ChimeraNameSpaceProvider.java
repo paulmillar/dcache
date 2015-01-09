@@ -54,6 +54,7 @@ import org.dcache.chimera.StorageGenericLocation;
 import org.dcache.chimera.StorageLocatable;
 import org.dcache.chimera.UnixPermission;
 import org.dcache.chimera.posix.Stat;
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -64,6 +65,7 @@ import org.dcache.util.ChecksumType;
 import org.dcache.util.Glob;
 import org.dcache.vehicles.FileAttributes;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static org.dcache.acl.enums.AccessType.ACCESS_ALLOWED;
 
 public class ChimeraNameSpaceProvider
@@ -700,10 +702,7 @@ public class ChimeraNameSpaceProvider
                 break;
             case SIZE:
                 stat = inode.statCache();
-                // REVISIT when we have another way to detect new files
-                ExtendedInode level2 = inode.getLevel(2);
-                boolean isNew = (stat.getSize() == 0) && (!level2.exists());
-                if (!isNew) {
+                if (!inode.isNew(stat)) {
                     attributes.setSize(stat.getSize());
                 }
                 break;
@@ -759,6 +758,12 @@ public class ChimeraNameSpaceProvider
                 break;
             case STORAGEINFO:
                 attributes.setStorageInfo(_extractor.getStorageInfo(inode));
+                break;
+            case CONTENTS_STATE:
+                stat = inode.statCache();
+                boolean isRegularFile = new UnixPermission(stat.getMode()).isReg();
+                boolean isPartialFile = isRegularFile ? inode.isNew(stat) : false;
+                attributes.setContentsState(isPartialFile ? ContentsState.BEING_WRITTEN : ContentsState.IMMUTABLE);
                 break;
             default:
                 throw new UnsupportedOperationException("Attribute " + attribute + " not supported yet.");
@@ -886,12 +891,14 @@ public class ChimeraNameSpaceProvider
                         _fs.setRetentionPolicy(inode, attr.getRetentionPolicy());
                         break;
                     case FLAGS:
-                        FsInode level2 = new FsInode(_fs, pnfsId.toString(), 2);
-                        ChimeraCacheInfo cacheInfo = new ChimeraCacheInfo(level2);
-                        for (Map.Entry<String,String> flag: attr.getFlags().entrySet()) {
-                            cacheInfo.getFlags().put(flag.getKey(), flag.getValue());
+                        {
+                            FsInode level2 = new FsInode(_fs, pnfsId.toString(), 2);
+                            ChimeraCacheInfo cacheInfo = new ChimeraCacheInfo(level2);
+                            for (Map.Entry<String,String> flag: attr.getFlags().entrySet()) {
+                                cacheInfo.getFlags().put(flag.getKey(), flag.getValue());
+                            }
+                            cacheInfo.writeCacheInfo(level2);
                         }
-                        cacheInfo.writeCacheInfo(level2);
                         break;
                     case ACL:
                         if(_aclEnabled) {
@@ -901,6 +908,32 @@ public class ChimeraNameSpaceProvider
                         break;
                     case STORAGEINFO:
                         _extractor.setStorageInfo(inode, attr.getStorageInfo());
+                        break;
+                    case CONTENTS_STATE:
+                        switch (attr.getContentsState()) {
+                        case BEING_WRITTEN:
+                            // only allow BEING_WRITTEN --> BEING_WRITTEN transition.
+                            checkArgument(inode.isNew(stat), "cannot edit immutable file");
+                            break;
+
+                        case IMMUTABLE:
+                            // allow any state to transition to IMMUTABLE
+
+                            // REVISIT: write an "empty" level-2 if one is not
+                            // already present as work-around for Chimera not
+                            // storing this state.
+                            if (inode.isNew(stat)) {
+                                FsInode level2 = new FsInode(_fs, pnfsId.toString(), 2);
+                                if (!level2.exists()) {
+                                    new ChimeraCacheInfo(level2).writeCacheInfo(level2);
+                                }
+                            }
+                            break;
+
+                        case LOST:
+                            // allow any state to transition to LOST
+                            throw new CacheException("Not supported");
+                        }
                         break;
                     default:
                         throw new UnsupportedOperationException("Attribute " + attribute + " not supported yet.");

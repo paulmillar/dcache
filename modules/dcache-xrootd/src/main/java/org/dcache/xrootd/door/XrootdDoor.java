@@ -71,6 +71,7 @@ import org.dcache.cells.CellStub;
 import org.dcache.cells.MessageCallback;
 import org.dcache.namespace.ACLPermissionHandler;
 import org.dcache.namespace.ChainedPermissionHandler;
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
@@ -850,7 +851,7 @@ public class XrootdDoor
             if (canReadFile) {
                 flags |= kXR_readable;
             }
-            if (attributes.getStorageInfo().isCreatedOnly()) {
+            if (attributes.getContentsState() == ContentsState.BEING_WRITTEN) {
                 flags |= kXR_poscpend;
             }
             break;
@@ -875,7 +876,8 @@ public class XrootdDoor
         /* Fetch file attributes.
          */
         PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
-        Set<FileAttribute> requestedAttributes = EnumSet.of(TYPE, SIZE, MODIFICATION_TIME, STORAGEINFO);
+        Set<FileAttribute> requestedAttributes = EnumSet.of(TYPE, SIZE,
+                MODIFICATION_TIME, STORAGEINFO, CONTENTS_STATE);
         requestedAttributes.addAll(PoolMonitorV5.getRequiredAttributesForFileLocality());
         requestedAttributes.addAll(_pdp.getRequiredAttributes());
 
@@ -890,7 +892,6 @@ public class XrootdDoor
                     _poolMonitor.getFileLocality(attributes, clientHost);
             switch (locality) {
             case NEARLINE:
-            case LOST:
             case UNAVAILABLE:
                 flags |= kXR_offline;
             }
@@ -906,7 +907,8 @@ public class XrootdDoor
         // TODO: Use SpreadAndWait
         for (int i = 0; i < allPaths.length; i++) {
             try {
-                Set<FileAttribute> requestedAttributes = EnumSet.of(TYPE);
+                Set<FileAttribute> requestedAttributes = EnumSet.of(TYPE,
+                        CONTENTS_STATE);
                 requestedAttributes.addAll(_pdp.getRequiredAttributes());
                 FileAttributes attributes =
                         pnfsHandler.getFileAttributes(allPaths[i].toString(), requestedAttributes);

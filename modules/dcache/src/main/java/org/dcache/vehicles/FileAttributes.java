@@ -19,6 +19,7 @@ import diskCacheV111.vehicles.StorageInfo;
 
 import org.dcache.acl.ACL;
 import org.dcache.namespace.FileAttribute;
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileType;
 import org.dcache.util.Checksum;
 
@@ -143,6 +144,11 @@ public class FileAttributes implements Serializable {
      * The storage info of a file.
      */
     private StorageInfo _storageInfo;
+
+    /**
+     * Whether the file is a normal file that is currently being uploaded.
+     */
+    private ContentsState _state;
 
     /** Throws IllegalStateException if attribute is not defined. */
     private void guard(FileAttribute attribute)
@@ -310,6 +316,13 @@ public class FileAttributes implements Serializable {
         return _storageInfo;
     }
 
+    @Nonnull
+    public ContentsState getContentsState()
+    {
+        guard(CONTENTS_STATE);
+        return _state;
+    }
+
     public void setAccessTime(long atime)
     {
         define(ACCESS_TIME);
@@ -409,6 +422,12 @@ public class FileAttributes implements Serializable {
     {
         define(STORAGEINFO);
         _storageInfo = storageInfo;
+    }
+
+    public void setContentsState(ContentsState state)
+    {
+        define(CONTENTS_STATE);
+        _state = state;
     }
 
     @Override

@@ -22,8 +22,6 @@ public class EnstoreStorageInfo extends GenericStorageInfo {
       setHsm("enstore");
       _family = fileFamily ;
       _group  = storageGroup ;
-      setIsNew( true ) ;
-
    }
    public EnstoreStorageInfo( String storageGroup ,
                               String fileFamily ,
@@ -32,8 +30,6 @@ public class EnstoreStorageInfo extends GenericStorageInfo {
       _family = fileFamily ;
       _group  = storageGroup ;
       setBitfileId(bfid) ;
-      setIsNew( false ) ;
-
    }
    public void setPath( String path){ _path = path ; }
    public String getPath(){ return _path ; }

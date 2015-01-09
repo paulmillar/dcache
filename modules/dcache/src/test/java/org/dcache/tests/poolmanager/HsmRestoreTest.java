@@ -36,6 +36,7 @@ import dmg.cells.nucleus.CellAddressCore;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
 
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.classic.IoQueueManager;
 import org.dcache.poolmanager.PartitionManager;
@@ -125,7 +126,6 @@ public class HsmRestoreTest {
          */
 
         _storageInfo.addLocation(new URI("osm://osm?"));
-        _storageInfo.setIsNew(false);
 
         PnfsGetFileAttributes fileAttributesMessage =
             new PnfsGetFileAttributes(pnfsId, EnumSet.noneOf(FileAttribute.class));
@@ -136,6 +136,7 @@ public class HsmRestoreTest {
         attributes.setSize(5);
         attributes.setAccessLatency(StorageInfo.DEFAULT_ACCESS_LATENCY);
         attributes.setRetentionPolicy(StorageInfo.DEFAULT_RETENTION_POLICY);
+        attributes.setContentsState(ContentsState.IMMUTABLE);
         fileAttributesMessage.setFileAttributes(attributes);
         _cell.prepareMessage(new CellPath("PnfsManager"), fileAttributesMessage, true);
 
@@ -202,7 +203,6 @@ public class HsmRestoreTest {
          */
 
         _storageInfo.addLocation(new URI("osm://osm?"));
-        _storageInfo.setIsNew(false);
 
         PnfsGetFileAttributes fileAttributesMessage =
             new PnfsGetFileAttributes(pnfsId, EnumSet.noneOf(FileAttribute.class));
@@ -211,6 +211,7 @@ public class HsmRestoreTest {
         attributes.setPnfsId(pnfsId);
         attributes.setLocations(Collections.<String>emptyList());
         attributes.setSize(5);
+        attributes.setContentsState(ContentsState.IMMUTABLE);
         attributes.setAccessLatency(StorageInfo.DEFAULT_ACCESS_LATENCY);
         attributes.setRetentionPolicy(StorageInfo.DEFAULT_RETENTION_POLICY);
         fileAttributesMessage.setFileAttributes(attributes);
@@ -302,7 +303,6 @@ public class HsmRestoreTest {
          */
 
         _storageInfo.addLocation(new URI("osm://osm?"));
-        _storageInfo.setIsNew(false);
 
         PnfsGetFileAttributes fileAttributesMessage =
             new PnfsGetFileAttributes(pnfsId, EnumSet.noneOf(FileAttribute.class));
@@ -311,6 +311,7 @@ public class HsmRestoreTest {
         attributes.setPnfsId(pnfsId);
         attributes.setLocations(Collections.<String>emptyList());
         attributes.setSize(5);
+        attributes.setContentsState(ContentsState.IMMUTABLE);
         attributes.setAccessLatency(StorageInfo.DEFAULT_ACCESS_LATENCY);
         attributes.setRetentionPolicy(StorageInfo.DEFAULT_RETENTION_POLICY);
         fileAttributesMessage.setFileAttributes(attributes);
@@ -401,7 +402,6 @@ public class HsmRestoreTest {
          */
 
         _storageInfo.addLocation(new URI("osm://osm?"));
-        _storageInfo.setIsNew(false);
 
         PnfsGetFileAttributes fileAttributesMessage =
             new PnfsGetFileAttributes(pnfsId, EnumSet.noneOf(FileAttribute.class));
@@ -410,6 +410,7 @@ public class HsmRestoreTest {
         attributes.setPnfsId(pnfsId);
         attributes.setLocations(Collections.<String>emptyList());
         attributes.setSize(5);
+        attributes.setContentsState(ContentsState.IMMUTABLE);
         attributes.setAccessLatency(StorageInfo.DEFAULT_ACCESS_LATENCY);
         attributes.setRetentionPolicy(StorageInfo.DEFAULT_RETENTION_POLICY);
         fileAttributesMessage.setFileAttributes(attributes);

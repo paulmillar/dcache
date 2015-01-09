@@ -105,13 +105,7 @@ public interface StorageInfo
       */
     public String getHsm() ;
     public void setHsm( String newHsm);
-    /**
-      * Determines whether the file exists somewhere (cache or HSM)
-      * or not. Currently isCreatedOnly returns true is the
-      * size of the level-0 file is not zero.
-      */
-    public boolean isCreatedOnly() ;
-    public void setIsNew(boolean isNew);
+
     /**
       *
       * @return true if locations list is not empty or ( legacy case )

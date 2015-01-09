@@ -42,6 +42,7 @@ import org.dcache.chimera.FileSystemProvider;
 import org.dcache.chimera.FsInode;
 import org.dcache.chimera.FsInodeType;
 import org.dcache.chimera.StorageLocatable;
+import org.dcache.chimera.posix.Stat;
 import org.dcache.chimera.store.InodeStorageInformation;
 import org.dcache.util.Checksum;
 
@@ -238,6 +239,15 @@ public class ExtendedInode extends FsInode
             levels.put(level, inode);
         }
         return inode;
+    }
+
+    /**
+     * Return true iff this is the inode of a file that is being uploaded.
+     */
+    public boolean isNew(Stat stat) throws ChimeraFsException
+    {
+        ExtendedInode level2 = getLevel(2);
+        return (stat.getSize() == 0) && (!level2.exists());
     }
 
     public InodeStorageInformation getStorageInfo() throws ChimeraFsException

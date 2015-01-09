@@ -7,7 +7,6 @@ public enum FileLocality
     ONLINE             (TFileLocality.ONLINE, true),
     NEARLINE           (TFileLocality.NEARLINE, false),
     ONLINE_AND_NEARLINE(TFileLocality.ONLINE_AND_NEARLINE, true),
-    LOST               (TFileLocality.LOST, false),
     NONE               (TFileLocality.NONE, false),
     UNAVAILABLE        (TFileLocality.UNAVAILABLE,false);
 

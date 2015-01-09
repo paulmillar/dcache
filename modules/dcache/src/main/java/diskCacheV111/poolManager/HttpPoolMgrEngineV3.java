@@ -39,6 +39,7 @@ import dmg.util.HttpRequest;
 import dmg.util.HttpResponseEngine;
 
 import org.dcache.cells.CellStub;
+import org.dcache.namespace.ContentsState;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.poolmanager.Partition;
 import org.dcache.util.Args;
@@ -266,7 +267,7 @@ public class HttpPoolMgrEngineV3 implements
                             }
                             if (_siDetails != null) { // allows to select items
                                 storageInfo.setKey("size",""+fileAttributes.getSize());
-                                storageInfo.setKey("new",""+storageInfo.isCreatedOnly());
+                                storageInfo.setKey("new",""+(fileAttributes.getContentsState() == ContentsState.BEING_WRITTEN));
                                 storageInfo.setKey("stored",""+storageInfo.isStored());
                                 storageInfo.setKey("sClass",storageInfo.getStorageClass());
                                 storageInfo.setKey("cClass",storageInfo.getCacheClass());
@@ -313,7 +314,7 @@ public class HttpPoolMgrEngineV3 implements
     {
         try {
             PnfsGetFileAttributes msg =
-                    new PnfsGetFileAttributes(new PnfsId(pnfsId), EnumSet.of(FileAttribute.SIZE, FileAttribute.STORAGEINFO));
+                    new PnfsGetFileAttributes(new PnfsId(pnfsId), EnumSet.of(FileAttribute.SIZE, FileAttribute.STORAGEINFO, FileAttribute.CONTENTS_STATE));
             return _pnfsManager.sendAndWait(msg).getFileAttributes();
         } catch (InterruptedException | CacheException e) {
             _log.warn(e.toString());

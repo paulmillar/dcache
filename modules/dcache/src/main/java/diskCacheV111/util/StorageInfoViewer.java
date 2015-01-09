@@ -51,8 +51,6 @@ public class StorageInfoViewer {
                                    (cacheClass == null ? "None" : cacheClass));
                            System.out.println("  File Size    : " + info
                                    .getLegacySize());
-                           System.out.println("  Created Only : " + info
-                                   .isCreatedOnly());
                            System.out.println("  Stored       : " + info
                                    .isStored());
                            String[] flags = {"flag-s", "flag-l", "flag-c"};

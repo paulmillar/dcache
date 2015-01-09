@@ -34,11 +34,7 @@ public class ChimeraOsmStorageInfoExtractor extends ChimeraHsmStorageInfoExtract
 
         try {
             Stat stat = inode.statCache();
-            ExtendedInode level2 = inode.getLevel(2);
-
-            boolean isNew = (stat.getSize() == 0) && (!level2.exists());
-
-            if (!isNew) {
+            if (!inode.isNew(stat)) {
                 ImmutableList<String> locations = inode.getLocations(StorageGenericLocation.TAPE);
 
                 if (locations.isEmpty()) {
@@ -60,8 +56,6 @@ public class ChimeraOsmStorageInfoExtractor extends ChimeraHsmStorageInfoExtract
             } else {
                 info = (OSMStorageInfo) getDirStorageInfo(inode);
             }
-
-            info.setIsNew(isNew);
 
         } catch (ChimeraFsException e) {
             throw new CacheException(e.getMessage());

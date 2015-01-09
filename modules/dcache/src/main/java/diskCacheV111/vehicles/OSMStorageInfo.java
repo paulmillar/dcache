@@ -12,7 +12,6 @@ public class OSMStorageInfo extends GenericStorageInfo {
       setHsm("osm");
       _store = store ;
       _group = group ;
-      setIsNew(true) ;
    }
    public OSMStorageInfo( String store , String group , String bfid ){
 	   super();
@@ -20,8 +19,6 @@ public class OSMStorageInfo extends GenericStorageInfo {
       _store = store ;
       _group = group ;
       setBitfileId(bfid) ;
-      setIsNew(false) ;
-
    }
    @Override
    public String getStorageClass() {

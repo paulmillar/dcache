@@ -38,7 +38,6 @@ public class GenericStorageInfo
     private boolean _setBitFileId;
     private boolean _setLocation;
 
-    private boolean _isNew = true;
     private boolean _isStored;
 
     private String _hsm;
@@ -100,11 +99,6 @@ public class GenericStorageInfo
     @Override
     public String getStorageClass() {
         return _storageClass;
-    }
-
-    @Override
-    public boolean isCreatedOnly() {
-        return _isNew;
     }
 
     @Override
@@ -184,11 +178,6 @@ public class GenericStorageInfo
     }
 
     @Override
-    public void setIsNew(boolean isNew) {
-        _isNew = isNew;
-    }
-
-    @Override
     @Deprecated
     public String setKey(String key, String value) {
         if (value == null) {
@@ -220,8 +209,8 @@ public class GenericStorageInfo
         AccessLatency ac = getLegacyAccessLatency();
         RetentionPolicy rp = getLegacyRetentionPolicy();
         StringBuilder sb = new StringBuilder();
-        sb.append("size=").append(getLegacySize()).append(";new=").append(
-                isCreatedOnly()).append(";stored=").append(isStored()).append(
+        sb.append("size=").append(getLegacySize())
+                .append(";stored=").append(isStored()).append(
                 ";sClass=").append(sc == null ? "-" : sc).append(";cClass=")
                 .append(cc == null ? "-" : cc).append(";hsm=").append(
                         hsm == null ? "-" : hsm).append(";accessLatency=")
@@ -256,8 +245,7 @@ public class GenericStorageInfo
         ourLocations.hashCode() ^
         (int) getLegacySize() ^
         getStorageClass().hashCode() ^
-        (isStored() ? 1 << 0 : 0) ^
-        (isCreatedOnly() ? 1 << 1 : 0);
+        (isStored() ? 1 << 0 : 0);
     }
 
     @Override
@@ -331,9 +319,6 @@ public class GenericStorageInfo
         }
 
         if (other.isStored() != this.isStored() ) {
-            return false;
-        }
-        if (other.isCreatedOnly() != this.isCreatedOnly() ) {
             return false;
         }
 
