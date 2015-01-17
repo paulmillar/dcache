@@ -344,4 +344,9 @@ public interface FileSystemProvider extends Closeable {
      * @throws ChimeraFsException
      */
     public void unpin(String pnfsid) throws ChimeraFsException;
+
+    /**
+     * Provide accounting information by gid.
+     */
+    public Map<Long,Map<UsageType,UsageRecord>> getUsageByGid() throws ChimeraFsException;
 }

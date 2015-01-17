@@ -5,8 +5,10 @@ import com.google.common.collect.Range;
 import javax.security.auth.Subject;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import diskCacheV111.namespace.usage.Usage;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FsPath;
@@ -161,6 +163,12 @@ public class AbstractNameSpaceProvider
 
     @Override
     public void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Map<Long, Usage> accountUsageByGID() throws CacheException
     {
         throw new UnsupportedOperationException();
     }

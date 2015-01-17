@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import diskCacheV111.vehicles.Message;
 import diskCacheV111.vehicles.PnfsAddCacheLocationMessage;
 import diskCacheV111.vehicles.PnfsClearCacheLocationMessage;
 import diskCacheV111.vehicles.PnfsCreateDirectoryMessage;
@@ -32,7 +33,9 @@ import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.NoRouteToCellException;
 
 import org.dcache.acl.enums.AccessMask;
+
 import dmg.cells.nucleus.CellMessageSender;
+
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -210,7 +213,7 @@ public class PnfsHandler
      * as a CacheException. Timeouts and failure to send the message
      * to the PnfsManager are reported as a timeout CacheException.
      */
-   public <T extends PnfsMessage> T pnfsRequest( T msg )
+   public <T extends Message> T pnfsRequest( T msg )
            throws CacheException {
 
        if (_cellStub == null) {

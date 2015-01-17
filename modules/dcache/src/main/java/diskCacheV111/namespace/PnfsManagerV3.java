@@ -1,6 +1,7 @@
 package diskCacheV111.namespace;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import java.io.PrintWriter;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -85,6 +87,7 @@ import org.dcache.util.ChecksumType;
 import org.dcache.util.MathUtils;
 import org.dcache.util.PrefixMap;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.vehicles.PnfsAccountUsageByGidMessage;
 import org.dcache.vehicles.PnfsCreateSymLinkMessage;
 import org.dcache.vehicles.PnfsGetFileAttributes;
 import org.dcache.vehicles.PnfsListDirectoryMessage;
@@ -108,7 +111,7 @@ public class PnfsManagerV3
 
     private final Random _random = new Random(System.currentTimeMillis());
 
-    private final RequestExecutionTimeGauges<Class<? extends PnfsMessage>> _gauges =
+    private final RequestExecutionTimeGauges<Class<? extends Message>> _gauges =
         new RequestExecutionTimeGauges<>("PnfsManagerV3");
     private final RequestCounters<Class<?>> _foldedCounters =
         new RequestCounters<>("PnfsManagerV3.Folded");
@@ -129,7 +132,8 @@ public class PnfsManagerV3
         PnfsCreateEntryMessage.class,
         PnfsCreateDirectoryMessage.class,
         PnfsGetFileAttributes.class,
-        PnfsListDirectoryMessage.class
+        PnfsListDirectoryMessage.class,
+        PnfsAccountUsageByGidMessage.class
     };
 
     private int _threads;
@@ -164,6 +168,11 @@ public class PnfsManagerV3
     private BlockingQueue<CellMessage>[] _fifos;
 
     /**
+     * Tasks queue used for messages that do accounting activities.
+     */
+    private BlockingQueue<CellMessage> _accountingFifo;
+
+    /**
      * Executor for ProcessThread instances.
      */
     private ExecutorService executor =
@@ -181,6 +190,8 @@ public class PnfsManagerV3
      * updates.
      */
     private long _atimeGap;
+
+    private CellPath _thisCellPath;
 
     private void populateRequestMap()
     {
@@ -304,6 +315,7 @@ public class PnfsManagerV3
 
     public void init()
     {
+        _thisCellPath = new CellPath(getCellAddress());
         _fifos = new BlockingQueue[_threads * _threadGroups];
         _log.info("Starting {} threads", _fifos.length);
         for (int i = 0; i < _fifos.length; i++) {
@@ -338,42 +350,41 @@ public class PnfsManagerV3
                 executor.execute(new ProcessThread(_listQueues[i]));
             }
         }
+
+        _accountingFifo = new LinkedBlockingQueue<>();
+        executor.execute(new ProcessThread(_accountingFifo));
     }
 
     public void shutdown() throws InterruptedException
     {
-        drainQueues(_fifos);
-        drainQueues(_listQueues);
+        Arrays.stream(_fifos).forEach((q) -> {drainQueue(q);});
+        Arrays.stream(_listQueues).forEach((q) -> {drainQueue(q);});
         if (_locationFifos != _fifos) {
-            drainQueues(_locationFifos);
+            Arrays.stream(_locationFifos).forEach((q) -> {drainQueue(q);});
         }
+        drainQueue(_accountingFifo);
         MoreExecutors.shutdownAndAwaitTermination(executor, 1, TimeUnit.SECONDS);
     }
 
-    private void drainQueues(BlockingQueue<CellMessage>[] queues)
+    private void drainQueue(BlockingQueue<CellMessage> queue)
     {
-        CellPath self = new CellPath(getCellAddress());
-        String error = "Name space is shutting down.";
-
-        for (BlockingQueue<CellMessage> queue : queues) {
-            ArrayList<CellMessage> drained = new ArrayList<>();
-            queue.drainTo(drained);
-            for (CellMessage envelope : drained) {
-                Message msg = (Message) envelope.getMessageObject();
-                if (msg.getReplyRequired()) {
-                    try {
-                        UOID uoid = envelope.getUOID();
-                        CellExceptionMessage ret =
-                                new CellExceptionMessage(envelope.getSourcePath().revert(),
-                                                         new NoRouteToCellException(uoid, self, error));
-                        ret.setLastUOID(uoid);
-                        sendMessage(ret);
-                    } catch (NoRouteToCellException ignored) {
-                    }
+        ArrayList<CellMessage> drained = new ArrayList<>();
+        queue.drainTo(drained);
+        for (CellMessage envelope : drained) {
+            Message msg = (Message) envelope.getMessageObject();
+            if (msg.getReplyRequired()) {
+                try {
+                    UOID uoid = envelope.getUOID();
+                    CellExceptionMessage ret =
+                            new CellExceptionMessage(envelope.getSourcePath().revert(),
+                                                     new NoRouteToCellException(uoid, _thisCellPath, "Name space is shutting down."));
+                    ret.setLastUOID(uoid);
+                    sendMessage(ret);
+                } catch (NoRouteToCellException ignored) {
                 }
             }
-            queue.offer(SHUTDOWN_SENTINEL);
         }
+        queue.offer(SHUTDOWN_SENTINEL);
     }
 
     @Override
@@ -1569,7 +1580,7 @@ public class PnfsManagerV3
                          * timeout (within 10% of the TTL or 10 seconds,
                          * whatever is smaller)
                          */
-                        PnfsMessage pnfs = (PnfsMessage) message.getMessageObject();
+                        Message pnfs = (Message) message.getMessageObject();
                         if (message.getLocalAge() > message.getAdjustedTtl() && useEarlyDiscard(pnfs)) {
                             _log.warn("Discarding {} because its time to live has been exceeded.",
                                       pnfs.getClass().getSimpleName());
@@ -1590,14 +1601,14 @@ public class PnfsManagerV3
             }
         }
 
-        protected void fold(PnfsMessage message)
+        protected void fold(Message message)
         {
             if (_canFold && message.getReturnCode() == 0) {
                 Iterator<CellMessage> i = _fifo.iterator();
                 while (i.hasNext()) {
                     CellMessage envelope = i.next();
-                    PnfsMessage other =
-                        (PnfsMessage) envelope.getMessageObject();
+                    Message other =
+                        (Message) envelope.getMessageObject();
 
                     if (other.invalidates(message)) {
                         break;
@@ -1701,6 +1712,14 @@ public class PnfsManagerV3
         }
     }
 
+    public void messageArrived(CellMessage envelope, PnfsAccountUsageByGidMessage message) throws CacheException
+    {
+        if (!_accountingFifo.offer(envelope)) {
+            throw new MissingResourceCacheException("PnfsManager queue limit exceeded");
+        }
+    }
+
+
     private void forwardModifyCacheLocationMessage(PnfsMessage message)
     {
         try {
@@ -1711,7 +1730,7 @@ public class PnfsManagerV3
         }
     }
 
-    public void processPnfsMessage(CellMessage message, PnfsMessage pnfsMessage)
+    public void processPnfsMessage(CellMessage message, Message pnfsMessage)
     {
         long ctime = System.currentTimeMillis();
 
@@ -1773,6 +1792,9 @@ public class PnfsManagerV3
         }
         else if (pnfsMessage instanceof PnfsRemoveChecksumMessage) {
             removeChecksum((PnfsRemoveChecksumMessage) pnfsMessage);
+        }
+        else if (pnfsMessage instanceof PnfsAccountUsageByGidMessage) {
+            accountUsageByGid((PnfsAccountUsageByGidMessage) pnfsMessage);
         }
         else {
             _log.warn("Unexpected message class [" + pnfsMessage.getClass() + "] from source [" + message.getSourcePath() + "]");
@@ -1951,9 +1973,9 @@ public class PnfsManagerV3
         return (id.getDatabaseId() % _threadGroups);
     }
 
-    private boolean useEarlyDiscard(PnfsMessage message)
+    private boolean useEarlyDiscard(Message message)
     {
-        Class<? extends PnfsMessage> msgClass = message.getClass();
+        Class<? extends Message> msgClass = message.getClass();
         for (Class<?> c: DISCARD_EARLY) {
             if (c.equals(msgClass)) {
                 return true;
@@ -2211,5 +2233,16 @@ public class PnfsManagerV3
             }
         }
         return (access == ACCESS_ALLOWED);
+    }
+
+    private void accountUsageByGid(PnfsAccountUsageByGidMessage message)
+    {
+        try {
+            message.setUsage(_nameSpaceProvider.accountUsageByGID());
+        } catch (CacheException e) {
+            message.setFailed(e.getRc(), e.getMessage());
+        } catch(RuntimeException e) {
+            message.setFailed(CacheException.UNEXPECTED_SYSTEM_EXCEPTION, e);
+        }
     }
 }

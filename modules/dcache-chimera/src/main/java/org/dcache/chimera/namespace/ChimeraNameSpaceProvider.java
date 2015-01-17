@@ -2,7 +2,10 @@ package org.dcache.chimera.namespace;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -19,14 +22,20 @@ import javax.security.auth.Subject;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import diskCacheV111.namespace.NameSpaceProvider;
+import diskCacheV111.namespace.usage.Record;
+import diskCacheV111.namespace.usage.Type;
+import diskCacheV111.namespace.usage.Usage;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileExistsCacheException;
@@ -49,10 +58,12 @@ import org.dcache.chimera.FileNotFoundHimeraFsException;
 import org.dcache.chimera.FsInode;
 import org.dcache.chimera.HimeraDirectoryEntry;
 import org.dcache.chimera.JdbcFs;
+import org.dcache.chimera.UsageRecord;
 import org.dcache.chimera.NotDirChimeraException;
 import org.dcache.chimera.StorageGenericLocation;
 import org.dcache.chimera.StorageLocatable;
 import org.dcache.chimera.UnixPermission;
+import org.dcache.chimera.UsageType;
 import org.dcache.chimera.posix.Stat;
 import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
@@ -87,6 +98,51 @@ public class ChimeraNameSpaceProvider
     private boolean _aclEnabled;
     private PermissionHandler _permissionHandler;
     private String _uploadDirectory;
+
+    private class GidAccountingSupplier implements Supplier<Map<Long,Usage>>
+    {
+        @Override
+        public Map<Long,Usage> get()
+        {
+            try {
+                Map<Long,Map<UsageType,UsageRecord>> account = _fs.getUsageByGid();
+
+                Map<Long,Usage> report = new HashMap<>();
+                account.forEach((gid,summary) -> {
+                    summary.forEach((type,usage) -> {
+                        Record record = new Record(usage.getLogicalUsed(), usage.getFileCount(), usage.getPhysicalUsed());
+                        report.computeIfAbsent(gid, k -> new Usage()).add(toType(type), record);
+                    });
+                });
+
+                return ImmutableMap.copyOf(report);
+            } catch (ChimeraFsException e) {
+                _log.warn("Failed to fetch accounting info: " + e.getMessage());
+                return Collections.emptyMap();
+            } catch (RuntimeException e) {
+                _log.error("Found bug", e);
+                return Collections.emptyMap();
+            }
+        }
+
+        private Type toType(UsageType type)
+        {
+            switch (type) {
+            case ONLINE:
+                return Type.ONLINE;
+            case NEARLINE:
+                return Type.NEARLINE;
+            case STAGED:
+                return Type.STAGED;
+            case FLUSHABLE:
+                return Type.FLUSHABLE;
+            }
+            throw new RuntimeException("Unexpected UsageType: " + type);
+        }
+    }
+
+    private final Supplier<Map<Long,Usage>> _accountingSupplier =
+            Suppliers.memoizeWithExpiration(new GidAccountingSupplier(), 1, TimeUnit.MINUTES);
 
     @Required
     public void setExtractor(ChimeraStorageInfoExtractable extractor)
@@ -1309,5 +1365,11 @@ public class ChimeraNameSpaceProvider
             _fs.remove(temporary, name);
         } catch (FileNotFoundHimeraFsException ignored) {
         }
+    }
+
+    @Override
+    public Map<Long,Usage> accountUsageByGID() throws CacheException
+    {
+        return _accountingSupplier.get();
     }
 }

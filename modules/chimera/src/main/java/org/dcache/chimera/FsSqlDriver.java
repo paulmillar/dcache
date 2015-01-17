@@ -16,6 +16,7 @@
  */
 package org.dcache.chimera;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Ints;
@@ -26,18 +27,23 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
+
+import javax.annotation.Nonnull;
 
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.RetentionPolicy;
@@ -2583,5 +2589,139 @@ class FsSqlDriver {
         }
         preparedStatement.setString(idx++, inode.toString());
         return preparedStatement;
+    }
+
+    @Nonnull
+    public Map<Long,Map<UsageType,UsageRecord>> accountUsageByGID(Connection connection)
+    {
+        Map<Long,Map<UsageType,UsageRecord>> report = new HashMap<>();
+
+        for (UsageType type : UsageType.values()) {
+            String logicalSQL;
+            List<Integer> logicalArguments;
+            String physicalSQL;
+            List<Integer> physicalArguments;
+
+            switch (type) {
+            case ONLINE:
+                logicalSQL = "SELECT i.igid,SUM(i.isize),COUNT(1) " +
+                        "FROM t_inodes AS i INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE al.iaccesslatency=? " +
+                        "GROUP BY i.igid;";
+                logicalArguments = Lists.newArrayList(AccessLatency.ONLINE.getId());
+
+                physicalSQL = "SELECT i.igid, li.ilocation, SUM(i.isize) " +
+                        "FROM t_inodes AS i INNER JOIN t_locationinfo AS li ON i.ipnfsid=li.ipnfsid INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE al.iaccesslatency=? AND li.itype=? AND li.istate=1 " +
+                        "GROUP BY i.igid, li.ilocation;";
+                physicalArguments = Lists.newArrayList(AccessLatency.ONLINE.getId(), StorageGenericLocation.DISK);
+                break;
+
+            case NEARLINE:
+                logicalSQL = "SELECT i.igid,SUM(i.isize),COUNT(1) " +
+                        "FROM t_inodes AS i INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE al.iaccesslatency=? AND EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                        "GROUP BY i.igid;";
+                logicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.TAPE);
+
+                physicalSQL = "SELECT i.igid, li.ilocation, i.isize " +
+                        "FROM t_inodes AS i INNER JOIN t_locationinfo AS li ON i.ipnfsid=li.ipnfsid INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE al.iaccesslatency=? AND li.itype=? AND li.istate=1;";
+                physicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.TAPE);
+                break;
+
+            case STAGED:
+                logicalSQL = "SELECT i.igid,SUM(i.isize),COUNT(1) " +
+                        "FROM t_inodes AS i INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE iaccesslatency=? AND EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                                "AND EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                        "GROUP BY i.igid;";
+                logicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.DISK, StorageGenericLocation.TAPE);
+
+                physicalSQL = "SELECT i.igid,li.ilocation,SUM(i.isize) " +
+                        "FROM t_inodes AS i INNER JOIN t_locationinfo AS li ON i.ipnfsid=li.ipnfsid INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE iaccesslatency=? AND li.itype=? AND li.istate=1 AND EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                                "AND EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                        "GROUP BY i.igid, li.ilocation;";
+                physicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.DISK,
+                        StorageGenericLocation.DISK, StorageGenericLocation.TAPE);
+                break;
+
+            case FLUSHABLE:
+                logicalSQL = "SELECT i.igid,SUM(i.isize),COUNT(1) " +
+                        "FROM t_inodes AS i INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE iaccesslatency=? AND NOT EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                        "GROUP BY i.igid;";
+                logicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.TAPE);
+
+                physicalSQL = "SELECT i.igid,li.ilocation,SUM(i.isize) " +
+                        "FROM t_inodes AS i INNER JOIN t_locationinfo AS li ON i.ipnfsid=li.ipnfsid INNER JOIN t_access_latency al ON i.ipnfsid=al.ipnfsid " +
+                        "WHERE iaccesslatency=? AND li.itype=? AND li.istate=1 AND NOT EXISTS " +
+                                "(SELECT * FROM t_locationinfo AS li WHERE li.ipnfsid=i.ipnfsid AND li.istate=1 AND li.itype=?) " +
+                        "GROUP BY i.igid, li.ilocation;";
+
+                physicalArguments = Lists.newArrayList(AccessLatency.NEARLINE.getId(), StorageGenericLocation.DISK, StorageGenericLocation.TAPE);
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unknown type: " + type);
+            }
+
+            try {
+                PreparedStatement logicalQuery = connection.prepareStatement(logicalSQL);
+                try {
+                    for (int i = 0; i < logicalArguments.size(); i++) {
+                        logicalQuery.setInt(i+1, logicalArguments.get(i));
+                    }
+                    ResultSet results = logicalQuery.executeQuery();
+                    while (results.next()) {
+                        long gid = results.getLong(1);
+                        long size = results.getLong(2);
+                        long count = results.getLong(3);
+                        UsageRecord record = new UsageRecord();
+                        record.setFileCount(count);
+                        record.setLogicalUsed(size);
+                        report.computeIfAbsent(gid, k->new HashMap<>()).put(type, record);
+                    }
+                } finally {
+                    SqlHelper.tryToClose(logicalQuery);
+                }
+            } catch (SQLException e) {
+                _log.error("Failed to run logical query for {}: {}", type, e.getMessage());
+            }
+
+            // Physical usage
+            try {
+                PreparedStatement physicalQuery = connection.prepareStatement(physicalSQL);
+                try {
+                    for (int i = 0; i < physicalArguments.size(); i++) {
+                        physicalQuery.setInt(i+1, physicalArguments.get(i));
+                    }
+                    ResultSet results = physicalQuery.executeQuery();
+                    while (results.next()) {
+                        long gid = results.getLong(1);
+                        String location = results.getString(2);
+                        if (type == UsageType.NEARLINE) {
+                            location = URI.create(location).getAuthority();
+                        }
+                        long size = results.getLong(3);
+                        report.get(gid).get(type).incrementPhysicalUsed(location, size);
+                    }
+                } finally {
+                    SqlHelper.tryToClose(physicalQuery);
+                }
+            } catch (SQLException e) {
+                _log.error("Failed to run physical query for {}: {}", type, e.getMessage());
+            }
+
+        }
+
+        return report;
     }
 }

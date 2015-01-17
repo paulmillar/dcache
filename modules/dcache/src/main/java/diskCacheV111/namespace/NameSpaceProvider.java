@@ -1,12 +1,17 @@
 package diskCacheV111.namespace;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
 
 import javax.security.auth.Subject;
 
+import java.io.Serializable;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import diskCacheV111.namespace.usage.Usage;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FsPath;
@@ -264,4 +269,11 @@ public interface NameSpaceProvider
      * @param path the path of file that is uploaded
      */
     void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException;
+
+    /**
+     * Provide a summary of current capacity usage.  Each key of the
+     * returned map is a gid and the corresponding value is the sum of all
+     * file sizes of files owned by that gid.
+     */
+    Map<Long,Usage> accountUsageByGID() throws CacheException;
 }

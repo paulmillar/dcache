@@ -2809,4 +2809,22 @@ public class JdbcFs implements FileSystemProvider {
     public void unpin(String pnfsid) throws ChimeraFsException {
        throw new ChimeraFsException(NOT_IMPL);
     }
+
+    @Override
+    public Map<Long,Map<UsageType,UsageRecord>> getUsageByGid() throws ChimeraFsException
+    {
+        Connection dbConnection;
+        try {
+            // get from pool
+            dbConnection = _dbConnectionsPool.getConnection();
+        } catch (SQLException e) {
+            throw new BackEndErrorHimeraFsException(e.getMessage());
+        }
+
+        try {
+            return _sqlDriver.accountUsageByGID(dbConnection);
+        } finally {
+            tryToClose(dbConnection);
+        }
+    }
 }

@@ -27,6 +27,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -304,4 +305,12 @@ class PgSQLFsSqlDriver extends FsSqlDriver {
          * There is a trigger which does it
          */
     }
+
+    /*  PostgreSQL has a String functions that allows grouping by tape
+        location to be part of the query:
+
+            SELECT i.igid, SUBSTRING(li.ilocation FROM '^.*://([^/]*)'), li.itype, SUM(i.isize)
+                    FROM t_inodes AS i JOIN t_locationinfo AS li ON i.ipnfsid = li.ipnfsid
+                    GROUP BY i.igid, SUBSTRING(li.ilocation FROM '^.*://([^/]*)'), li.itype;
+    */
 }

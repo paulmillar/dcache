@@ -6,9 +6,11 @@ import javax.security.auth.Subject;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import diskCacheV111.namespace.NameSpaceProvider;
+import diskCacheV111.namespace.usage.Usage;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FsPath;
@@ -32,6 +34,7 @@ import org.dcache.util.list.DirectoryEntry;
 import org.dcache.util.list.DirectoryStream;
 import org.dcache.util.list.ListDirectoryHandler;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.vehicles.PnfsAccountUsageByGidMessage;
 
 import static diskCacheV111.vehicles.PnfsFlagMessage.FlagOperation.REMOVE;
 
@@ -234,5 +237,11 @@ public class RemoteNameSpaceProvider implements NameSpaceProvider
     public void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException
     {
         _pnfs.pnfsRequest(new PnfsCancelUpload(subject, uploadPath, path));
+    }
+
+    @Override
+    public Map<Long, Usage> accountUsageByGID() throws CacheException
+    {
+        return _pnfs.pnfsRequest(new PnfsAccountUsageByGidMessage()).getUsage();
     }
 }

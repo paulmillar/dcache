@@ -41,4 +41,9 @@ public class SkelPeriodicActivity implements Schedulable {
 	protected long metricLifetime() {
 		return (long) (_period * 2.5);
 	}
+
+        protected long getPeriod()
+        {
+            return _period;
+        }
 }

@@ -1,0 +1,24 @@
+
+SELECT igid,
+    SUM(isize),
+    COUNT(1) FROM t_inodes GROUP BY igid;
+
+SELECT
+    igid  AS gid,
+    substring(ilocation from '^.*://([^/]*)') AS site,
+    CASE WHEN t_locationinfo.itype = 0 THEN 'tape'
+         WHEN t_locationinfo.itype = 1 THEN 'disk'
+         ELSE 'unknown media'
+    END AS media,
+    SUM(isize)::int8 AS size
+FROM
+    t_inodes
+    JOIN t_locationinfo ON t_inodes.ipnfsid = t_locationinfo.ipnfsid
+GROUP BY
+    igid,
+    substring(ilocation FROM '^.*://([^/]*)'),
+    t_locationinfo.itype;
+"""
+
+
+SELECT igid AS gid, SUM(isize) AS size, COUNT(1) AS count FROM t_inodes GROUP BY igid;
