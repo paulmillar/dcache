@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+
+    <context:property-placeholder/>
+    <context:annotation-config/>
+
+    <bean id="pnfs-stub" class="org.dcache.cells.CellStub">
+        <description>PnfsManager communication stub</description>
+        <property name="destination" value="${cdmi.service.pnfsmanager}" />
+        <property name="timeout" value="${cdmi.service.pnfsmanager.timeout}"/>
+        <property name="timeoutUnit" value="${cdmi.service.pnfsmanager.timeout.unit}"/>
+        <property name="retryOnNoRouteToCell" value="true" />
+    </bean>
+
+    <bean id="billing-stub" class="org.dcache.cells.CellStub">
+        <description>Billing communication stub</description>
+        <property name="destination" value="${cdmi.service.billing}" />
+    </bean>
+
+    <bean id="pool-stub" class="org.dcache.cells.CellStub">
+        <description>Pool communication stub</description>
+        <property name="timeout" value="${cdmi.service.pool.timeout}"/>
+        <property name="timeoutUnit" value="${cdmi.service.pool.timeout.unit}"/>
+    </bean>
+
+    <bean id="list-handler" class="org.dcache.util.list.ListDirectoryHandler">
+        <description>ListDirectoryHandler</description>
+        <constructor-arg>
+            <bean class="diskCacheV111.util.PnfsHandler">
+                <constructor-arg ref="pnfs-stub" />
+            </bean>
+        </constructor-arg>
+    </bean>
+
+    <bean id="pool-manager-stub" class="org.dcache.cells.CellStub">
+        <description>PoolManager communication stub</description>
+        <property name="destination" value="${cdmi.service.poolmanager}"/>
+        <property name="timeout" value="${cdmi.service.poolmanager.timeout}"/>
+        <property name="timeoutUnit" value="${cdmi.service.poolmanager.timeout.unit}"/>
+    </bean>
+
+    <!-- JETTY CONFIG -->
+    <bean id="thread-pool" class="org.eclipse.jetty.util.thread.QueuedThreadPool">
+        <!-- Note that Jetty manages the lifecycle of this thread pool -->
+        <description>Thread pool used by Jetty for request processing</description>
+        <constructor-arg value="${cdmi.limits.threads.max}"/>
+        <constructor-arg value="${cdmi.limits.threads.min}"/>
+        <constructor-arg
+                value="#{T(java.util.concurrent.TimeUnit).MILLISECONDS.convert(
+                     ${cdmi.limits.threads.idle-time},
+                     '${cdmi.limits.threads.idle-time.unit}')}" />
+        <constructor-arg>
+            <bean class="org.eclipse.jetty.util.BlockingArrayQueue">
+                <constructor-arg value="${cdmi.limits.queue-length}"/>
+            </bean>
+        </constructor-arg>
+
+        <property name="name" value="jetty-cdmi" />
+    </bean>
+
+
+    <bean id="setter" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+	<property name="targetObject" ref="servlet-context-handler"/>
+	<property name="targetMethod" value="setInitParameter"/>
+	<property name="arguments">
+	    <list>
+		<value>contextConfigLocation</value>
+		<value>classpath:org/dcache/cdmi/cxf-jsr-config.xml</value>
+	    </list>
+	</property>
+    </bean>
+
+    <bean id="server" class="org.eclipse.jetty.server.Server"
+          init-method="start" destroy-method="stop" depends-on="setter">
+        <description>Embedded HTTP server</description>
+
+        <constructor-arg ref="thread-pool"/>
+
+        <property name="stopTimeout" value="#{T(java.util.concurrent.TimeUnit).MILLISECONDS.convert(
+                     ${cdmi.limits.graceful-shutdown},
+                     '${cdmi.limits.graceful-shutdown.unit}')}"/>
+        <property name="connectors">
+            <list>
+                <ref bean="server-connector"/>
+            </list>
+        </property>
+        <property name="handler" ref="handlers"/>
+
+        <property name="beans">
+            <list>
+                <bean class="org.eclipse.jetty.server.LowResourceMonitor">
+                    <constructor-arg ref="server"/>
+                    <property name="lowResourcesIdleTimeout"
+                              value="#{T(java.util.concurrent.TimeUnit).MILLISECONDS.convert(
+                              ${cdmi.limits.low-resource-idle-time},
+                              '${cdmi.limits.low-resource-idle-time.unit}')}" />
+                    <property name="maxLowResourcesTime" value="180000"/>
+                </bean>
+            </list>
+        </property>
+    </bean>
+
+
+    <bean id="handlers" class="org.eclipse.jetty.server.handler.HandlerList">
+        <description>List of handlers for HTTP requests</description>
+        <property name="handlers">
+            <list>
+                <ref bean="servlet-context-handler"/>
+                <bean class="org.eclipse.jetty.server.handler.DefaultHandler"/>
+            </list>
+        </property>
+    </bean>
+
+
+    <bean id="banned-ciphers" class="org.dcache.util.Crypto"
+            factory-method="getBannedCipherSuitesFromConfigurationValue">
+        <constructor-arg value="${cdmi.authn.ciphers}"/>
+    </bean>
+
+    <bean id="server-connector" class="org.dcache.util.jetty.GlobusConnectorFactoryBean">
+        <description>HTTPS connector supporting grid certificates</description>
+        <property name="server" ref="server"/>
+
+        <property name="host" value="#{ '${cdmi.net.listen}'.equals('any') ? null : '${cdmi.net.listen}' }"/>
+        <property name="port" value="${cdmi.net.port}"/>
+        <property name="backlog" value="${cdmi.limits.backlog}"/>
+        <property name="idleTimeout" value="${cdmi.limits.idle-time}"/>
+        <property name="idleTimeoutUnit" value="${cdmi.limits.idle-time.unit}"/>
+        <property name="acceptors" value="${cdmi.limits.acceptors}"/>
+
+        <property name="wantClientAuth" value="${cdmi.authn.accept-client-cert}"/>
+        <property name="needClientAuth" value="${cdmi.authn.require-client-cert}"/>
+        <property name="excludedCipherSuites" ref="banned-ciphers"/>
+
+        <property name="caPath" value="${cdmi.authn.capath}"/>
+        <property name="caPathTimeout" value="${cdmi.authn.capath.refresh}"/>
+        <property name="caPathTimeoutUnit" value="${cdmi.authn.capath.refresh.unit}"/>
+
+        <property name="serverCertificatePath" value="${cdmi.authn.hostcert.cert}"/>
+        <property name="serverKeyPath" value="${cdmi.authn.hostcert.key}"/>
+        <property name="serverCertificateTimeout" value="${cdmi.authn.hostcert.refresh}"/>
+        <property name="serverCertificateTimeoutUnit" value="${cdmi.authn.hostcert.refresh.unit}"/>
+    </bean>
+
+    <!-- class="org.eclipse.jetty.servlet.ServletContextHandler" -->
+    <bean name="servlet-context-handler" class="org.dcache.cdmi.BirminghamScrewdriver">
+	<property name="contextPath" value="/"/>
+	<property name="servletHandler">
+	    <bean class="org.eclipse.jetty.servlet.ServletHandler">
+		<property name="servlets">
+		    <list>
+			<bean class="org.eclipse.jetty.servlet.ServletHolder">
+			    <property name="name" value="CXFServlet" />
+			    <property name="servlet">
+				<bean class="org.apache.cxf.transport.servlet.CXFServlet"/>
+			    </property>
+			    <property name="initParameters">
+				<map>
+				    <entry key="config-location"
+					   value="classpath:org/dcache/cdmi/cxf-jsr-config.xml"/>
+				</map>
+			    </property>
+			</bean>
+		    </list>
+		</property>
+		<property name="servletMappings">
+		    <list>
+			<bean class="org.eclipse.jetty.servlet.ServletMapping">
+			    <property name="servletName" value="CXFServlet" />
+			    <property name="pathSpec" value="/*" />
+			</bean>
+		    </list>
+		</property>
+	    </bean>
+	</property>
+	<property name="attributes">
+            <bean class="org.dcache.util.jetty.ImmutableAttributesMap">
+                <constructor-arg>
+                    <map>
+			<entry key="org.dcache.cdmi.pnfsstub" value-ref="pnfs-stub" />
+			<entry key="org.dcache.cdmi.lister" value-ref="list-handler" />
+			<entry key="org.dcache.cdmi.poolmgrstub" value-ref="pool-manager-stub" />
+			<entry key="org.dcache.cdmi.poolstub" value-ref="pool-stub" />
+			<entry key="org.dcache.cdmi.billingstub" value-ref="billing-stub" />
+		    </map>
+		</constructor-arg>
+	    </bean>
+	</property>
+
+	<property name="eventListeners">
+	    <bean class="org.springframework.web.context.ContextLoaderListener"/>
+	</property>
+    </bean>
+
+</beans>

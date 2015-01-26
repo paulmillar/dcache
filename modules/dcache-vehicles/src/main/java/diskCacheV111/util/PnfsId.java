@@ -22,8 +22,8 @@ public class PnfsId implements Serializable, Comparable<PnfsId> {
     private static final String VALID_ID_REGEX = "^("+PNFS_STRING_REGEX+"|"+CHIMERA_ID_REGEX+")$";
     private static final Pattern VALID_ID_PATTERN = Pattern.compile( VALID_ID_REGEX);
 
-    private static final int OLD_ID_SIZE = 12; // original pnfs
-    private static final int NEW_ID_SIZE = 18; // chimera
+    public static final int OLD_ID_SIZE = 12; // original pnfs
+    public static final int NEW_ID_SIZE = 18; // chimera
 
     private final byte[] _a;
     private final String _domain;
