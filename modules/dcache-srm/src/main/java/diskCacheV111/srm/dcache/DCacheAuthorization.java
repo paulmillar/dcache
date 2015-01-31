@@ -73,39 +73,29 @@ COPYRIGHT STATUS:
 
 package diskCacheV111.srm.dcache;
 
-import org.globus.gsi.gssapi.GSSConstants;
-import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
-import org.gridforum.jgss.ExtendedGSSContext;
-import org.ietf.jgss.GSSContext;
-import org.ietf.jgss.GSSException;
+import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.Subject;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
-import diskCacheV111.util.CacheException;
-import diskCacheV111.util.PermissionDeniedCacheException;
-import diskCacheV111.util.TimeoutCacheException;
-
-import org.dcache.auth.LoginNamePrincipal;
-import org.dcache.auth.LoginStrategy;
-import org.dcache.auth.Origin;
-import org.dcache.auth.Origin.AuthType;
-import org.dcache.gplazma.AuthenticationException;
+import org.dcache.auth.LoginReply;
+import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.LoginAttribute;
 import org.dcache.srm.SRMAuthenticationException;
 import org.dcache.srm.SRMAuthorization;
 import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMUser;
-import org.dcache.util.CertificateFactories;
 
-import static java.util.Arrays.asList;
+import static org.dcache.srm.util.Axis.*;
+
+import org.dcache.util.jetty.LoginEngine;
+import org.dcache.util.jetty.LoginRequestCustomizer;
+
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 /**
  *
@@ -115,15 +105,10 @@ public final class DCacheAuthorization implements SRMAuthorization
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(DCacheAuthorization.class);
     private final DcacheUserPersistenceManager persistenceManager;
-    private final LoginStrategy loginStrategy;
-    private final CertificateFactory cf;
 
-    public DCacheAuthorization(LoginStrategy loginStrategy,
-            DcacheUserPersistenceManager persistenceManager)
+    public DCacheAuthorization(DcacheUserPersistenceManager persistenceManager)
     {
-        this.loginStrategy = loginStrategy;
         this.persistenceManager = persistenceManager;
-        this.cf = CertificateFactories.newX509CertificateFactory();
     }
 
     /** Performs authorization checks. Throws
@@ -143,35 +128,50 @@ public final class DCacheAuthorization implements SRMAuthorization
             throws SRMAuthorizationException, SRMInternalErrorException, SRMAuthenticationException
     {
         LOGGER.trace("authorize {}:{}", requestCredentialId, secureId);
-        try {
-            Subject subject = new Subject();
-            if (secureId != null && !secureId.isEmpty()) {
-                /* Technically, the secureId could be a
-                 * KerberosPrincipal too. At this point we cannot tell
-                 * the difference anymore.
-                 */
-                subject.getPrincipals().add(new GlobusPrincipal(secureId));
-            }
-            subject.getPublicCredentials().add(cf.generateCertPath(asList(chain)));
 
-            try {
-                InetAddress remoteOrigin = InetAddress.getByName(remoteIP);
-                subject.getPrincipals().add(new Origin(AuthType.ORIGIN_AUTHTYPE_STRONG,
-                                                      remoteOrigin));
-                LOGGER.debug("User connected from the following IP, setting as origin: {}.",
-                        remoteIP);
-            } catch (UnknownHostException uhex) {
-                LOGGER.info("Could not add the remote-IP {} as an origin principal.",
-                        remoteIP);
-            }
+        switch (getState()) {
+        case NOT_ATTEMPTED:
+            throw new SRMInternalErrorException("login not attempted.");
+        case SUCCESS:
+            return persistenceManager.persist(buildLoginReply());
+        case AUTHENTICATION_FAILURE:
+            throw new SRMAuthorizationException(appendMessage("Unknown user"));
+        case INTERNAL_FAILURE:
+            throw new SRMInternalErrorException(appendMessage("Internal failure"));
+        case CREDENTIAL_FAILURE:
+            throw new SRMAuthenticationException(appendMessage("Unable to accept certificate"));
+        default:
+            throw new SRMInternalErrorException("Unknown login state: " + getState());
+        }
+    }
 
-            return persistenceManager.persist(loginStrategy.login(subject));
-        } catch (PermissionDeniedCacheException e) {
-            throw new SRMAuthorizationException(e.getMessage(), e);
-        } catch (CacheException e) {
-            throw new SRMInternalErrorException(e.getMessage(), e);
-        } catch (CertificateException e) {
-            throw new SRMAuthenticationException(e.getMessage(), e);
+    private LoginReply buildLoginReply()
+    {
+        Subject subject = getRequestAttribute(LoginRequestCustomizer.SSL_SESSION_SUBJECT,
+                        Subject.class);
+
+        ImmutableSet<LoginAttribute> attributes = getRequestAttribute(LoginRequestCustomizer.SSL_SESSION_ATTRIBUTES,
+                ImmutableSet.class);
+
+        return new LoginReply(subject == null ? Subjects.NOBODY : subject,
+                attributes == null ? ImmutableSet.of() : attributes);
+    }
+
+    public static LoginEngine.LoginState getState()
+    {
+        LoginEngine.LoginState state = getRequestAttribute(LoginRequestCustomizer.SSL_SESSION_STATE,
+                LoginEngine.LoginState.class);
+        return (state == null) ? LoginEngine.LoginState.NOT_ATTEMPTED : state;
+    }
+
+    public static String appendMessage(String stem)
+    {
+        String message = getRequestAttribute(LoginRequestCustomizer.SSL_SESSION_MESSAGE,
+                String.class);
+        if (isNullOrEmpty(message)) {
+            return stem;
+        } else {
+            return stem + ": " + message;
         }
     }
 }

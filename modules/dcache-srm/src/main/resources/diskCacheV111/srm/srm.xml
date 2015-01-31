@@ -181,8 +181,7 @@
   </bean>
 
   <bean id="authorization" class="diskCacheV111.srm.dcache.DCacheAuthorization">
-    <description>gPlazma plugin for SRM</description>
-    <constructor-arg ref="login-strategy"/>
+    <description>dCache identity plugin for SRM</description>
     <constructor-arg ref="auth-persistence-manager"/>
   </bean>
 
@@ -725,6 +724,8 @@
         <property name="serverKeyPath" value="${srm.authn.hostcert.key}"/>
         <property name="serverCertificateTimeout" value="${srm.authn.capath.refresh}"/>
         <property name="serverCertificateTimeoutUnit" value="${srm.authn.capath.refresh.unit}"/>
+
+	<property name="loginStrategy" ref="login-strategy"/>
     </bean>
 
     <bean id="server" class="org.eclipse.jetty.server.Server"

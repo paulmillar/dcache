@@ -20,7 +20,13 @@ package org.dcache.util.jetty;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
+import org.eclipse.jetty.io.Connection;
+import org.eclipse.jetty.io.EndPoint;
+import org.eclipse.jetty.io.ssl.SslConnection;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -29,7 +35,12 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Required;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSession;
+
 import java.util.concurrent.TimeUnit;
+
+import org.dcache.auth.LoginStrategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.dcache.util.Crypto.*;
@@ -69,6 +80,7 @@ public class GlobusConnectorFactoryBean implements FactoryBean<ServerConnector>
     private String[] excludedCipherSuites = {};
     private boolean enableGsi;
     private boolean isUsingLegacyClose;
+    private LoginStrategy loginStrategy;
 
     public int getAcceptors()
     {
@@ -93,6 +105,16 @@ public class GlobusConnectorFactoryBean implements FactoryBean<ServerConnector>
     public String getHost()
     {
         return host;
+    }
+
+    public void setLoginStrategy(LoginStrategy login)
+    {
+        this.loginStrategy = login;
+    }
+
+    public LoginStrategy getLoginStrategy()
+    {
+        return loginStrategy;
     }
 
     public void setHost(String host)
@@ -286,6 +308,7 @@ public class GlobusConnectorFactoryBean implements FactoryBean<ServerConnector>
         factory.setExcludeCipherSuites(excludedCipherSuites);
         factory.setEnableGsi(enableGsi);
         factory.setUsingLegacyClose(isUsingLegacyClose);
+        factory.setLoginStragey(loginStrategy);
         factory.start();
         return factory;
     }
@@ -306,6 +329,9 @@ public class GlobusConnectorFactoryBean implements FactoryBean<ServerConnector>
         httpConnectionFactory.getHttpConfiguration().addCustomizer(new SecureRequestCustomizer());
         if (enableGsi) {
             httpConnectionFactory.getHttpConfiguration().addCustomizer(new GsiRequestCustomizer());
+        }
+        if (loginStrategy != null) {
+            httpConnectionFactory.getHttpConfiguration().addCustomizer(new LoginRequestCustomizer());
         }
 
         SslConnectionFactory sslConnectionFactory =

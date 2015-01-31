@@ -48,6 +48,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
+import org.dcache.auth.LoginStrategy;
+
 /**
  * Specialized SSLContext factory that uses Globus classes for certificate handling.
  *
@@ -63,6 +65,7 @@ public class GlobusContextFactory extends SslContextFactory
     private Map<String, ProxyPolicyHandler> proxyPolicyHandlers;
     private boolean isGsiEnabled;
     private boolean isUsingLegacyClose;
+    private LoginStrategy loginStrategy;
 
     public GlobusContextFactory()
     {
@@ -92,6 +95,16 @@ public class GlobusContextFactory extends SslContextFactory
     {
         checkNotStarted();
         this.serverKeyPath = serverKeyPath;
+    }
+
+    public void setLoginStragey(LoginStrategy strategy)
+    {
+        loginStrategy = strategy;
+    }
+
+    public LoginStrategy getLoginStragey()
+    {
+        return loginStrategy;
     }
 
     public boolean isRejectLimitProxy()
@@ -223,13 +236,19 @@ public class GlobusContextFactory extends SslContextFactory
 
     private SSLEngine wrapEngine(SSLEngine engine)
     {
+        SSLEngine wrapped = engine;
+
         if (isGsiEnabled) {
-            GsiEngine gsiEngine = new GsiEngine(engine);
+            GsiEngine gsiEngine = new GsiEngine(wrapped);
             gsiEngine.setUsingLegacyClose(isUsingLegacyClose);
-            return new GsiFrameEngine(gsiEngine);
-        } else {
-            return engine;
+            wrapped = new GsiFrameEngine(gsiEngine);
         }
+
+        if (loginStrategy != null) {
+            wrapped = new LoginEngine(wrapped, loginStrategy);
+        }
+
+        return wrapped;
     }
 
     @Override
