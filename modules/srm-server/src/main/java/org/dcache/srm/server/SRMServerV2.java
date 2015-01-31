@@ -185,9 +185,7 @@ import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
 import org.dcache.util.NetLoggerBuilder;
 
-import static org.apache.axis.transport.http.HTTPConstants.MC_HTTP_SERVLETREQUEST;
 import static org.dcache.srm.v2_2.TStatusCode.*;
-import static org.globus.axis.gsi.GSIConstants.GSI_CONTEXT;
 
 public class SRMServerV2 implements ISRM  {
 
@@ -695,10 +693,8 @@ public class SRMServerV2 implements ISRM  {
 
                 NetLoggerBuilder.Level level = isFailure ? NetLoggerBuilder.Level.ERROR : NetLoggerBuilder.Level.INFO;
                 NetLoggerBuilder log = new NetLoggerBuilder(level, "org.dcache.srm.request").omitNullValues();
-                MessageContext context = MessageContext.getCurrentContext();
-                HttpServletRequest servletRequest = (HttpServletRequest) context.getProperty(MC_HTTP_SERVLETREQUEST);
-                log.add("host.remote", servletRequest.getRemoteAddr());
-                log.add("dn", getDn(servletRequest));
+                log.add("host.remote", Axis.getRemoteAddress());
+                log.add("dn", Axis.getDN().orElse("-"));
                 log.add("request.method", requestName);
                 String requestToken = getRequestToken(request, response);
                 if (requestToken != null) {
@@ -712,7 +708,7 @@ public class SRMServerV2 implements ISRM  {
                 }
                 log.add("session", JDC.getSession());
 
-                log.add("user-agent", servletRequest.getHeader(HTTPConstants.HEADER_USER_AGENT));
+                log.add("user-agent", Axis.getUserAgent());
                 log.toLogger(ACCESS_LOGGER);
             }
         }
@@ -818,17 +814,5 @@ public class SRMServerV2 implements ISRM  {
             LOGGER.debug("Failed to extract status code: {}", e.toString());
         }
         return null;
-    }
-
-    private static String getDn(HttpServletRequest request)
-    {
-        try {
-            X509Certificate[] chain = (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate");
-            if (chain != null) {
-                return BouncyCastleUtil.getIdentity(BouncyCastleUtil.getIdentityCertificate(chain));
-            }
-        } catch (CertificateException ignored) {
-        }
-        return "-";
     }
 }
