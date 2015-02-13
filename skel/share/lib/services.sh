@@ -6,7 +6,7 @@ printDomains() # $1+ = patterns
 {
     local domain
     local domains
-    domains=$(getProperty dcache.domains)
+    domains="$(getProperty dcache.domains) $(printOrphanedDomains)"
     if [ $# -eq 0 ]; then
         echo $domains
     else
@@ -46,7 +46,7 @@ printSimpleDomainStatus() # $1 = domain
         if printDaemonPid "$1" > /dev/null; then
             printf "running"
         else
-            printf "orphaned"
+            printf "detached"
         fi
         return 0
     else
@@ -128,6 +128,36 @@ printJavaPid() # $1 = domain
 {
     printPidFromFile "$(getProperty dcache.pid.java "$1")"
 }
+
+
+# Record that we started a domain
+recordDomainStart() # $1 = domain, $2 = daemon pid, $3 = java pid
+{
+    echo "$1:$2:$3" >> "$(getProperty dcache.started-domains-list)"
+}
+
+# Record that we stopped a domain
+recordDomainStop() # $1 = domain
+{
+    local tmp
+    
+    tmp=$(mktemp)
+    grep -v "^$1:" "$(getProperty dcache.started-domains-list)" > "$tmp"
+    mv "$tmp" "$(getProperty dcache.started-domains-list)"
+}
+
+printOrphanedDomains() # $* known running domains
+{
+    known_domains=$(getProperty dcache.domains)
+    IFS=: cat "$(getProperty dcache.started-domains-list)" |
+	while read domain rest; do
+	    if ! matchesAny $domain $known_domains; then
+		orphaned="$orphaned $domain"
+	    fi
+	done
+    echo $orphaned
+}
+
 
 # Start domain. Use runDomain rather than calling this function
 # directly.
@@ -223,6 +253,7 @@ domainStart() # $1 = domain
     printf "Starting ${domain} "
     for c in 6 5 4 3 2 1 0; do
 	if [ "$(printSimpleDomainStatus "$domain")" != "stopped" ]; then
+	    recordDomainStart "$domain" "$PID_DAEMON" "$PID_JAVA"
             echo "done"
             return
         fi
@@ -277,6 +308,7 @@ domainStop() # $1 = domain
             PID_DAEMON="$(getProperty dcache.pid.daemon "$domain")"
             rm -f "$PID_DAEMON" "$PID_JAVA" "$RESTART_FILE"
             echo "done"
+	    recordDomainStop "$domain"
             return
         fi
         printf "$c "
@@ -285,6 +317,7 @@ domainStop() # $1 = domain
             if javaPid=$(printJavaPid "$domain"); then
                 kill -9 $javaPid 1>/dev/null 2>/dev/null || true
                 printf "[K] "
+		recordDomainStop "$domain"
             fi
         fi
     done
