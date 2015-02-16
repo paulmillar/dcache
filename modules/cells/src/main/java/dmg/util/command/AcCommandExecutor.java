@@ -2,6 +2,8 @@ package dmg.util.command;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Throwables;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -12,6 +14,7 @@ import dmg.util.CommandException;
 import dmg.util.CommandPanicException;
 import dmg.util.CommandSyntaxException;
 import dmg.util.CommandThrowableException;
+
 import org.dcache.util.Args;
 import org.dcache.util.cli.CommandExecutor;
 
@@ -21,6 +24,8 @@ import org.dcache.util.cli.CommandExecutor;
  */
 class AcCommandExecutor implements CommandExecutor
 {
+    private static final Logger LOG = LoggerFactory.getLogger(AcCommandExecutor.class);
+
     private final Object _listener;
     private Method _method;
     private int _minArgs;
@@ -160,7 +165,8 @@ class AcCommandExecutor implements CommandExecutor
                 }
 
                 if (!declared) {
-                    throw new CommandPanicException("Command failed: " + e.toString(),  e);
+                    LOG.warn("Command failed: ", te);
+                    throw new CommandPanicException("Command failed: " + te.toString(),  te);
                 }
             }
 
