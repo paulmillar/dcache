@@ -3,6 +3,7 @@ package org.dcache.util;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,11 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.InvalidPropertiesFormatException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -105,6 +108,9 @@ public class ConfigurationProperties
     private static final Set<Annotation> OBSOLETE_FORBIDDEN =
         EnumSet.of(Annotation.OBSOLETE, Annotation.FORBIDDEN);
 
+    private static final Set<Annotation> VALIDATING_ANNOTATIONS =
+        EnumSet.of(Annotation.ONE_OF, Annotation.ANY_OF);
+
     private final static Logger _log =
         LoggerFactory.getLogger(ConfigurationProperties.class);
 
@@ -119,6 +125,8 @@ public class ConfigurationProperties
     private boolean _loading;
     private boolean _isService;
     private ProblemConsumer _problemConsumer = new DefaultProblemConsumer();
+    private final Set<String> _validatingProperties = new HashSet<>();
+    private final Map<String,String> _propertyContext = new HashMap<>();
 
     public ConfigurationProperties()
     {
@@ -139,6 +147,7 @@ public class ConfigurationProperties
             ConfigurationProperties defaultConfig = (ConfigurationProperties) defaults;
             _problemConsumer = defaultConfig._problemConsumer;
             _prefixes.addAll(defaultConfig._prefixes);
+            _validatingProperties.addAll(defaultConfig._validatingProperties);
         }
         _usageChecker = usageChecker;
     }
@@ -284,9 +293,13 @@ public class ConfigurationProperties
             putAnnotatedKey(key);
         }
 
+        AnnotatedKey declaringKey = getAnnotatedKey(name);
+        if (declaringKey != null && declaringKey.hasAnyOf(VALIDATING_ANNOTATIONS)) {
+            _propertyContext.put(name, _problemConsumer.getContext());
+        }
+
         return key.hasAnyOf(OBSOLETE_FORBIDDEN) ? null : super.put(name, ((String)value).trim());
     }
-
 
     protected void checkIsAllowed(AnnotatedKey key, String value)
     {
@@ -294,7 +307,6 @@ public class ConfigurationProperties
         AnnotatedKey existingKey = getAnnotatedKey(name);
         if (existingKey != null) {
             checkKeyValid(existingKey, key);
-            checkDataValid(existingKey, value);
         } else if (name.indexOf('/') > -1) {
             _problemConsumer.error(
                     "Property " + name + " is a scoped property. Scoped properties are no longer supported.");
@@ -305,7 +317,6 @@ public class ConfigurationProperties
             // the entire property checking logic.
             _problemConsumer.info("Property " + name + " is not a standard property");
         }
-        checkDataValid(key, value);
     }
 
     private void checkKeyValid(AnnotatedKey existingKey, AnnotatedKey key)
@@ -329,37 +340,6 @@ public class ConfigurationProperties
         }
     }
 
-
-    private void checkDataValid(AnnotatedKey key, String value)
-    {
-        if(key.hasAnnotation(Annotation.ONE_OF)) {
-            String oneOfParameter = key.getParameter(Annotation.ONE_OF);
-            Set<String> validValues = ImmutableSet.copyOf(oneOfParameter.split("\\|"));
-            if(!validValues.contains(value)) {
-                String validValuesList = "\"" +
-                        Joiner.on("\", \"").join(validValues) + "\"";
-                _problemConsumer.error("Property " + key.getPropertyName() +
-                        ": \"" + value + "\" is not a valid value.  Must be one of "
-                        + validValuesList);
-            }
-        }
-        if (key.hasAnnotation(Annotation.ANY_OF)) {
-            String anyOfParameter = key.getParameter(Annotation.ANY_OF);
-            Set<String> values = Sets.newHashSet(Splitter.on(',')
-                    .omitEmptyStrings()
-                    .trimResults().split(value));
-            Set<String> validValues = ImmutableSet.copyOf(anyOfParameter.split("\\|"));
-            values.removeAll(validValues);
-            if (!values.isEmpty()) {
-                String validValuesList = "\""
-                        + Joiner.on("\", \"").join(validValues) + "\"";
-                _problemConsumer.error("Property " + key.getPropertyName()
-                        + ": \"" + value
-                        + "\" is not a valid value. Must be a comma separated list of "
-                        + validValuesList);
-            }
-        }
-    }
 
     /**
      * Define the binary relationship property A hasSynonym property B
@@ -470,6 +450,85 @@ public class ConfigurationProperties
     private void putAnnotatedKey(AnnotatedKey key)
     {
         _annotatedKeys.put(key.getPropertyName(), key);
+
+        if (key.hasAnyOf(VALIDATING_ANNOTATIONS)) {
+            _validatingProperties.add(key.getPropertyName());
+        }
+    }
+
+    /**
+     * This method validates the configuration data.  It should be run once
+     * after all properties are loaded.
+     *
+     * The context object should be some mutable Multimap implementation
+     * (e.g., HashMultimap).  No thread safety is needed and it should be
+     * initially empty.  If this method is called on two different
+     * ConfigurationProperties instances with some common defaults then the
+     * same context object should be presented.
+     */
+    public void validate(Multimap<String,String> context)
+    {
+        validate(this, new HashMap<>(), new HashSet<>(), context);
+    }
+
+    private void validate(ConfigurationProperties target,
+            Map<String,String> namesToCheck, Set<String> namesToSkip,
+            Multimap<String,String> reported)
+    {
+        keySet().stream().map(Object::toString).
+                filter(_validatingProperties::contains).
+                filter(n -> !namesToCheck.containsKey(n)).
+                forEach(n -> {if (reported.containsEntry(n, _propertyContext.get(n))) {
+                        namesToSkip.add(n);
+                    } else {
+                        namesToCheck.put(n, _propertyContext.get(n));
+                    }
+                });
+
+        if (defaults instanceof ConfigurationProperties) {
+            ((ConfigurationProperties)defaults).validate(target, namesToCheck, namesToSkip, reported);
+        }
+
+        namesToCheck.entrySet().stream().filter(e -> _annotatedKeys.containsKey(e.getKey())
+                    && _annotatedKeys.get(e.getKey()).hasAnnotation(Annotation.ONE_OF)).
+                filter(e -> !namesToSkip.contains(e.getKey())).
+                forEach(e -> {String value = target.getValue(e.getKey());
+                        AnnotatedKey key = _annotatedKeys.get(e.getKey());
+                        String oneOfParameter = key.getParameter(Annotation.ONE_OF);
+                        Set<String> validValues = ImmutableSet.copyOf(oneOfParameter.split("\\|"));
+                        if(!validValues.contains(value)) {
+                            String validValuesList = "\"" + Joiner.on("\", \"").join(validValues) + "\"";
+                            _problemConsumer.setContext(e.getValue());
+                            _problemConsumer.error("Property " + key.getPropertyName() +
+                                    ": \"" + value +
+                                    "\" is not a valid value.  Must be one of "
+                                    + validValuesList);
+                            _problemConsumer.setContext(null);
+                            reported.put(e.getKey(), e.getValue());
+                        }});
+
+        namesToCheck.entrySet().stream().filter(e -> _annotatedKeys.containsKey(e.getKey())
+                    && _annotatedKeys.get(e.getKey()).hasAnnotation(Annotation.ANY_OF)).
+                filter(e -> !namesToSkip.contains(e.getKey())).
+                forEach(e -> {String value = target.getValue(e.getKey());
+                        AnnotatedKey key = _annotatedKeys.get(e.getKey());
+                        String anyOfParameter = key.getParameter(Annotation.ANY_OF);
+                        Set<String> values = Sets.newHashSet(Splitter.on(',')
+                                .omitEmptyStrings().trimResults().split(value));
+                        Set<String> validValues =
+                                ImmutableSet.copyOf(anyOfParameter.split("\\|"));
+                        values.removeAll(validValues);
+                        if (!values.isEmpty()) {
+                            String validValuesList = "\""
+                                    + Joiner.on("\", \"").join(validValues) + "\"";
+                            _problemConsumer.setContext(e.getValue());
+                            _problemConsumer.error("Property " + key.getPropertyName()
+                                    + ": \"" + value
+                                    + "\" is not a valid value. Must be a comma separated list of "
+                                    + validValuesList);
+                            _problemConsumer.setContext(null);
+                            reported.put(e.getKey(), e.getValue());
+                        }});
     }
 
     /**
@@ -668,6 +727,8 @@ public class ConfigurationProperties
     public interface ProblemConsumer {
         public void setFilename(String name);
         public void setLineNumberReader(LineNumberReader reader);
+        public String getContext();
+        public void setContext(String context);
         public void error(String message);
         public void warning(String message);
         public void info(String message);
@@ -682,14 +743,32 @@ public class ConfigurationProperties
     {
         private String _filename;
         private LineNumberReader _reader;
+        private String _context;
 
         protected String addContextTo(String message)
         {
-            if( _filename == null || _reader == null) {
-                return message;
+            String context = getContext();
+            return context == null ? message : (context + ": " + message);
+        }
+
+        @Override
+        public String getContext()
+        {
+            if (_context != null) {
+                return _context;
             }
 
-            return _filename + ":" + _reader.getLineNumber() + ": " + message;
+            if( _filename == null || _reader == null) {
+                return null;
+            }
+
+            return _filename + ":" + _reader.getLineNumber();
+        }
+
+        @Override
+        public void setContext(String context)
+        {
+            _context = context;
         }
 
         @Override
@@ -714,12 +793,14 @@ public class ConfigurationProperties
         public void setFilename(String name)
         {
             _filename = name;
+            _context = null;
         }
 
         @Override
         public void setLineNumberReader(LineNumberReader reader)
         {
             _reader = reader;
+            _context = null;
         }
     }
 

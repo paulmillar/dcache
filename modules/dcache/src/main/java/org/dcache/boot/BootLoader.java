@@ -235,6 +235,17 @@ public class BootLoader
         public void info( String message) {
             _inner.info(message);
         }
+
+        @Override
+        public void setContext(String context) {
+            _inner.setContext(context);
+        }
+
+        @Override
+        public String getContext()
+        {
+            return _inner.getContext();
+        }
     }
 
     /**

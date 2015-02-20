@@ -1,7 +1,8 @@
 package org.dcache.boot;
 
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
 import java.io.File;
@@ -12,6 +13,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -36,7 +39,19 @@ public class LayoutBuilder
 
     public Layout build() throws IOException, URISyntaxException
     {
-        return loadLayout(loadConfiguration());
+        Multimap<String,String> context = HashMultimap.create();
+
+        ConfigurationProperties base = loadConfiguration();
+        base.validate(context);
+
+        Layout layout = loadLayout(base);
+
+        layout.getDomains().stream().map(d->d.properties()).
+                forEach(p -> p.validate(context));
+        layout.getDomains().stream().flatMap(d -> d.getServices().stream()).
+                forEach(p -> p.validate(context));
+
+        return layout;
     }
 
     private ConfigurationProperties loadSystemProperties()
@@ -209,6 +224,17 @@ public class LayoutBuilder
         @Override
         public void info(String message)
         {
+        }
+
+        @Override
+        public void setContext(String context)
+        {
+        }
+
+        @Override
+        public String getContext()
+        {
+            return "";
         }
     }
 }
