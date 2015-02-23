@@ -1130,11 +1130,9 @@ public class ChimeraNameSpaceProvider
              */
             FsInode inodeOfUploadDir = installDirectory(Subjects.ROOT, uploadDirectory, 0, 0, 0711);
             if (inodeOfUploadDir.statCache().getUid() != 0) {
-                _log.error("Owner must be root: {}", uploadDirectory);
                 throw new CacheException("Owner must be root: " + uploadDirectory);
             }
             if ((inodeOfUploadDir.statCache().getMode() & UnixPermission.S_PERMS) != 0711) {
-                _log.error("File mode must be 0711: {}", uploadDirectory);
                 throw new CacheException("File mode must be 0711: " + uploadDirectory);
             }
 
@@ -1164,7 +1162,6 @@ public class ChimeraNameSpaceProvider
 
             return new FsPath(uploadDirectory, uuid.toString(), path.getName());
         } catch (ChimeraFsException e) {
-            _log.error("Problem with database: {}", e.getMessage());
             throw new CacheException(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                      e.getMessage());
         }

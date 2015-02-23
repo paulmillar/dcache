@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.ChecksumFactory;
+import diskCacheV111.util.FileExistsCacheException;
 import diskCacheV111.util.FileNotFoundCacheException;
 import diskCacheV111.util.FsPath;
 import diskCacheV111.util.InvalidMessageCacheException;
@@ -1198,7 +1199,11 @@ public class PnfsManagerV3
                                                                     message.getSpaceToken(),
                                                                     message.getOptions());
             message.setUploadPath(uploadPath);
+        } catch (FileExistsCacheException | PermissionDeniedCacheException e) {
+            // User-triggered errors are not logged.
+            message.setFailed(e.getRc(), e.getMessage());
         } catch (CacheException e) {
+            _log.error("Failed to create upload directory: {}", e.getMessage());
             message.setFailed(e.getRc(), e.getMessage());
         } catch (RuntimeException e) {
             _log.error("Create upload path failed", e);
