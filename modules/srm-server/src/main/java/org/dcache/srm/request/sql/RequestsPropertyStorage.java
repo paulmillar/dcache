@@ -180,16 +180,21 @@ public class RequestsPropertyStorage extends JobIdGeneratorFactory implements Jo
 
     public synchronized  int nextInt()   {
         if (nextIntIncrement >= NEXT_INT_STEP) {
-            nextIntBase = transactionTemplate.execute(status -> {
-                int base = jdbcTemplate.queryForObject("SELECT NEXTINT FROM " + nextRequestIdTableName + " FOR UPDATE", Integer.class);
-                int newBase = base + NEXT_INT_STEP;
-                int n = jdbcTemplate.update("UPDATE " + nextRequestIdTableName + " SET NEXTINT=?", newBase);
-                if (n != 1) {
-                    throw new IncorrectResultSizeDataAccessException(
-                            "Unexpected number of rows got updated in " + nextRequestIdTableName, 1, n);
-                }
-                return newBase;
-            });
+            try {
+                nextIntBase = transactionTemplate.execute(status -> {
+                    int base = jdbcTemplate.queryForObject("SELECT NEXTINT FROM " + nextRequestIdTableName + " FOR UPDATE", Integer.class);
+                    int newBase = base + NEXT_INT_STEP;
+                    int n = jdbcTemplate.update("UPDATE " + nextRequestIdTableName + " SET NEXTINT=?", newBase);
+                    if (n != 1) {
+                        throw new IncorrectResultSizeDataAccessException(
+                                "Unexpected number of rows got updated in " + nextRequestIdTableName, 1, n);
+                    }
+                    return newBase;
+                });
+            } catch (DataAccessException e) {
+                throw new IllegalStateException("Failed to fetch next int from " +
+                        "table" + nextRequestIdTableName + ": " + e.toString(), e);
+            }
             nextIntIncrement = 0;
         }
         int nextInt = nextIntBase + nextIntIncrement++;
@@ -216,16 +221,21 @@ public class RequestsPropertyStorage extends JobIdGeneratorFactory implements Jo
     @Override
     public synchronized long nextLong() {
         if (nextLongIncrement >= NEXT_LONG_STEP) {
-            nextLongBase = transactionTemplate.execute(status -> {
-                long base = jdbcTemplate.queryForObject("SELECT NEXTLONG FROM " + nextRequestIdTableName + " FOR UPDATE", Long.class);
-                long newBase = base + NEXT_LONG_STEP;
-                int n = jdbcTemplate.update("UPDATE " + nextRequestIdTableName + " SET NEXTLONG=?", newBase);
-                if (n != 1) {
-                    throw new IncorrectResultSizeDataAccessException(
-                            "Unexpected number of rows got updated in " + nextRequestIdTableName, 1, n);
-                }
-                return newBase;
-            });
+            try {
+                nextLongBase = transactionTemplate.execute(status -> {
+                    long base = jdbcTemplate.queryForObject("SELECT NEXTLONG FROM " + nextRequestIdTableName + " FOR UPDATE", Long.class);
+                    long newBase = base + NEXT_LONG_STEP;
+                    int n = jdbcTemplate.update("UPDATE " + nextRequestIdTableName + " SET NEXTLONG=?", newBase);
+                    if (n != 1) {
+                        throw new IncorrectResultSizeDataAccessException(
+                                "Unexpected number of rows got updated in " + nextRequestIdTableName, 1, n);
+                    }
+                    return newBase;
+                });
+            } catch (DataAccessException e) {
+                throw new IllegalStateException("Failed fetch next long from " +
+                        "table " + nextRequestIdTableName + ": " + e.toString(), e);
+            }
             nextLongIncrement = 0;
         }
 
