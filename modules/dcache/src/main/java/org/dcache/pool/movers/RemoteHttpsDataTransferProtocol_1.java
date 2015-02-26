@@ -38,6 +38,7 @@ import dmg.util.Replaceable;
 
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.vehicles.FileAttributes;
 
 import static org.globus.gsi.provider.KeyStoreParametersFactory.createTrustStoreParameters;
@@ -101,7 +102,8 @@ public class RemoteHttpsDataTransferProtocol_1 extends RemoteHttpDataTransferPro
 
     @Override
     public void runIO(FileAttributes attributes, RepositoryChannel channel,
-            ProtocolInfo genericInfo, Allocator allocator, IoMode access)
+            ProtocolInfo genericInfo, Allocator allocator, IoMode access,
+            TransferMonitor monitor)
             throws CacheException, IOException, InterruptedException
     {
          RemoteHttpsDataTransferProtocolInfo info =
@@ -109,7 +111,7 @@ public class RemoteHttpsDataTransferProtocol_1 extends RemoteHttpDataTransferPro
          privateKey = info.getPrivateKey();
          chain = info.getCertificateChain();
 
-         super.runIO(attributes, channel, genericInfo, allocator, access);
+         super.runIO(attributes, channel, genericInfo, allocator, access, monitor);
     }
 
     private KeyStore getTrustStore() throws KeyStoreException, IOException, CertificateException

@@ -35,6 +35,7 @@ import org.dcache.net.ProtocolConnectionPool;
 import org.dcache.net.ProtocolConnectionPoolFactory;
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
@@ -287,7 +288,8 @@ public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
                       RepositoryChannel  fileChannel,
                       ProtocolInfo protocol,
                       Allocator    allocator,
-                      IoMode          access  )
+                      IoMode          access,
+                      TransferMonitor monitor)
         throws Exception
     {
         Exception ioException         = null;
@@ -1105,12 +1107,6 @@ public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
     public long getLastTransferred() { return _lastTransferred; }
     @Override
     public long getBytesTransferred(){ return _bytesTransferred ; }
-    @Override
-    public long getTransferTime(){
-        return _transferTime < 0 ?
-            System.currentTimeMillis() - _transferStarted :
-            _transferTime ;
-    }
 
     @Override
     public void enableTransferChecksum(ChecksumType suggestedAlgorithm)

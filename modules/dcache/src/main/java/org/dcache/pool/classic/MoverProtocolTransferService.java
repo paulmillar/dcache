@@ -207,7 +207,7 @@ public class MoverProtocolTransferService extends AbstractCellComponent
         private void runMover(RepositoryChannel fileIoChannel) throws Exception
         {
             _mover.getMover().runIO(_mover.getFileAttributes(), fileIoChannel, _mover.getProtocolInfo(),
-                    _mover.getIoHandle(), _mover.getIoMode());
+                    _mover.getIoHandle(), _mover.getIoMode(), _mover);
         }
 
         private synchronized void setThread() throws InterruptedException {

@@ -4,6 +4,7 @@ import diskCacheV111.vehicles.ProtocolInfo;
 
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.vehicles.FileAttributes;
 
 public interface MoverProtocol
@@ -17,7 +18,8 @@ public interface MoverProtocol
                       RepositoryChannel diskFile,
                       ProtocolInfo protocol,
                       Allocator    allocator,
-                      IoMode         access)
+                      IoMode         access,
+                      TransferMonitor monitor)
         throws Exception;
 
     /**
@@ -27,14 +29,6 @@ public interface MoverProtocol
      * @return number of bytes
      */
     public long getBytesTransferred();
-
-    /**
-     * Get time between transfers begin and end. If Mover is sill
-     * active, then current time used as end.
-     *
-     * @return transfer time in milliseconds.
-     */
-    public long getTransferTime();
 
     /**
      * Get time of last transfer.

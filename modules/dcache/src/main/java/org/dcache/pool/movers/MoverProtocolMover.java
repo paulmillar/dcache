@@ -51,12 +51,6 @@ public class MoverProtocolMover extends AbstractMover<ProtocolInfo, MoverProtoco
     }
 
     @Override
-    public long getTransferTime()
-    {
-        return _moverProtocol.getTransferTime();
-    }
-
-    @Override
     public long getBytesTransferred()
     {
         return _moverProtocol.getBytesTransferred();

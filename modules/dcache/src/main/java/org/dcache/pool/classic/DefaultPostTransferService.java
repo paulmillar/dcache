@@ -36,6 +36,7 @@ import diskCacheV111.vehicles.MoverInfoMessage;
 import dmg.cells.nucleus.NoRouteToCellException;
 
 import dmg.cells.nucleus.AbstractCellComponent;
+
 import org.dcache.cells.CellStub;
 import org.dcache.pool.FaultAction;
 import org.dcache.pool.FaultEvent;
@@ -43,9 +44,12 @@ import org.dcache.pool.FaultListener;
 import org.dcache.pool.movers.IoMode;
 import org.dcache.pool.movers.Mover;
 import org.dcache.pool.repository.ReplicaDescriptor;
+import org.dcache.pool.repository.TransferStatistics;
 import org.dcache.util.CDCExecutorServiceDecorator;
 import org.dcache.util.FireAndForgetTask;
 import org.dcache.vehicles.FileAttributes;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class DefaultPostTransferService extends AbstractCellComponent implements PostTransferService
 {
@@ -144,6 +148,8 @@ public class DefaultPostTransferService extends AbstractCellComponent implements
     public void sendBillingMessage(Mover<?> mover, long fileSize) {
         FileAttributes fileAttributes = mover.getFileAttributes();
 
+        TransferStatistics statistics = mover.getStatistics();
+
         MoverInfoMessage info = new MoverInfoMessage(getCellName(), fileAttributes.getPnfsId());
         info.setSubject(mover.getSubject());
         info.setInitiator(mover.getInitiator());
@@ -152,8 +158,12 @@ public class DefaultPostTransferService extends AbstractCellComponent implements
         info.setP2P(mover.isPoolToPoolTransfer());
         info.setFileSize(fileSize);
         info.setResult(mover.getErrorCode(), mover.getErrorMessage());
+        info.setTimeWaiting(statistics.getWaiting(MILLISECONDS));
+        info.setTimePending(statistics.getPending(MILLISECONDS));
+        info.setTimeProcessing(statistics.getProcessing(MILLISECONDS));
+        info.setTimeClosed(statistics.getClosed(MILLISECONDS));
         info.setTransferAttributes(mover.getBytesTransferred(),
-                mover.getTransferTime(),
+                statistics.getTransferTime(MILLISECONDS),
                 mover.getProtocolInfo());
         info.setPath(mover.getPath());
 

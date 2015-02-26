@@ -6,6 +6,10 @@ public class MoverInfoMessage extends PnfsFileInfoMessage
 {
     private long _dataTransferred;
     private long _connectionTime;
+    private long _timeWaiting;
+    private long _timePending;
+    private long _timeProcessing;
+    private long _timeClosed;
 
     private ProtocolInfo _protocolInfo;
     private boolean _fileCreated;
@@ -19,6 +23,26 @@ public class MoverInfoMessage extends PnfsFileInfoMessage
     {
 
         super("transfer", "pool", cellName, pnfsId);
+    }
+
+    public void setTimeWaiting(long duration)
+    {
+        _timeWaiting = duration;
+    }
+
+    public void setTimeProcessing(long duration)
+    {
+        _timeProcessing = duration;
+    }
+
+    public void setTimeClosed(long duration)
+    {
+        _timeClosed = duration;
+    }
+
+    public void setTimePending(long duration)
+    {
+        _timePending = duration;
     }
 
     public void setFileCreated(boolean created)
@@ -59,6 +83,26 @@ public class MoverInfoMessage extends PnfsFileInfoMessage
     public long getConnectionTime()
     {
         return _connectionTime;
+    }
+
+    public long getTimeWaiting()
+    {
+        return _timeWaiting;
+    }
+
+    public long getTimePending()
+    {
+        return _timePending;
+    }
+
+    public long getTimeProcessing()
+    {
+        return _timeProcessing;
+    }
+
+    public long getTimeClosed()
+    {
+        return _timeClosed;
     }
 
     public boolean isFileCreated()

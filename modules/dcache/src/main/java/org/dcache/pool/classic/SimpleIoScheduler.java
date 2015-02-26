@@ -32,6 +32,7 @@ import org.dcache.util.LifoPriorityComparator;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.dcache.pool.classic.IoRequestState.*;
 
 /**
@@ -419,7 +420,8 @@ public class SimpleIoScheduler implements IoScheduler, Runnable {
             return new IoJobInfo(_submitTime, _startTime, _state.toString(), _id,
                                  _mover.getPathToDoor().getDestinationAddress().toString(), _mover.getClientId(),
                                  _mover.getFileAttributes().getPnfsId(), _mover.getBytesTransferred(),
-                                 _mover.getTransferTime(), _mover.getLastTransferred());
+                                 _mover.getStatistics().getTransferTime(MILLISECONDS),
+                                 _mover.getLastTransferred());
         }
 
         public synchronized void transfer(CompletionHandler<Void,Void> completionHandler) {

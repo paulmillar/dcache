@@ -31,6 +31,7 @@ import dmg.cells.nucleus.CellPath;
 
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.util.NetworkUtils;
 import org.dcache.util.PortRange;
 import org.dcache.vehicles.FileAttributes;
@@ -44,7 +45,6 @@ public class DCapClientProtocol_1 implements MoverProtocol
     private long last_transfer_time    = System.currentTimeMillis();
     private final CellEndpoint   cell;
     private DCapClientProtocolInfo dcapClient;
-    private long starttime;
     private volatile long transfered;
 
 
@@ -72,7 +72,8 @@ public class DCapClientProtocol_1 implements MoverProtocol
                        RepositoryChannel fileChannel,
                        ProtocolInfo protocol ,
                        Allocator    allocator ,
-                       IoMode         access)
+                       IoMode         access,
+                       TransferMonitor monitor)
         throws Exception
     {
         PnfsId pnfsId = fileAttributes.getPnfsId();
@@ -85,7 +86,6 @@ public class DCapClientProtocol_1 implements MoverProtocol
                 throw new  CacheException(
                                           "protocol info is not RemoteGsiftpransferProtocolInfo");
             }
-        starttime = System.currentTimeMillis();
 
         dcapClient = (DCapClientProtocolInfo) protocol;
 
@@ -152,12 +152,6 @@ public class DCapClientProtocol_1 implements MoverProtocol
     public long getBytesTransferred()
     {
         return  transfered;
-    }
-
-    @Override
-    public long getTransferTime()
-    {
-        return System.currentTimeMillis() -starttime;
     }
 
     private void dcapReadFile(Socket _socket,

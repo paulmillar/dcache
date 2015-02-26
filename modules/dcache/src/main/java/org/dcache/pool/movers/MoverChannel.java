@@ -302,12 +302,6 @@ public class MoverChannel<T extends ProtocolInfo> implements RepositoryChannel
         return _bytesTransferred.get();
     }
 
-    public long getTransferTime() {
-        return (_channel.isOpen()
-                ? System.currentTimeMillis()
-                : getLastTransferred()) - _transferStarted;
-    }
-
     public long getLastTransferred() {
         return _lastTransferred.get();
     }

@@ -27,6 +27,7 @@ import javax.security.auth.Subject;
 import java.io.FileNotFoundException;
 import java.io.InterruptedIOException;
 import java.nio.channels.CompletionHandler;
+import java.util.concurrent.TimeUnit;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.DiskErrorCacheException;
@@ -41,12 +42,17 @@ import org.dcache.pool.classic.Cancellable;
 import org.dcache.pool.classic.PostTransferService;
 import org.dcache.pool.classic.TransferService;
 import org.dcache.pool.repository.FileRepositoryChannel;
+import org.dcache.pool.repository.MonitoringRepositoryChannelHandler;
 import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
+import org.dcache.pool.repository.TransferStatistics;
 import org.dcache.util.TryCatchTemplate;
 import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Abstract base class for movers.
@@ -71,6 +77,7 @@ public abstract class AbstractMover<P extends ProtocolInfo, M extends Mover<P>> 
     protected final FsPath _path;
     protected volatile int _errorCode;
     protected volatile String _errorMessage = "";
+    private TransferMonitor _monitor;
 
     public AbstractMover(ReplicaDescriptor handle, PoolIoFileMessage message, CellPath pathToDoor,
                          TransferService<M> transferService,
@@ -258,7 +265,21 @@ public abstract class AbstractMover<P extends ProtocolInfo, M extends Mover<P>> 
         default:
             throw new RuntimeException("Invalid I/O mode");
         }
+
+        channel = MonitoringRepositoryChannelHandler.addMonitoringTo(channel);
+        _monitor = (TransferMonitor)channel;
+
         return channel;
+    }
+
+    @Override
+    public TransferStatistics getStatistics()
+    {
+        if (_monitor != null) {
+            return _monitor.getStatistics();
+        } else {
+            return new TransferStatistics(0L, 0L, 0L, 0L);
+        }
     }
 
     @Override
@@ -267,8 +288,19 @@ public abstract class AbstractMover<P extends ProtocolInfo, M extends Mover<P>> 
         StringBuilder sb = new StringBuilder();
         sb.append(getFileAttributes().getPnfsId());
         sb.append(" IoMode=").append(getIoMode());
-        sb.append(" h={").append(getStatus()).append("} bytes=").append(getBytesTransferred()).append(
-                " time/sec=").append(getTransferTime() / 1000L).append(" LM=");
+        sb.append(" h={").append(getStatus()).append("} bytes=").append(getBytesTransferred());
+
+        TransferStatistics statistics = getStatistics();
+        sb.append(" waiting=").append(statistics.getWaiting(SECONDS)).append('s');
+        sb.append(" active=").append(statistics.getActive(SECONDS)).append('s');
+        sb.append(" {pending=").append(statistics.getPending(SECONDS)).append('s');
+        sb.append(" + proc=").append(statistics.getProcessing(SECONDS)).append('s');
+        sb.append("} closed=").append(statistics.getClosed(SECONDS)).append('s');
+
+        sb.append(" disk=").append(describeBandwidth(statistics.getProcessing(MILLISECONDS)));
+        sb.append(" net=").append(describeBandwidth(statistics.getPending(MILLISECONDS)));
+
+        sb.append(" LM=");
         long lastTransferTime = getLastTransferred();
         if (lastTransferTime == 0L) {
             sb.append(0);
@@ -276,6 +308,29 @@ public abstract class AbstractMover<P extends ProtocolInfo, M extends Mover<P>> 
             sb.append((System.currentTimeMillis() - lastTransferTime) / 1000L);
         }
         return sb.toString();
+    }
+
+    private String describeBandwidth(long duration)
+    {
+        long bytes = getBytesTransferred();
+
+        if (duration == 0L) {
+            return "";
+        }
+
+        double bandwidth = 1000.0 * (double)bytes / duration;
+
+        if (bandwidth < 2*1024) {
+            return String.format("%.0fB/s", bandwidth);
+        } else if (bandwidth < 2*1024*1024) {
+            return String.format("%.0fkiB/s", bandwidth/1024);
+        } else if (bandwidth < 2*1024*1024*1024) {
+            return String.format("%.0fMiB/s", bandwidth/1024/1024);
+        } else if (bandwidth < 2*1024*1024*1024*1024) {
+            return String.format("%.0fGiB/s", bandwidth/1024/1024/1024);
+        } else {
+            return String.format("%.0fTiB/s", bandwidth/1024/1024/1024/1024);
+        }
     }
 
     protected abstract String getStatus();

@@ -50,13 +50,6 @@ public abstract class MoverChannelMover<P extends ProtocolInfo, M extends Mover<
     }
 
     @Override
-    public long getTransferTime()
-    {
-        MoverChannel<P> channel = _wrappedChannel;
-        return (channel == null) ? 0 : channel.getTransferTime();
-    }
-
-    @Override
     public long getBytesTransferred()
     {
         MoverChannel<P> channel = _wrappedChannel;

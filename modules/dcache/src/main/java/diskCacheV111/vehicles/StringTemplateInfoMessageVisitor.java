@@ -71,10 +71,41 @@ public class StringTemplateInfoMessageVisitor implements InfoMessageVisitor
         acceptFileInfoMessage(message);
         template.add("transferred", message.getDataTransferred());
         template.add("connectionTime", message.getConnectionTime());
+        template.add("waitingTime", message.getTimeWaiting());
+        template.add("activeTime", message.getTimePending() + message.getTimeProcessing());
+        template.add("pendingTime", message.getTimePending());
+        template.add("processingTime", message.getTimeProcessing());
+
+        template.add("netBandwidth", describeBandwidth(message.getDataTransferred(),
+                message.getTimePending()));
+        template.add("diskBandwidth", describeBandwidth(message.getDataTransferred(),
+                message.getTimeProcessing()));
+        template.add("closedTime", message.getTimeClosed());
         template.add("created", message.isFileCreated());
         template.add("protocol", message.getProtocolInfo());
         template.add("initiator", message.getInitiator());
         template.add("p2p", message.isP2P());
+    }
+
+    public String describeBandwidth(long size, long duration)
+    {
+        if (duration == 0L) {
+            return "";
+        }
+
+        double bandwidth = 1000.0 * (double)size / duration;
+
+        if (bandwidth < 2048.0) {
+            return String.format("%.0fB/s", bandwidth);
+        } else if (bandwidth < 2097152.0) {
+            return String.format("%.0fkiB/s", bandwidth/1024.0);
+        } else if (bandwidth < 2.1474836e9) {
+            return String.format("%.0fMiB/s", bandwidth/1048576.0);
+        } else if (bandwidth < 2.1990232e12) {
+            return String.format("%.0fGiB/s", bandwidth/1.0737418e9);
+        } else {
+            return String.format("%.0fTiB/s", bandwidth/1.0995116e12);
+        }
     }
 
     @Override

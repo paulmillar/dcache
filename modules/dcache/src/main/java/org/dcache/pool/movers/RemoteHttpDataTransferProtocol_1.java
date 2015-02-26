@@ -38,6 +38,7 @@ import dmg.cells.nucleus.CellEndpoint;
 import org.dcache.pool.movers.MoverChannel.AllocatorMode;
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.Checksums;
@@ -183,7 +184,8 @@ public class RemoteHttpDataTransferProtocol_1 implements MoverProtocol,
 
     @Override
     public void runIO(FileAttributes attributes, RepositoryChannel channel,
-            ProtocolInfo genericInfo, Allocator allocator, IoMode access)
+            ProtocolInfo genericInfo, Allocator allocator, IoMode access,
+            TransferMonitor monitor)
             throws CacheException, IOException, InterruptedException
     {
         _log.debug("info={}, attributes={},  access={}", genericInfo,
@@ -578,12 +580,6 @@ public class RemoteHttpDataTransferProtocol_1 implements MoverProtocol,
     public long getBytesTransferred()
     {
         return _channel.getBytesTransferred();
-    }
-
-    @Override
-    public long getTransferTime()
-    {
-        return _channel.getTransferTime();
     }
 
     @Override

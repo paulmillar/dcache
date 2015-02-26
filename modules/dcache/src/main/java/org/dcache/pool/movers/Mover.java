@@ -29,6 +29,7 @@ import dmg.cells.nucleus.CellPath;
 
 import org.dcache.pool.classic.Cancellable;
 import org.dcache.pool.repository.ReplicaDescriptor;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.util.Checksum;
 import org.dcache.vehicles.FileAttributes;
 
@@ -40,7 +41,7 @@ import org.dcache.vehicles.FileAttributes;
  * <p/>
  * The interface is not to be confused with the legacy MoverProtocol interface.
  */
-public interface Mover<T extends ProtocolInfo>
+public interface Mover<T extends ProtocolInfo> extends TransferMonitor
 {
     /**
      * Provides attributes of the file being transferred.
@@ -51,8 +52,6 @@ public interface Mover<T extends ProtocolInfo>
      * Provides protocol specific information about the transfer.
      */
     T getProtocolInfo();
-
-    long getTransferTime();
 
     /**
      * Number of bytes transferred by this mover.

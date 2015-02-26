@@ -37,6 +37,7 @@ import org.dcache.ftp.data.Role;
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.FileRepositoryChannel;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
@@ -46,6 +47,7 @@ import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * FTP mover. Supports both mover protocols GFtp/1 and GFtp/2.
@@ -185,6 +187,11 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
      * True while the transfer is in progress.
      */
     protected boolean      _inProgress;
+
+    /**
+     * The monitor for this transfer
+     */
+    private TransferMonitor _monitor;
 
     public GFtpProtocol_2_nio(CellEndpoint cell)
     {
@@ -352,7 +359,7 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
             /* Log some useful information about the transfer.
              */
             long amount = getBytesTransferred();
-            long time = getTransferTime();
+            long time = _monitor.getStatistics().getTransferTime(MILLISECONDS);
             if (time > 0) {
                 _log.info("Transfer finished: {} bytes transferred in {} seconds = {} MB/s",
                                           amount, time / 1000.0, (1000.0 * amount) / (time * 1024 * 1024));
@@ -385,7 +392,8 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
                       RepositoryChannel fileChannel,
                       ProtocolInfo protocol,
                       Allocator    allocator,
-                      IoMode          access)
+                      IoMode          access,
+                      TransferMonitor monitor)
             throws Exception
     {
         if (!(protocol instanceof GFtpProtocolInfo)) {
@@ -433,7 +441,7 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
          */
         _transferStarted  = System.currentTimeMillis();
         _lastTransferred  = _transferStarted;
-
+        _monitor = monitor;
         Mode mode = createMode(gftpProtocolInfo.getMode(), role, fileChannel);
         mode.setBufferSize(bufferSize);
 
@@ -549,7 +557,7 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
              * will be send back to the door by the pool cell.
              */
             gftpProtocolInfo.setBytesTransferred(getBytesTransferred());
-            gftpProtocolInfo.setTransferTime(getTransferTime());
+            gftpProtocolInfo.setTransferTime(_monitor.getStatistics().getTransferTime(MILLISECONDS));
             if (passive) {
                 gftpProtocolInfo.setSocketAddress(
                         Iterables.getFirst(mode.getRemoteAddresses(), gftpProtocolInfo.getSocketAddress()));
@@ -562,14 +570,6 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
     public long getBytesTransferred()
     {
         return _bytesTransferred;
-    }
-
-    /** Part of the MoverProtocol interface. */
-    @Override
-    public long getTransferTime()
-    {
-        return (_inProgress ? System.currentTimeMillis() : _lastTransferred)
-                - _transferStarted;
     }
 
     /** Part of the MoverProtocol interface. */

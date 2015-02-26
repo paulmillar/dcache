@@ -100,6 +100,7 @@ import dmg.cells.nucleus.NoRouteToCellException;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.repository.TransferMonitor;
 import org.dcache.srm.util.GridftpClient;
 import org.dcache.srm.util.GridftpClient.IDiskDataSourceSink;
 import org.dcache.util.Checksum;
@@ -118,7 +119,6 @@ public class RemoteGsiftpTransferProtocol_1
         new CellPath("PnfsManager");
 
     private final CellEndpoint _cell;
-    private long _starttime;
     private long _timeout_time;
     private PnfsId _pnfsId;
 
@@ -168,7 +168,8 @@ public class RemoteGsiftpTransferProtocol_1
                       RepositoryChannel fileChannel,
                       ProtocolInfo protocol,
                       Allocator allocator,
-                      IoMode access)
+                      IoMode access,
+                      TransferMonitor monitor)
         throws CacheException, IOException,
                NoRouteToCellException,
                ServerException, ClientException,
@@ -185,7 +186,6 @@ public class RemoteGsiftpTransferProtocol_1
             throw new CacheException("protocol info is not RemoteGsiftpransferProtocolInfo");
         }
         _fileChannel = fileChannel;
-        _starttime = System.currentTimeMillis();
 
         RemoteGsiftpTransferProtocolInfo remoteGsiftpProtocolInfo
             = (RemoteGsiftpTransferProtocolInfo) protocol;
@@ -231,12 +231,6 @@ public class RemoteGsiftpTransferProtocol_1
     public long getBytesTransferred()
     {
         return (_client == null ? 0 : _client.getTransfered());
-    }
-
-    @Override
-    public long getTransferTime()
-    {
-        return System.currentTimeMillis() - _starttime;
     }
 
     public void gridFTPRead(RemoteGsiftpTransferProtocolInfo protocolInfo,
