@@ -30,6 +30,7 @@ import dmg.util.CommandException;
 
 import org.dcache.util.Args;
 import org.dcache.util.ConfigurationProperties;
+import org.dcache.util.ConfigurationProperties.Context;
 
 import static org.dcache.boot.Properties.*;
 
@@ -50,7 +51,8 @@ public class Domain
 
     public Domain(String name, ConfigurationProperties defaults)
     {
-        _properties = new ConfigurationProperties(defaults, new DcacheConfigurationUsageChecker());
+        _properties = new ConfigurationProperties(defaults,
+                new DcacheConfigurationUsageChecker(), Context.DOMAIN);
         _properties.put(PROPERTY_DOMAIN_NAME, name);
         _services = new ArrayList<>();
     }
@@ -74,8 +76,8 @@ public class Domain
 
     public ConfigurationProperties createService(String source, LineNumberReader reader, String type) throws IOException
     {
-        ConfigurationProperties service = new ConfigurationProperties(_properties, new DcacheConfigurationUsageChecker());
-        service.setIsService(true);
+        ConfigurationProperties service = new ConfigurationProperties(_properties,
+                new DcacheConfigurationUsageChecker(), Context.SERVICE);
         service.put(PROPERTY_DOMAIN_SERVICE, type);
         service.load(source, reader);
 

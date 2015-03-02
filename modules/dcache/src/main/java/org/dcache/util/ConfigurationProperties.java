@@ -34,8 +34,11 @@ import java.util.regex.Pattern;
 import dmg.util.Formats;
 import dmg.util.PropertiesBackedReplaceable;
 
+import static org.dcache.util.ConfigurationProperties.Annotation.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.dcache.util.ConfigurationProperties.Context.DOMAIN;
+import static org.dcache.util.ConfigurationProperties.Context.SERVICE;
 
 /**
  * The ConfigurationProperties class represents a set of dCache
@@ -117,13 +120,14 @@ public class ConfigurationProperties
     private final List<String> _prefixes = new ArrayList<>();
 
     private boolean _loading;
-    private boolean _isService;
+    private final Context _context;
     private ProblemConsumer _problemConsumer = new DefaultProblemConsumer();
 
     public ConfigurationProperties()
     {
         super();
         _usageChecker = new UniversalUsageChecker();
+        _context = Context.GLOBAL;
     }
 
     public ConfigurationProperties(Properties defaults)
@@ -133,6 +137,12 @@ public class ConfigurationProperties
 
     public ConfigurationProperties(Properties defaults, UsageChecker usageChecker)
     {
+        this(defaults, usageChecker, Context.GLOBAL);
+    }
+
+    public ConfigurationProperties(Properties defaults, UsageChecker usageChecker,
+            Context context)
+    {
         super(defaults);
 
         if( defaults instanceof ConfigurationProperties) {
@@ -141,6 +151,7 @@ public class ConfigurationProperties
             _prefixes.addAll(defaultConfig._prefixes);
         }
         _usageChecker = usageChecker;
+        _context = context;
     }
 
     public void setProblemConsumer(ProblemConsumer consumer)
@@ -151,11 +162,6 @@ public class ConfigurationProperties
     public ProblemConsumer getProblemConsumer()
     {
         return _problemConsumer;
-    }
-
-    public void setIsService(boolean isService)
-    {
-        _isService = isService;
     }
 
     public boolean hasDeclaredPrefix(String name)
@@ -323,7 +329,8 @@ public class ConfigurationProperties
             _problemConsumer.error(messageFor(existingKey));
         }
 
-        if ((_isService && existingKey.hasAnnotation(Annotation.NOT_FOR_SERVICES)) ||
+        if ((_context==DOMAIN && existingKey.hasAnnotation(FOR_SCRIPTS)) ||
+            (_context==SERVICE && existingKey.hasAnyOf(EnumSet.of(FOR_SCRIPTS, FOR_DOMAINS))) ||
             existingKey.hasAnyOf(EnumSet.of(Annotation.OBSOLETE, Annotation.DEPRECATED))) {
             _problemConsumer.warning(messageFor(existingKey));
         }
@@ -431,8 +438,17 @@ public class ConfigurationProperties
                 sb.append("please review configuration");
             }
             sb.append("; support for ").append(name).append(" will be removed in the future");
-        } else if (key.hasAnnotation(Annotation.NOT_FOR_SERVICES)) {
-            sb.append("consider moving to a domain scope; it has no effect here");
+        } else if (key.hasAnnotation(FOR_SCRIPTS) && (_context==DOMAIN || _context==SERVICE)) {
+            sb.append("consider moving definition to the global scope");
+            if ((_context==DOMAIN && !key.hasAnyOf(EnumSet.of(FOR_DOMAINS, FOR_SERVICES))) ||
+                    (_context==SERVICE && !key.hasAnnotation(FOR_SERVICES))) {
+                sb.append("; it has no effect here");
+            }
+        } else if (_context==SERVICE && key.hasAnnotation(FOR_DOMAINS)) {
+            sb.append("consider moving definition to the domain or global scope");
+            if (!key.hasAnnotation(FOR_SERVICES)) {
+                sb.append("; it has no effect here");
+            }
         } else {
             sb.append("has an unknown problem");
         }
@@ -606,6 +622,31 @@ public class ConfigurationProperties
     }
 
     /**
+     * The Context describes how an instance of ConfigurationProperties was
+     * defined.
+     */
+    public enum Context
+    {
+        /**
+         * Defined in the global context; configuration applies to all
+         * scripts, all domains and all services.
+         */
+        GLOBAL,
+
+        /**
+         * Defined in the context of some domain; configuration applies to
+         * this particular domain and all services it hosts.
+         */
+        DOMAIN,
+
+        /**
+         * Defined in the context of some service; configuration applies to
+         * this particular service.
+         */
+        SERVICE
+    }
+
+    /**
      *  This enum represents a property key annotation.  Each annotation has
      *  an associated label that is present as a comma-separated list within
      *  parentheses.
@@ -616,7 +657,9 @@ public class ConfigurationProperties
         OBSOLETE("obsolete"),
         ONE_OF("one-of", true),
         DEPRECATED("deprecated"),
-        NOT_FOR_SERVICES("not-for-services"),
+        FOR_SERVICES("for-services"),
+        FOR_DOMAINS("for-domains"),
+        FOR_SCRIPTS("for-scripts"),
         IMMUTABLE("immutable"),
         ANY_OF("any-of", true),
         PREFIX("prefix");
