@@ -16,6 +16,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.Map;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
@@ -28,6 +29,7 @@ import diskCacheV111.vehicles.StorageInfos;
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
+import dmg.cells.nucleus.EnvironmentAware;
 
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.RepositoryChannel;
@@ -35,7 +37,7 @@ import org.dcache.util.NetworkUtils;
 import org.dcache.util.PortRange;
 import org.dcache.vehicles.FileAttributes;
 
-public class DCapClientProtocol_1 implements MoverProtocol
+public class DCapClientProtocol_1 implements MoverProtocol, EnvironmentAware
 {
     private static final Logger _log =
         LoggerFactory.getLogger(DCapClientProtocol_1.class);
@@ -46,6 +48,7 @@ public class DCapClientProtocol_1 implements MoverProtocol
     private DCapClientProtocolInfo dcapClient;
     private long starttime;
     private volatile long transfered;
+    private String _dcachePorts;
 
 
     public DCapClientProtocol_1(CellEndpoint cell)
@@ -97,8 +100,7 @@ public class DCapClientProtocol_1 implements MoverProtocol
         ServerSocket serverSocket;
         int port;
         try {
-            String dcachePorts = System.getProperty("org.dcache.net.tcp.portrange");
-            PortRange portRange = (dcachePorts != null) ? PortRange.valueOf(dcachePorts) : new PortRange(0);
+            PortRange portRange = (_dcachePorts != null) ? PortRange.valueOf(_dcachePorts) : new PortRange(0);
             serverSocket = new ServerSocket();
             port = portRange.bind(serverSocket, 1);
         } catch(IOException ioe) {
@@ -377,5 +379,11 @@ public class DCapClientProtocol_1 implements MoverProtocol
                              returnCode+") "+error);
         }
         say("<Done>");
+    }
+
+    @Override
+    public void setEnvironment(Map<String,Object> environment)
+    {
+        _dcachePorts = (String)environment.get("pool.mover.dcap.port-range");
     }
 }

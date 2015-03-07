@@ -1,6 +1,3 @@
-/*
- * $Id: ProtocolConnectionPool.java,v 1.5 2007-07-04 16:29:31 tigran Exp $
- */
 package org.dcache.net;
 
 import org.slf4j.Logger;
@@ -14,6 +11,10 @@ import java.util.Map;
 
 import org.dcache.util.PortRange;
 
+/**
+ * Class to handle accepting incoming connections and verifying the
+ * client against some challenge.
+ */
 public class ProtocolConnectionPool extends Thread {
 
     private static Logger _logSocketIO = LoggerFactory.getLogger("logger.dev.org.dcache.io.socket");
@@ -23,37 +24,17 @@ public class ProtocolConnectionPool extends Thread {
     private boolean _stop;
 
     /**
-     * Create a new ProtocolConnectionPool on specified TCP port. If <code>listenPort</code>
-     * is zero, then random port is used unless <i>org.dcache.net.tcp.portrange</i>
-     * property is set. The {@link ChallengeReader} is used to associate connections
-     * with clients.
-     *
-     * @param listenPort
-     * @param challengeReader
-     * @throws IOException
+     * Create a new ProtocolConnectionPool using the specified PortRange.
+     * The {@link ChallengeReader} is used to associate connections with clients.
      */
-    ProtocolConnectionPool(int listenPort, int receiveBufferSize,
-                           ChallengeReader challengeReader)
-        throws IOException
+    ProtocolConnectionPool(PortRange portRange, int receiveBufferSize,
+                           ChallengeReader challengeReader) throws IOException
     {
         super("ProtocolConnectionPool");
         _challengeReader = challengeReader;
         _serverSocketChannel = ServerSocketChannel.open();
         if (receiveBufferSize > 0) {
             _serverSocketChannel.socket().setReceiveBufferSize(receiveBufferSize);
-        }
-
-        PortRange portRange;
-        if (listenPort != 0) {
-            portRange = new PortRange(listenPort);
-        } else {
-            String dcachePorts = System.getProperty("org.dcache.net.tcp.portrange");
-
-            if (dcachePorts != null) {
-                portRange = PortRange.valueOf(dcachePorts);
-            } else {
-                portRange = new PortRange(0);
-            }
         }
 
         portRange.bind(_serverSocketChannel.socket());
@@ -134,52 +115,3 @@ public class ProtocolConnectionPool extends Thread {
         }
     }
 }
-/*
- * $Log: not supported by cvs2svn $
- * Revision 1.4  2007/05/24 13:51:12  tigran
- * merge of 1.7.1 and the head
- *
- * Revision 1.1.2.3.2.2  2007/03/01 14:02:40  tigran
- * fixed local port in debug message
- *
- * Revision 1.1.2.3.2.1  2007/02/16 22:20:35  tigran
- * paranoid network traceing:
- *
- * all binds, accepts, connects and closees in dcap and FTP (nio code only)
- * used logging category:
- *
- * private static Logger _logSocketIO = LoggerFactory.getLogger("logger.dev.org.dcache.io.socket");
- *
- * TODO: find and trace others as well
- * all calls surrounded with
- * if ( _logSocketIO.isDebugEnabled ){
- * ....
- * }
- * so no performance penalty if debug switched off
- * log example (passive dcap):
- *
- * 16 Feb 2007 22:51:33 logger.dev.org.dcache.io.socket org.dcache.net.ProtocolConnectionPool.<init>(ProtocolConnectionPool.java:66) Socket BIND local = /0.0.0.0:33115
- * 16 Feb 2007 22:51:33 logger.dev.org.dcache.io.socket org.dcache.net.ProtocolConnectionPool.run(ProtocolConnectionPool.java:118) Socket OPEN (ACCEPT) remote = /127.0.0.2:11930 local = /127.0.0.2:11930
- * 16 Feb 2007 22:51:33 logger.dev.org.dcache.io.socket diskCacheV111.movers.DCapProtocol_3_nio.runIO(DCapProtocol_3_nio.java:766) Socket CLOSE remote = /127.0.0.2:11930 local = /127.0.0.2:11930
- * 16 Feb 2007 22:51:57 logger.dev.org.dcache.io.socket org.dcache.net.ProtocolConnectionPool.run(ProtocolConnectionPool.java:118) Socket OPEN (ACCEPT) remote = /127.0.0.2:11934 local = /127.0.0.2:11934
- * 16 Feb 2007 22:51:57 logger.dev.org.dcache.io.socket diskCacheV111.movers.DCapProtocol_3_nio.runIO(DCapProtocol_3_nio.java:766) Socket CLOSE remote = /127.0.0.2:11934 local = /127.0.0.2:11934
- * 16 Feb 2007 22:52:06 logger.dev.org.dcache.io.socket org.dcache.net.ProtocolConnectionPool.run(ProtocolConnectionPool.java:144) Socket SHUTDOWN local = /0.0.0.0:33115
- *
- * Revision 1.1.2.3  2006/10/04 09:57:06  tigran
- * fixed first/last port range index
- *
- * Revision 1.1.2.2  2006/08/22 13:43:34  tigran
- * added port range for passive DCAP
- * rmoved System.out
- *
- * Revision 1.2  2006/07/21 12:07:53  tigran
- * added port range support for multple pools on one host
- * to enable port range follofing java properies have to be defined:
- *
- * i) org.dcache.dcap.port=0
- * ii) org.dcache.net.tcp.portrange=<first>:<last>
- *
- * Revision 1.1  2006/07/18 09:06:04  tigran
- * added protocol connection pool
- *
- */

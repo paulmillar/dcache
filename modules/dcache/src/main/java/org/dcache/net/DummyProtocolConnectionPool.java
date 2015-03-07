@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
 
+import org.dcache.util.PortRange;
+
 
 public class DummyProtocolConnectionPool  implements ChallengeReader {
 
@@ -54,9 +56,8 @@ public class DummyProtocolConnectionPool  implements ChallengeReader {
 
 
 			DummyProtocolConnectionPool dp = new DummyProtocolConnectionPool();
-			ProtocolConnectionPoolFactory cf = new ProtocolConnectionPoolFactory(8998, dp);
-
-			ProtocolConnectionPool pcp = cf.getConnectionPool(0);
+			ProtocolConnectionPoolFactory cf = new ProtocolConnectionPoolFactory(dp);
+			ProtocolConnectionPool pcp = cf.getConnectionPool(new PortRange(8998), 0);
 			int i = 0;
 			while(true) {
 

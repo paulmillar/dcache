@@ -30,6 +30,8 @@ import diskCacheV111.vehicles.StorageInfo;
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
+import dmg.cells.nucleus.EnvironmentAware;
+import dmg.cells.nucleus.Environments;
 
 import org.dcache.net.ProtocolConnectionPool;
 import org.dcache.net.ProtocolConnectionPoolFactory;
@@ -39,15 +41,19 @@ import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.NetworkUtils;
+import org.dcache.util.PortRange;
 import org.dcache.vehicles.FileAttributes;
 
 
-public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
+public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover, EnvironmentAware {
 
     private static Logger _log = LoggerFactory.getLogger(DCapProtocol_3_nio.class);
     private static Logger _logSocketIO = LoggerFactory.getLogger("logger.dev.org.dcache.io.socket");
     private final static Logger _logSpaceAllocation = LoggerFactory.getLogger("logger.dev.org.dcache.poolspacemonitor." + DCapProtocol_3_nio.class.getName());
     private static final int INC_SPACE  =  (50*1024*1024);
+
+    private static ProtocolConnectionPoolFactory protocolConnectionPoolFactory =
+            new ProtocolConnectionPoolFactory(new DCapChallengeReader());
 
     private final Args          _args   ;
     private final Map<String,Object> _context;
@@ -69,27 +75,12 @@ public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
     private  Checksum  _clientChecksum;
     private ChecksumFactory _checksumFactory;
     private MessageDigest _digest;
+    private PortRange _portRange;
 
     private final MoverIoBuffer _defaultBufferSize = new MoverIoBuffer(256 * 1024, 256 * 1024, 256 * 1024);
     private final MoverIoBuffer _maxBufferSize     = new MoverIoBuffer(1024 * 1024, 1024 * 1024, 1024 * 1024);
 
     private SpaceMonitorHandler _spaceMonitorHandler;
-
-
-    // bind passive dcap to port defined as org.dcache.dcap.port
-    private static ProtocolConnectionPoolFactory protocolConnectionPoolFactory;
-
-    static {
-        int port = 0;
-
-        try {
-            port = Integer.parseInt(System.getProperty("org.dcache.dcap.port"));
-        }catch(NumberFormatException e){ /* bad values are ignored */}
-
-        protocolConnectionPoolFactory =
-            new ProtocolConnectionPoolFactory(port, new DCapChallengeReader());
-
-    }
 
     private void initialiseBuffer(MoverIoBuffer bufferSize) {
         try {
@@ -375,7 +366,7 @@ public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
             socketChannel.write(_bigBuffer);
         }else{ // passive connection
             ProtocolConnectionPool pcp =
-                protocolConnectionPoolFactory.getConnectionPool(bufferSize.getRecvBufferSize());
+                protocolConnectionPoolFactory.getConnectionPool(_portRange, bufferSize.getRecvBufferSize());
 
             InetAddress localAddress = NetworkUtils.
                     getLocalAddress(dcapProtocolInfo.getSocketAddress().getAddress());
@@ -1130,4 +1121,25 @@ public class DCapProtocol_3_nio implements MoverProtocol, ChecksumMover {
         return (_digest == null) ? null : _checksumFactory.create(_digest.digest());
     }
 
+    @Override
+    public void setEnvironment(Map<String,Object> environment)
+    {
+        int port = 0;
+        try {
+            port = Integer.valueOf(Environments.getValue(environment, "pool.mover.dcap.port"));
+        } catch (NumberFormatException ignored) {
+            // bad values are simply ignored.
+        }
+
+        if (port != 0) {
+            _portRange = new PortRange(port);
+        } else {
+            String range = Environments.getValue(environment, "pool.mover.dcap.port-range");
+            if (range != null) {
+                _portRange = PortRange.valueOf(range);
+            } else {
+                _portRange = new PortRange(0);
+            }
+        }
+    }
 }

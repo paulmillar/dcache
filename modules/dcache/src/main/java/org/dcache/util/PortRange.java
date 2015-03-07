@@ -311,4 +311,26 @@ public class PortRange
     {
         return String.format("%d:%d", _lower, _upper);
     }
+
+    @Override
+    public int hashCode()
+    {
+        return _lower ^ _upper;
+    }
+
+    @Override
+    public boolean equals(Object rawOther)
+    {
+        if (rawOther == this) {
+            return true;
+        }
+
+        if (!(rawOther instanceof PortRange)) {
+            return false;
+        }
+
+        PortRange other = (PortRange)rawOther;
+
+        return other._lower == _lower && other._upper == _upper;
+    }
 }
