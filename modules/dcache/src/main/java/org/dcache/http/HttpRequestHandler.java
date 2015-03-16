@@ -1,5 +1,6 @@
 package org.dcache.http;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -13,7 +14,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.util.CharsetUtil;
-import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,11 +185,26 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<Object>
         return new HttpTextResponse(status, message);
     }
 
-    protected static class HttpTextResponse extends DefaultFullHttpResponse
+    protected static class DcacheFullHttpResponse extends DefaultFullHttpResponse
+    {
+        public DcacheFullHttpResponse(HttpResponseStatus status, ByteBuf content)
+        {
+            super(HTTP_1_1, status, content);
+            headers().add("X-Clacks-Overhead", "GNU Terry Pratchett");
+        }
+
+        public DcacheFullHttpResponse(HttpResponseStatus status)
+        {
+            super(HTTP_1_1, status);
+            headers().add("X-Clacks-Overhead", "GNU Terry Pratchett");
+        }
+    }
+
+    protected static class HttpTextResponse extends DcacheFullHttpResponse
     {
         public HttpTextResponse(HttpResponseStatus status, String message)
         {
-            super(HTTP_1_1, status, Unpooled.copiedBuffer(message + CRLF, CharsetUtil.UTF_8));
+            super(status, Unpooled.copiedBuffer(message + CRLF, CharsetUtil.UTF_8));
             headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
             headers().set(CONTENT_LENGTH, content().readableBytes());
         }

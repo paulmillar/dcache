@@ -84,6 +84,7 @@ public class DcacheStandardFilter implements Filter
              */
             response.setStatus(Response.Status.SC_TEMPORARY_REDIRECT);
             response.setLocationHeader(e.getUrl());
+            response.setNonStandardHeader("X-Clacks-Overhead", "GNU Terry Pratchett");
         } catch (WebDavException e) {
             log.warn("Internal server error: {}", e.toString());
             responseHandler.respondServerError(request, response, e.getMessage());

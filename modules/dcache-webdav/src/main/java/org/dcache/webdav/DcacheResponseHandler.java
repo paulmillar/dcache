@@ -178,6 +178,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
         } catch (IOException ex) {
             log.warn("exception writing content");
         }
+        addClacksOverhead(response);
     }
 
     /**
@@ -260,6 +261,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
                 }
             }
         }
+        addClacksOverhead(response);
         super.respondPropFind(propFindResponses, response, request, r);
     }
 
@@ -269,6 +271,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
     {
         super.respondHead(resource, response, request);
         rfc3230(resource, response);
+        addClacksOverhead(response);
     }
 
     @Override
@@ -277,6 +280,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
     {
         super.respondPartialContent(resource, response, request, params, ranges);
         rfc3230(resource, response);
+        addClacksOverhead(response);
     }
 
     @Override
@@ -299,6 +303,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
         }
         super.respondPartialContent(resource, response, request, params, range);
         rfc3230(resource, response);
+        addClacksOverhead(response);
     }
 
     @Override
@@ -309,8 +314,22 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
     {
         super.respondContent(resource, response, request, params);
         rfc3230(resource, response);
+        addClacksOverhead(response);
     }
 
+    @Override
+    public void respondCreated(Resource resource, Response response, Request request)
+    {
+        super.respondCreated(resource, response, request);
+        addClacksOverhead(response);
+    }
+
+    @Override
+    public void respondRedirect(Response response, Request request, String url)
+    {
+        addClacksOverhead(response);
+        super.respondRedirect(response, request, url); // NB. this must be last operation
+    }
 
     private void rfc3230(Resource resource, Response response)
     {
@@ -322,5 +341,11 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
                 response.setNonStandardHeader("Digest", digest);
             }
         }
+    }
+
+    public void addClacksOverhead(Response response)
+    {
+        // See http://www.gnuterrypratchett.com/
+        response.setNonStandardHeader("X-Clacks-Overhead", "GNU Terry Pratchett");
     }
 }

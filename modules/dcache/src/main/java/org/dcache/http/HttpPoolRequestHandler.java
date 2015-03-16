@@ -10,7 +10,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpContent;
@@ -356,7 +355,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
             }
 
             if (is100ContinueExpected(request)) {
-                context.writeAndFlush(new DefaultFullHttpResponse(HTTP_1_1, CONTINUE));
+                context.writeAndFlush(new DcacheFullHttpResponse(CONTINUE));
             }
             _writeChannel = file;
             file = null;
@@ -564,11 +563,23 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
         return attributes.getChecksumsIfPresent().transform(TO_RFC3230).or("");
     }
 
-    private static class HttpGetResponse extends DefaultHttpResponse
+    /**
+     * Base class for all generic dCache responses.
+     */
+    private static class BasicDcacheHttpResponse extends DefaultHttpResponse
+    {
+        public BasicDcacheHttpResponse(HttpResponseStatus status)
+        {
+            super(HTTP_1_1, status);
+            headers().add("X-Clacks-Overhead", "GNU Terry Pratchett");
+        }
+    }
+
+    private static class HttpGetResponse extends BasicDcacheHttpResponse
     {
         public HttpGetResponse(long fileSize, NettyTransferService<HttpProtocolInfo>.NettyMoverChannel file)
         {
-            super(HTTP_1_1, OK);
+            super(OK);
             HttpProtocolInfo protocolInfo = file.getProtocolInfo();
             headers().add(ACCEPT_RANGES, BYTES);
             headers().add(CONTENT_LENGTH, fileSize);
@@ -585,14 +596,14 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
         }
     }
 
-    private static class HttpPartialContentResponse extends DefaultHttpResponse
+    private static class HttpPartialContentResponse extends BasicDcacheHttpResponse
     {
         public HttpPartialContentResponse(long lower,
                                           long upper,
                                           long total,
                                           String digest)
         {
-            super(HTTP_1_1, PARTIAL_CONTENT);
+            super(PARTIAL_CONTENT);
 
             String contentRange = BYTES + RANGE_SP + lower + RANGE_SEPARATOR +
                                   upper + RANGE_PRE_TOTAL + total;
@@ -606,11 +617,11 @@ public class HttpPoolRequestHandler extends HttpRequestHandler
         }
     }
 
-    private static class HttpMultipartResponse extends DefaultHttpResponse
+    private static class HttpMultipartResponse extends BasicDcacheHttpResponse
     {
         public HttpMultipartResponse(String digest, long totalBytes)
         {
-            super(HTTP_1_1, PARTIAL_CONTENT);
+            super(PARTIAL_CONTENT);
             headers().add(ACCEPT_RANGES, BYTES);
             headers().add(CONTENT_LENGTH, totalBytes);
             headers().add(CONTENT_TYPE, MULTIPART_TYPE);
