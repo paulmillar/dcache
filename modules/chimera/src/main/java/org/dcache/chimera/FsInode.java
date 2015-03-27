@@ -437,6 +437,11 @@ public class FsInode {
 	}
     }
 
+    public void clearStatCache()
+    {
+        _stat = null;
+    }
+
     void setStatCache(Stat predefinedStat) {
 	_stat = predefinedStat;
     }

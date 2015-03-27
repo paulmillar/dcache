@@ -341,7 +341,8 @@ public class ChimeraNameSpaceProvider
             }
 
             _fs.remove(inode);
-            return inode.stat().getNlink();
+            inode.clearStatCache();
+            return inode.exists() ? inode.statCache().getNlink() : 0;
         }catch(FileNotFoundHimeraFsException fnf) {
             throw new FileNotFoundCacheException("No such file or directory: " + pnfsId);
         }catch(DirNotEmptyHimeraFsException e) {
@@ -386,8 +387,10 @@ public class ChimeraNameSpaceProvider
                 }
             }
 
+            FsInode inode = pathToInode(subject, path);
             _fs.remove(path);
-            return pathToInode(subject, path).stat().getNlink();
+            inode.clearStatCache();
+            return inode.exists() ? inode.statCache().getNlink() : 0;
         }catch(FileNotFoundHimeraFsException fnf) {
             throw new FileNotFoundCacheException("No such file or directory: " + path);
         }catch(DirNotEmptyHimeraFsException e) {
