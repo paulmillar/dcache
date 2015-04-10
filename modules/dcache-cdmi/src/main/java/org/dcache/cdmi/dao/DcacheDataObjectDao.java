@@ -38,6 +38,7 @@ import org.snia.cdmiserver.dao.DataObjectDao;
 import org.snia.cdmiserver.exception.BadRequestException;
 import org.snia.cdmiserver.exception.ConflictException;
 import org.snia.cdmiserver.model.DataObject;
+import org.springframework.beans.factory.annotation.Required;
 import org.springframework.web.context.ServletContextAware;
 
 import javax.security.auth.Subject;
@@ -89,7 +90,7 @@ import static org.dcache.namespace.FileAttribute.*;
  * </p>
  */
 public class DcacheDataObjectDao extends AbstractCellComponent
-    implements DataObjectDao, ServletContextAware, CellLifeCycleAware
+    implements DataObjectDao, CellLifeCycleAware
 {
     private final static Logger _log = LoggerFactory.getLogger(DcacheDataObjectDao.class);
 
@@ -516,16 +517,35 @@ public class DcacheDataObjectDao extends AbstractCellComponent
         throw new UnsupportedOperationException("DCacheDataObjectDaoImpl, Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    @Override
-    public void setServletContext(ServletContext context) {
-        _log.debug("Init DCacheDataObjectDaoImpl...");
-        pnfsStub = Attributes.getPnfsManager(context);
-        listDirectoryHandler = Attributes.getListDirectoryHandler(context);
-        poolStub = Attributes.getPool(context);
-        poolMgrStub = Attributes.getPoolManager(context);
-        billingStub = Attributes.getBilling(context);
+    @Required
+    public void setPnfsManagerStub(CellStub stub)
+    {
+        pnfsStub = stub;
+        pnfsHandler = new PnfsHandler(stub);
+    }
 
-        this.pnfsHandler = new PnfsHandler(pnfsStub);
+    @Required
+    public void setListDirectoryHandler(ListDirectoryHandler handler)
+    {
+        listDirectoryHandler = handler;
+    }
+
+    @Required
+    public void setPoolStub(CellStub stub)
+    {
+        poolStub = stub;
+    }
+
+    @Required
+    public void setPoolManagerStub(CellStub stub)
+    {
+        poolMgrStub = stub;
+    }
+
+    @Required
+    public void setBillingStub(CellStub stub)
+    {
+        billingStub = stub;
     }
 
     private static class ListPrinter implements DirectoryListPrinter

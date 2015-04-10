@@ -50,7 +50,6 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.security.auth.Subject;
-import javax.servlet.ServletContext;
 
 import org.dcache.auth.Subjects;
 
@@ -78,6 +77,7 @@ import org.snia.cdmiserver.dao.ContainerDao;
 import org.snia.cdmiserver.exception.BadRequestException;
 import org.snia.cdmiserver.exception.NotFoundException;
 import org.snia.cdmiserver.model.Container;
+import org.springframework.beans.factory.annotation.Required;
 
 import diskCacheV111.util.PnfsId;
 
@@ -89,9 +89,6 @@ import org.dcache.acl.ACLException;
 import org.dcache.cdmi.model.DCacheContainer;
 import org.dcache.cdmi.utils.IDs;
 
-import org.springframework.web.context.ServletContextAware;
-
-import org.dcache.cdmi.utils.Attributes;
 
 /**
  * <p>
@@ -99,7 +96,7 @@ import org.dcache.cdmi.utils.Attributes;
  * </p>
  */
 public class DcacheContainerDao extends AbstractCellComponent
-    implements ContainerDao, ServletContextAware, CellLifeCycleAware
+        implements ContainerDao, CellLifeCycleAware
 {
 
     //
@@ -1011,16 +1008,35 @@ public class DcacheContainerDao extends AbstractCellComponent
         return result;
     }
 
-    @Override
-    public void setServletContext(ServletContext context) {
-        _log.debug("Init DCacheContainerDaoImpl...");
-        pnfsStub = Attributes.getPnfsManager(context);
-        listDirectoryHandler = Attributes.getListDirectoryHandler(context);
-        poolStub = Attributes.getPool(context);
-        poolMgrStub = Attributes.getPnfsManager(context);
-        billingStub = Attributes.getBilling(context);
+    @Required
+    public void setPnfsStub(CellStub stub)
+    {
+        pnfsStub = stub;
+        pnfsHandler = new PnfsHandler(stub);
+    }
 
-        this.pnfsHandler = new PnfsHandler(pnfsStub);
+    @Required
+    public void setListDirectoryHandler(ListDirectoryHandler handler)
+    {
+        listDirectoryHandler = handler;
+    }
+
+    @Required
+    public void setPoolStub(CellStub stub)
+    {
+        poolStub = stub;
+    }
+
+    @Required
+    public void setPoolManagerStub(CellStub stub)
+    {
+        poolMgrStub = stub;
+    }
+
+    @Required
+    public void setBillingStub(CellStub stub)
+    {
+        billingStub = stub;
     }
 
     private static class ListPrinter implements DirectoryListPrinter
