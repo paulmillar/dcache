@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:property-placeholder/>
+    <context:annotation-config/>
+
+    <bean id="noroutetocell" class="org.dcache.cells.LogNoRouteToCellExceptionReceiver">
+        <description>Undeliverable message logger</description>
+    </bean>
+
+    <bean id="data-source" class="org.dcache.db.AlarmEnabledDataSource" destroy-method="close">
+        <description>Database connection pool</description>
+        <constructor-arg value="${macaroons.db.url}"/>
+        <constructor-arg value="JdbcFs"/>
+        <constructor-arg>
+            <bean class="com.zaxxer.hikari.HikariDataSource">
+                <constructor-arg>
+                    <bean class="com.zaxxer.hikari.HikariConfig">
+                        <property name="jdbcUrl" value="${macaroons.db.url}"/>
+                        <property name="username" value="${macaroons.db.user}"/>
+                        <property name="password" value="#{ T(diskCacheV111.util.Pgpass).getPassword('${macaroons.db.password.file}', '${macaroons.db.url}', '${macaroons.db.user}', '${macaroons.db.password}') }"/>
+                        <property name="minimumIdle" value="${macaroons.db.connections.idle}"/>
+                        <property name="maximumPoolSize" value="${macaroons.db.connections.max}"/>
+                        <property name="autoCommit" value="true"/>
+                        <property name="transactionIsolation" value="TRANSACTION_READ_COMMITTED"/>
+                    </bean>
+                </constructor-arg>
+            </bean>
+        </constructor-arg>
+    </bean>
+
+    <bean id="message-thread-pool"
+          class="java.util.concurrent.ThreadPoolExecutor"
+          destroy-method="shutdown">
+	<description>Thread pool for message processing</description>
+	<constructor-arg value="${macaroons.cell.threads.min}"/>
+	<constructor-arg value="${macaroons.cell.threads.max}"/>
+	<constructor-arg value="${macaroons.cell.threads.max-idle-time}"/>
+	<constructor-arg value="${macaroons.cell.threads.max-idle-time.unit}"/>
+	<constructor-arg>
+	    <bean class="java.util.concurrent.ArrayBlockingQueue">
+		<constructor-arg value="${macaroons.cell.queue.max}"/>
+	    </bean>
+	</constructor-arg>
+    </bean>
+
+
+    <bean id="tx-manager" class="org.springframework.orm.jdo.JdoTransactionManager">
+        <description>JDO transaction manager</description>
+        <property name="persistenceManagerFactory" ref="pmf"/>
+        <property name="jdoDialect">
+            <bean class="org.dcache.util.Jdo3Dialect"/>
+        </property>
+    </bean>
+
+    <bean id="tx-annotation-processor" class="org.dcache.util.aspects.PerInstanceAnnotationTransactionBeanPostProcessor">
+        <description>Annotated transaction demarcation processor</description>
+        <property name="transactionManager" ref="tx-manager"/>
+    </bean>
+
+    <bean id="liquibase" class="org.dcache.util.SpringLiquibase">
+        <description>Database schema manager</description>
+        <property name="dataSource" ref="data-source"/>
+        <property name="changeLog" value="classpath:${macaroons.db.schema.changelog}"/>
+        <property name="shouldUpdate" value="${macaroons.db.schema.auto}"/>
+    </bean>
+
+    <bean id="macaroons-service" class="org.dcache.macaroons.MacaroonService">
+        <description>Handle macaroon requests</description>
+        <property name="maximumLifetime" value="#{T(java.util.concurrent.TimeUnit).MILLISECONDS.convert(
+            ${macaroons.max-lifetime}, '${macaroons.max-lifetime.unit}')}"/>
+        <property name="dao" ref="dao"/>
+    </bean>
+
+    <bean id="dao" class="org.dcache.macaroons.JdoDao">
+        <description>Data access object</description>
+        <property name="persistenceManagerFactory" ref="pmf-proxy"/>
+    </bean>
+
+    <bean id="pmf-proxy"
+            class="org.springframework.orm.jdo.TransactionAwarePersistenceManagerFactoryProxy">
+        <description>Transaction aware JDO connection</description>
+        <property name="targetPersistenceManagerFactory" ref="pmf"/>
+        <property name="allowCreate" value="false"/>
+    </bean>
+
+    <bean id="pmf" class="org.datanucleus.api.jdo.JDOPersistenceManagerFactory" depends-on="liquibase">
+        <description>Database persistence manager</description>
+        <constructor-arg>
+            <props>
+                <prop key="datanucleus.PersistenceUnitName">Macaroons</prop>
+                <prop key="datanucleus.connectionPoolingType">None</prop>
+                <prop key="datanucleus.cache.level2.type">none</prop>
+            </props>
+        </constructor-arg>
+        <property name="connectionFactory" ref="data-source"/>
+  </bean>
+
+</beans>

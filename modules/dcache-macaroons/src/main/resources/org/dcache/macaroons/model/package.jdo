@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jdo xmlns="http://java.sun.com/xml/ns/jdo/jdo"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://java.sun.com/xml/ns/jdo/jdo
+        http://java.sun.com/xml/ns/jdo/jdo_2_0.xsd">
+  <package name="org.dcache.macaroons.model">
+    <class name="Macaroon" table="macaroons" identity-type="application"
+           detachable="true">
+      <field name="_id" column="id"/>
+      <field name="_uid" column="uid"/>
+      <field name="_gids" column="gids"/>
+      <field name="_pnfsId" column="pnfsid"/>
+      <field name="_secret" column="secret"/>
+      <field name="_created" column="created"/>
+      <field name="_termination" column="termination"/>
+    </class>
+  </package>
+</jdo>

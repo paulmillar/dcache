@@ -9,6 +9,7 @@
         <include within="org.eclipse.jetty.server.HttpConnection"/>
         <include within="org.apache.axis.description.JavaServiceDesc"/>
         <include within="org.dcache.ftp.door.*"/>
+        <include within="org.dcache.macaroons.*"/>
     </weaver>
 
     <aspects>

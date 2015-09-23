@@ -35,6 +35,13 @@
       <property name="timeoutUnit" value="${webdav.service.pnfsmanager.timeout.unit}"/>
   </bean>
 
+  <bean id="macaroons-stub" class="org.dcache.cells.CellStub">
+      <description>Macaroons communication stub</description>
+      <property name="destination" value="${webdav.service.macaroons}"/>
+      <property name="timeout" value="${webdav.service.macaroons.timeout}"/>
+      <property name="timeoutUnit" value="${webdav.service.macaroons.timeout.unit}"/>
+  </bean>
+
   <bean id="transfer-manager-stub" class="org.dcache.cells.CellStub">
       <description>TransferManager communication stub</description>
 
@@ -237,6 +244,16 @@
                       <bean class="org.eclipse.jetty.server.handler.ResourceHandler">
                           <property name="directoriesListed" value="true"/>
                           <property name="resourceBase" value="${webdav.static-content.dir.default}"/>
+                      </bean>
+                  </property>
+              </bean>
+              <bean class="org.eclipse.jetty.server.handler.ContextHandler">
+                  <property name="contextPath" value="/"/>
+                  <property name="handler">
+                      <bean class="org.dcache.webdav.macaroons.MacaroonMintingService">
+                          <property name="macaroonsStub" ref="macaroons-stub"/>
+                          <property name="loginStrategy" ref="login-strategy"/>
+                          <property name="pnfsStub" ref="pnfs-stub"/>
                       </bean>
                   </property>
               </bean>

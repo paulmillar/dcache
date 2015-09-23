@@ -831,6 +831,11 @@
                 </exclusion>
             </exclusions>
         </dependency>
+            <dependency>
+                <groupId>com.github.nitram509</groupId>
+                <artifactId>jmacaroons</artifactId>
+                <version>0.3.1</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -1258,6 +1263,7 @@
         <module>modules/dcache</module>
         <module>modules/dcache-chimera</module>
         <module>modules/dcache-ftp</module>
+        <module>modules/dcache-macaroons</module>
         <module>modules/dcache-webdav</module>
         <module>modules/dcache-xrootd</module>
         <module>modules/dcache-dcap</module>

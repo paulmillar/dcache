@@ -1,0 +1,27 @@
+#
+# Macaroon cell
+#
+# Used to store macaroon state
+#
+
+onerror shutdown
+
+check -strong macaroons.cell.name
+check -strong macaroons.cell.export
+check -strong macaroons.max-lifetime
+check -strong macaroons.max-lifetime.unit
+
+check -strong macaroons.db.connections.max
+check -strong macaroons.db.connections.idle
+check -strong macaroons.db.user
+check -strong macaroons.db.password
+check -strong macaroons.db.password.file
+check -strong macaroons.db.url
+check -strong macaroons.db.schema.auto
+
+create org.dcache.cells.UniversalSpringCell "${macaroons.cell.name}" \
+    "classpath:org/dcache/macaroons/macaroons.xml \
+    -export=${macaroons.cell.export} \
+    -messageExecutor=message-thread-pool \
+"
+
