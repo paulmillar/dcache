@@ -7,10 +7,11 @@ import org.slf4j.LoggerFactory;
 
 import java.rmi.RemoteException;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.commons.stats.RequestCounters;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
+import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
-import org.dcache.srm.SRMAuthorization;
 import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMUser;
@@ -31,11 +32,13 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
     private final RequestExecutionTimeGauges<String> srmServerGauges;
     private final boolean isClientDNSLookup;
     private final boolean isEnabled;
+    private final AbstractStorageElement storage;
 
     public SRMServerV1()
     {
          log = LoggerFactory.getLogger(this.getClass().getName());
          srm = Axis.getSRM();
+         storage = Axis.getStorage();
          Configuration config = Axis.getConfiguration();
          srmAuth = new SrmAuthorizer(Axis.getSrmAuthorization(),
                 srm.getRequestCredentialStorage(),
@@ -85,9 +88,7 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
               requestCredential = srmAuth.getRequestCredential();
               user = srmAuth.getRequestUser();
-              if (user.isReadOnly()) {
-                  throw new SRMAuthorizationException("Session is read-only");
-              }
+              storage.checkAuthorization(user, Activity.UPLOAD);
           } catch (SRMException sae) {
               log.error(sae.getMessage());
               throw new java.rmi.RemoteException(sae.getMessage());
@@ -122,6 +123,7 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
              requestCredential = srmAuth.getRequestCredential();
              user = srmAuth.getRequestUser();
+             storage.checkAuthorization(user, Activity.DOWNLOAD);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());
@@ -160,6 +162,7 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
              requestCredential = srmAuth.getRequestCredential();
              user = srmAuth.getRequestUser();
+             storage.checkAuthorization(user, Activity.MANAGE);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());
@@ -334,8 +337,8 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           SRMUser user;
           try {
               user = srmAuth.getRequestUser();
-          }
-          catch (SRMException sae) {
+              storage.checkAuthorization(user, Activity.READ_METADATA);
+          } catch (SRMException sae) {
               log.error(sae.getMessage());
               throw new java.rmi.RemoteException(sae.getMessage());
           }
@@ -344,7 +347,10 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           diskCacheV111.srm.FileMetaData[] fmdArray;
           try {
              fmdArray = srm.getFileMetaData(user,arg0);
-          } catch(Exception e) {
+          } catch (SRMAuthorizationException e) {
+             log.error("advisoryDelete denied: {}", e.getMessage());
+             throw new java.rmi.RemoteException(e.getMessage());
+        } catch(Exception e) {
              log.error(e.toString());
              throw new java.rmi.RemoteException("srm getFileMetaData failed", e);
           }
@@ -469,9 +475,7 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           SRMUser user;
           try {
               user = srmAuth.getRequestUser();
-              if (user.isReadOnly()) {
-                  throw new SRMAuthorizationException("Session is read-only");
-              }
+              storage.checkAuthorization(user, Activity.DELETE);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());
@@ -479,8 +483,10 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           }
 
           try {
-
               srm.advisoryDelete(user,arg0);
+          } catch (SRMAuthorizationException e) {
+             log.error("advisoryDelete denied: {}", e.getMessage());
+             throw new java.rmi.RemoteException(e.getMessage());
           } catch(Exception e) {
              log.error(e.toString());
              throw new java.rmi.RemoteException("srm advisoryDelete failed", e);

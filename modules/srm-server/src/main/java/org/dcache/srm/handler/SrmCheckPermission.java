@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
@@ -14,7 +15,6 @@ import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMUser;
-import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.v2_2.ArrayOfTSURLPermissionReturn;
 import org.dcache.srm.v2_2.SrmCheckPermissionRequest;
 import org.dcache.srm.v2_2.SrmCheckPermissionResponse;
@@ -75,7 +75,9 @@ public class SrmCheckPermission
             TReturnStatus returnStatus;
             TPermissionMode pm = null;
             try {
-                FileMetaData fmd = storage.getFileMetaData(user, URI.create(surls[i].toString()), false);
+                URI surl = URI.create(surls[i].toString());
+                storage.checkAuthorization(user, surl, Activity.READ_METADATA);
+                FileMetaData fmd = storage.getFileMetaData(user, surl, false);
                 int mode = fmd.permMode;
                 if (fmd.isOwner(user)) {
                     pm = PermissionMaskToTPermissionMode.maskToTPermissionMode(((mode >> 6) & 0x7));

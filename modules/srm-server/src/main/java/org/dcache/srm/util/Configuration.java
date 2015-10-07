@@ -75,6 +75,7 @@ import javax.annotation.Nonnull;
 import javax.sql.DataSource;
 
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,6 +87,8 @@ import diskCacheV111.util.FsPath;
 
 import org.dcache.srm.SRMAuthorization;
 import org.dcache.srm.SRMInvalidPathException;
+import org.dcache.srm.SRMException;
+import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMUserPersistenceManager;
 import org.dcache.srm.client.Transport;
 

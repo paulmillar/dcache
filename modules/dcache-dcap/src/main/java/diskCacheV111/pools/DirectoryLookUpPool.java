@@ -3,8 +3,10 @@
 package diskCacheV111.pools;
 
 import com.google.common.collect.Range;
+
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,22 +17,25 @@ import java.net.Socket;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileNotFoundCacheException;
 import diskCacheV111.util.FsPath;
 import diskCacheV111.util.NotDirCacheException;
+import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.vehicles.DCapProtocolInfo;
-import diskCacheV111.vehicles.PoolIoFileMessage;
+import diskCacheV111.vehicles.DirRequestMessage;
 
 import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.DelayedReply;
 import dmg.cells.nucleus.NoRouteToCellException;
 
+import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.AbstractCell;
 import org.dcache.util.Option;
 import org.dcache.namespace.FileAttribute;
@@ -100,17 +105,42 @@ public class DirectoryLookUpPool extends AbstractCell
     /**
      * List a directory.
      */
-    private String list(FsPath path)
+    private String list(FsPath path, Restriction restriction)
         throws InterruptedException, CacheException
     {
         StringBuilder sb = new StringBuilder();
         try {
-            _list.printDirectory(null, new DirectoryPrinter(sb),
-                                 path, null, Range.<Integer>all());
+            try {
+                // If target is a directory prevent any listing; if target is a file
+                // this has no effect.
+                Restriction listingRestriction = restriction;
+                if (listingRestriction.isRestricted(Activity.LIST, path)) {
+                    listingRestriction = Restrictions.denyAll();
+                }
+
+                _list.printDirectory(null, new DirectoryPrinter(sb, listingRestriction),
+                                     path, null, Range.<Integer>all());
+
+                if (listingRestriction.isRestricted(Activity.LIST, path)) {
+                    throw new PermissionDeniedCacheException("Not authorised");
+                }
+            } catch (NotDirCacheException e) {
+                /*
+                 *  Target path is not a directory, return information about this
+                 *  specific file.
+                 */
+                if (restriction.isRestricted(Activity.LIST, path.getParent())) {
+                    throw new PermissionDeniedCacheException("Not authorised");
+                }
+
+                if (restriction.isRestricted(Activity.READ_METADATA, path)) {
+                    throw new FileNotFoundCacheException("No such file.");
+                } else {
+                    _list.printFile(null, new FilePrinter(sb), path);
+                }
+            }
         } catch (FileNotFoundCacheException e) {
             sb.append("Path ").append(path).append(" does not exist.");
-        } catch (NotDirCacheException e) {
-            _list.printFile(null, new FilePrinter(sb), path);
         }
         return sb.toString();
     }
@@ -121,10 +151,12 @@ public class DirectoryLookUpPool extends AbstractCell
     class DirectoryPrinter implements DirectoryListPrinter
     {
         private final StringBuilder _out;
+        private final Restriction _restriction;
 
-        public DirectoryPrinter(StringBuilder out)
+        public DirectoryPrinter(StringBuilder out, Restriction restriction)
         {
             _out = out;
+            _restriction = restriction;
         }
 
         @Override
@@ -136,6 +168,11 @@ public class DirectoryLookUpPool extends AbstractCell
         @Override
         public void print(FsPath dir, FileAttributes dirAttr, DirectoryEntry entry)
         {
+            FsPath path = new FsPath(dir).add(entry.getName());
+            if (_restriction.isRestricted(Activity.READ_METADATA, path)) {
+                return;
+            }
+
             FileAttributes attr = entry.getFileAttributes();
             _out.append(attr.getPnfsId());
             switch (attr.getFileType()) {
@@ -199,7 +236,7 @@ public class DirectoryLookUpPool extends AbstractCell
         {
             try {
                 try {
-                    reply(list(_path));
+                    reply(list(_path, Restrictions.none()));
                 } catch (CacheException e) {
                     reply(e);
                 }
@@ -242,11 +279,12 @@ public class DirectoryLookUpPool extends AbstractCell
     // The io File Part
     //
     //
-    public PoolIoFileMessage messageArrived(PoolIoFileMessage message)
+    public DirRequestMessage messageArrived(DirRequestMessage message)
     {
         DCapProtocolInfo dcap = (DCapProtocolInfo) message.getProtocolInfo();
         PnfsId pnfsId = message.getPnfsId();
-        DirectoryService service = new DirectoryService(dcap, pnfsId);
+        Restriction restriction = message.getRestriction();
+        DirectoryService service = new DirectoryService(dcap, pnfsId, restriction);
         new Thread(service, "list[" + pnfsId + "]").start();
         message.setSucceeded();
         return message;
@@ -263,21 +301,23 @@ public class DirectoryLookUpPool extends AbstractCell
      */
     private class DirectoryService implements Runnable
     {
-        private DCapProtocolInfo dcap;
-        private int sessionId;
+        private final DCapProtocolInfo dcap;
+        private final PnfsId pnfsId;
+        private final int sessionId;
+        private final Restriction restriction;
 
         private DCapDataOutputStream ostream;
         private DataInputStream istream;
         private Socket dataSocket;
         private DCapDataOutputStream cntOut;
         private DataInputStream cntIn;
-        private PnfsId pnfsId;
 
-        DirectoryService(DCapProtocolInfo dcap, PnfsId pnfsId)
+        DirectoryService(DCapProtocolInfo dcap, PnfsId pnfsId, Restriction restriction)
         {
             this.dcap = dcap;
             this.pnfsId = pnfsId;
             this.sessionId = dcap.getSessionId();
+            this.restriction = restriction;
         }
 
         @Override
@@ -291,7 +331,7 @@ public class DirectoryLookUpPool extends AbstractCell
 
             try {
                 FsPath path = _pnfs.getPathByPnfsId(pnfsId);
-                String dirList = list(path);
+                String dirList = list(path, restriction);
 
                 connectToClinet();
 

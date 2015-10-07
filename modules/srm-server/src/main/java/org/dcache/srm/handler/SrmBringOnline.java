@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
+import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMNotSupportedException;
@@ -71,13 +72,15 @@ public class SrmBringOnline
                 response = getFailedResponse(e.getMessage(), TStatusCode.SRM_INTERNAL_ERROR);
             } catch (SRMInvalidRequestException e) {
                 response = getFailedResponse(e.getMessage(), TStatusCode.SRM_INVALID_REQUEST);
+            } catch (SRMAuthorizationException e) {
+                response = getFailedResponse(e.getMessage(), TStatusCode.SRM_AUTHORIZATION_FAILURE);
             }
         }
         return response;
     }
 
     private SrmBringOnlineResponse srmBringOnline()
-            throws SRMInvalidRequestException, SRMInternalErrorException, SRMNotSupportedException
+            throws SRMInvalidRequestException, SRMInternalErrorException, SRMNotSupportedException, SRMAuthorizationException
     {
         String[] protocols = getProtocols(request);
         String clientHost = getClientNetwork(request).or(this.clientHost);

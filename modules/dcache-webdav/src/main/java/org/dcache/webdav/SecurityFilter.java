@@ -1,5 +1,6 @@
 package org.dcache.webdav;
 
+import io.milton.http.AbstractRequest;
 import io.milton.http.Auth;
 import io.milton.http.Filter;
 import io.milton.http.FilterChain;
@@ -32,8 +33,12 @@ import org.dcache.auth.LoginStrategy;
 import org.dcache.auth.Origin;
 import org.dcache.auth.PasswordCredential;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.attributes.Unrestricted;
 import org.dcache.auth.attributes.HomeDirectory;
 import org.dcache.auth.attributes.LoginAttribute;
+import org.dcache.auth.attributes.Restrictions;
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.ReadOnly;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.util.CertificateFactories;
@@ -68,9 +73,11 @@ public class SecurityFilter implements Filter
         "javax.servlet.request.X509Certificate";
     public static final String DCACHE_SUBJECT_ATTRIBUTE =
             "org.dcache.subject";
+    public static final String DCACHE_RESTRICTION_ATTRIBUTE =
+            "org.dcache.restriction";
 
     private String _realm;
-    private boolean _isReadOnly;
+    private Restriction _doorRestriction;
     private boolean _isBasicAuthenticationEnabled;
     private LoginStrategy _loginStrategy;
     private FsPath _rootPath = new FsPath();
@@ -88,31 +95,32 @@ public class SecurityFilter implements Filter
                         final Response response)
     {
         HttpManager manager = filterChain.getHttpManager();
-        Subject subject = new Subject();
+        Subject subject = null;
 
-        if (!isAllowedMethod(request.getMethod())) {
-            _log.debug("Failing {} from {} as door is read-only",
-                    request.getMethod(), request.getRemoteAddr());
+        try {
+            checkAuthorised(request, _doorRestriction);
+        } catch (PermissionDeniedCacheException e) {
+            _log.debug("Failing {} from {} due to door restriction {}",
+                    request.getMethod(), request.getRemoteAddr(), _doorRestriction);
             manager.getResponseHandler().respondMethodNotAllowed(new EmptyResource(request), response, request);
-            return;
         }
 
         try {
             HttpServletRequest servletRequest = ServletRequest.getRequest();
 
+            subject = new Subject();
             addX509ChainToSubject(servletRequest, subject);
             addOriginToSubject(servletRequest, subject);
             addPasswordCredentialToSubject(request, subject);
 
             LoginReply login = _loginStrategy.login(subject);
             subject = login.getSubject();
+            Restriction userRestriction = login.getRestriction();
 
             servletRequest.setAttribute(DCACHE_SUBJECT_ATTRIBUTE, subject);
+            servletRequest.setAttribute(DCACHE_RESTRICTION_ATTRIBUTE, userRestriction);
 
-            if (!isAuthorizedMethod(request.getMethod(), login)) {
-                throw new PermissionDeniedCacheException("Permission denied: " +
-                        "read-only user");
-            }
+            checkAuthorised(request, userRestriction);
 
             checkRootPath(request, login);
 
@@ -141,6 +149,84 @@ public class SecurityFilter implements Filter
         } catch (CacheException e) {
             _log.error("Internal server error: " + e);
             manager.getResponseHandler().respondServerError(request, response, e.getMessage());
+        }
+    }
+
+    private void checkAuthorised(Restriction restriction, Activity activity, FsPath path)
+            throws PermissionDeniedCacheException
+    {
+        if (restriction.isRestricted(activity, path)) {
+            throw new PermissionDeniedCacheException("Permission denied.");
+        }
+    }
+
+    private void checkAuthorised(Request request, Restriction restriction)
+            throws PermissionDeniedCacheException
+    {
+        String requestPath = request.getAbsolutePath();
+        FsPath fullPath = new FsPath(_rootPath, new FsPath(requestPath));
+
+        switch (request.getMethod()) {
+        case CONNECT:
+        case TRACE:
+        case OPTIONS:
+            return;
+
+        case GET:
+        case HEAD:
+            checkAuthorised(restriction, Activity.DOWNLOAD, fullPath);
+            break;
+
+        case PROPFIND:
+            switch (request.getDepthHeader()) {
+            case 0:
+                checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
+                break;
+            case 1:
+            case AbstractRequest.INFINITY:
+            default:
+                checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
+                checkAuthorised(restriction, Activity.LIST, fullPath);
+                break;
+            }
+            break;
+
+        case REPORT:
+            checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
+            break;
+
+        case POST:
+            /* POST is difficult to describe as its affect on the filesystem,
+             * if any, is ill-defined.  Currently we allow all POST requests
+             * through and rely on any code handling these requests to provide
+             * the necessary security checks.
+             */
+            break;
+
+        case PROPPATCH:
+        case ACL:
+        case LOCK:
+        case UNLOCK:
+            checkAuthorised(restriction, Activity.UPDATE_METADATA, fullPath);
+            break;
+
+        case PUT:
+            checkAuthorised(restriction, Activity.UPLOAD, fullPath.getParent());
+            break;
+
+        case DELETE:
+            checkAuthorised(restriction, Activity.DELETE, fullPath);
+            break;
+
+        case COPY:
+        case MOVE:
+        case MKCOL:
+            checkAuthorised(restriction, Activity.MANAGE, fullPath);
+            break;
+
+        case MKCALENDAR:
+        default:
+            throw new PermissionDeniedCacheException("Permission denied.");
         }
     }
 
@@ -218,39 +304,6 @@ public class SecurityFilter implements Filter
         }
     }
 
-    private boolean isAllowedMethod(Request.Method method)
-    {
-        return !_isReadOnly || isReadMethod(method);
-    }
-
-    private boolean isAuthorizedMethod(Request.Method method, LoginReply login)
-    {
-        return !isUserReadOnly(login) || isReadMethod(method);
-    }
-
-    private boolean isUserReadOnly(LoginReply login)
-    {
-        for (LoginAttribute attribute: login.getLoginAttributes()) {
-            if (attribute instanceof ReadOnly) {
-                return ((ReadOnly) attribute).isReadOnly();
-            }
-        }
-        return false;
-    }
-
-    private boolean isReadMethod(Request.Method method)
-    {
-        switch (method) {
-        case GET:
-        case HEAD:
-        case OPTIONS:
-        case PROPFIND:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     public String getRealm()
     {
         return _realm;
@@ -264,17 +317,12 @@ public class SecurityFilter implements Filter
         _realm = realm;
     }
 
-    public boolean isReadOnly()
-    {
-        return _isReadOnly;
-    }
-
     /**
      * Specifies whether the door is read only.
      */
     public void setReadOnly(boolean isReadOnly)
     {
-        _isReadOnly = isReadOnly;
+        _doorRestriction = isReadOnly ? Restrictions.readOnly() : Restrictions.none();
     }
 
     public void setEnableBasicAuthentication(boolean isEnabled)

@@ -1,54 +1,51 @@
 package org.dcache.auth.attributes;
 
-import java.util.EnumSet;
-
 import diskCacheV111.util.FsPath;
 
 /**
- * A Restriction that allows a user to read content in dCache but not to
- * modify it.
+ * Do not restrict the user's activity.
  */
-public class ReadOnly implements Restriction
+public class Unrestricted implements Restriction
 {
     private static final long serialVersionUID = 1L;
 
-    protected ReadOnly()
+    protected Unrestricted()
     {
     }
 
     @Override
     public boolean alwaysRestricted(Activity activity)
     {
-        return activity.isModifying();
+        return false;
     }
 
     @Override
     public boolean isRestricted(Activity activity, FsPath path)
     {
-        return activity.isModifying();
+        return false;
     }
 
     @Override
     public int hashCode()
     {
-        return ReadOnly.class.hashCode();
+        return Unrestricted.class.hashCode();
     }
 
     @Override
     public boolean equals(Object other)
     {
-        return other instanceof ReadOnly;
+        return other instanceof Unrestricted;
     }
 
     @Override
     public boolean isSubsumedBy(Restriction other)
     {
-        return other instanceof ReadOnly || other instanceof DenyAll;
+        return true;
     }
 
     @Override
     public String toString()
     {
-        return "ReadOnly";
+        return "Unrestricted";
     }
 }

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
@@ -77,6 +78,8 @@ public class SrmGetPermission
             TPermissionReturn p = new TPermissionReturn();
             TReturnStatus returnStatus;
             try {
+                URI surl = URI.create(surls[i].toString());
+                storage.checkAuthorization(user, surl, Activity.READ_METADATA);
                 FileMetaData fmd = storage.getFileMetaData(user, URI.create(surls[i].toString()), false);
                 copyPermissions(fmd, p);
                 returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);

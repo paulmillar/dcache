@@ -19,8 +19,8 @@ import org.dcache.auth.GidPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
+import org.dcache.auth.attributes.Unrestricted;
 import org.dcache.auth.attributes.HomeDirectory;
-import org.dcache.auth.attributes.ReadOnly;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.gplazma.AuthenticationException;
 import org.dcache.gplazma.NoSuchPrincipalException;
@@ -207,7 +207,6 @@ public class NsswitchTest
 
         assertThat(_attributes, hasItem(homeDirectory("/")));
         assertThat(_attributes, hasItem(rootDirectory("/")));
-        assertThat(_attributes, hasItem(readOnly(false)));
     }
 
 
@@ -294,11 +293,6 @@ public class NsswitchTest
     private Object rootDirectory(String dir)
     {
         return new RootDirectory(dir);
-    }
-
-    private Object readOnly(boolean isReadOnly)
-    {
-        return new ReadOnly(isReadOnly);
     }
 
     private UserInfo aUser()

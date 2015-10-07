@@ -17,6 +17,8 @@ import java.util.List;
 
 import diskCacheV111.srm.RequestFileStatus;
 
+import org.dcache.auth.attributes.Activity;
+import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
@@ -148,6 +150,7 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
             logger.trace("run");
             if (!getState().isFinal()) {
                 try {
+                    getStorage().checkAuthorization(getUser(), surl, Activity.LIST);
                     LsRequest parent = getContainerRequest();
                     long t0 = 0;
                     if (logger.isDebugEnabled()) {
@@ -358,6 +361,8 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                 throws SRMException, URISyntaxException
         {
                 List<FileMetaData> directoryList;
+                AbstractStorageElement storage = getStorage();
+                SRMUser user = getUser();
                 //
                 // simplify things for the most common case when people perform
                 // ls on directory w/o specifying recursionDepth
@@ -375,6 +380,9 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                         new LinkedList<>();
                 for (FileMetaData md : directoryList) {
                         URI subpath = new URI(null, null, md.SURL, null);
+                        if (storage.isRestrictedVerifiedSurl(user, subpath, Activity.READ_METADATA)) {
+                            continue;
+                        }
                         TMetaDataPathDetail dirMetaDataPathDetail=
                                 convertFileMetaDataToTMetaDataPathDetail(subpath,
                                                                          md,
@@ -411,6 +419,8 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                                                     boolean longFormat)
                 throws SRMException, URISyntaxException
         {
+            AbstractStorageElement storage = getStorage();
+            SRMUser user = getUser();
                 if (!fmd.isDirectory || depth >= recursionDepth) {
                     return;
                 }
@@ -458,6 +468,9 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                         new LinkedList<>();
                 for (FileMetaData md : directoryList) {
                         URI subpath = new URI(null, null, md.SURL, null);
+                        if (storage.isRestrictedVerifiedSurl(user, subpath, Activity.READ_METADATA)) {
+                            continue;
+                        }
                         TMetaDataPathDetail dirMetaDataPathDetail;
                         if (offset==0) {
                                 dirMetaDataPathDetail=

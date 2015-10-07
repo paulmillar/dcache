@@ -170,6 +170,7 @@ import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Origin;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Activity;
 import org.dcache.cells.AbstractMessageCallback;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.ACLPermissionHandler;
@@ -1897,6 +1898,21 @@ public final class Storage
 
     private final Map<Long,TransferInfo> callerIdToHandler =
         new ConcurrentHashMap<>();
+
+    @Override
+    public boolean alwaysRestricted(SRMUser abstractUser, Activity activity)
+    {
+        DcacheUser user = (DcacheUser) abstractUser;
+        return user.getRestriction().alwaysRestricted(activity);
+    }
+
+    @Override
+    public boolean isRestricted(SRMUser abstractUser, URI surl, Activity activity) throws SRMInvalidPathException
+    {
+        DcacheUser user = (DcacheUser) abstractUser;
+        FsPath path = config.getPath(surl);
+        return user.getRestriction().isRestricted(activity, path);
+    }
 
     private static class TransferInfo
     {

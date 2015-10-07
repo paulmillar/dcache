@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
@@ -13,6 +14,7 @@ import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.SrmMkdirRequest;
 import org.dcache.srm.v2_2.SrmMkdirResponse;
 import org.dcache.srm.v2_2.TReturnStatus;
@@ -52,7 +54,9 @@ public class SrmMkdir
     {
         TReturnStatus returnStatus;
         try {
-            storage.createDirectory(user, URI.create(request.getSURL().toString()));
+            URI url = URI.create(request.getSURL().toString());
+            storage.checkAuthorization(user, Surls.getParent(url), Activity.MANAGE);
+            storage.createDirectory(user, url);
             returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);
         } catch (SRMInternalErrorException e) {
             LOGGER.error(e.getMessage());

@@ -3,13 +3,20 @@ package org.dcache.auth;
 import javax.annotation.Nonnull;
 import javax.security.auth.Subject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import org.dcache.auth.attributes.DenyAll;
 import org.dcache.auth.attributes.LoginAttribute;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
+import org.dcache.auth.attributes.Unrestricted;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.Iterables.filter;
 
 /**
  * Immutable encapsulation of a login result as provided by a
@@ -79,6 +86,31 @@ public class LoginReply
         return result;
     }
 
+    public Restriction getRestriction()
+    {
+        Iterable<Restriction> restrictions = filter(_attributes, Restriction.class);
+
+        Restriction restriction = null;
+
+        for (Restriction r : restrictions) {
+            if (r instanceof DenyAll) {
+                return Restrictions.denyAll();
+            }
+
+            if (r instanceof Unrestricted) {
+                continue;
+            }
+
+            if (restriction == null) {
+                restriction = r;
+            } else {
+                return Restrictions.concat(restrictions);
+            }
+        }
+
+        return restriction == null ? Restrictions.none() : restriction;
+    }
+
     @Override
     public boolean equals(Object o)
     {
@@ -102,6 +134,7 @@ public class LoginReply
         return result;
     }
 
+    @Override
     public String toString()
     {
         String name = Subjects.getDisplayName(_subject);

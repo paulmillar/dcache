@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
+import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMNotSupportedException;
@@ -76,6 +77,8 @@ public class SrmCopy implements CredentialAwareHandler
             } catch (SRMInternalErrorException e) {
                 LOGGER.error(e.getMessage());
                 response = getFailedResponse(e.getMessage(), TStatusCode.SRM_INTERNAL_ERROR);
+            } catch (SRMAuthorizationException e) {
+                response = getFailedResponse(e.getMessage(), TStatusCode.SRM_AUTHORIZATION_FAILURE);
             }
         }
         return response;
@@ -83,7 +86,7 @@ public class SrmCopy implements CredentialAwareHandler
 
     private SrmCopyResponse srmCopy()
             throws SRMInvalidRequestException, SRMNotSupportedException,
-                   SRMInternalErrorException
+                   SRMInternalErrorException, SRMAuthorizationException
     {
         TCopyFileRequest[] arrayOfFileRequests = getFileRequests(request);
         long lifetime = getTotalRequestTime(request, configuration.getCopyLifetime());

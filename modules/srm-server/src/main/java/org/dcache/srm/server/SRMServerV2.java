@@ -84,6 +84,7 @@ import java.rmi.RemoteException;
 import java.util.Map;
 import java.util.Set;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.commons.stats.RequestCounters;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
 import org.dcache.srm.AbstractStorageElement;
@@ -291,18 +292,41 @@ public class SRMServerV2 implements ISRM  {
                 requestName.substring(1);
         try {
             try {
-                if (user.isReadOnly()) {
-                    switch (requestName) {
-                    case "srmRmdir":
-                    case "srmMkdir":
-                    case "srmPrepareToPut":
-                    case "srmRm" :
-                    case "srmMv":
-                    case "srmSetPermission":
-                        throw new SRMAuthorizationException(requestName + " denied because account " +
-                                                                    user.getDisplayName() + " is read-only.");
-                    }
+                switch (requestName) {
+                case "srmSetPermission":
+                    storage.checkAuthorization(user, Activity.UPDATE_METADATA);
+                    break;
+
+                case "srmMkdir":
+                case "srmMv":
+                    storage.checkAuthorization(user, Activity.MANAGE);
+                    break;
+
+                case "srmPrepareToPut":
+                    storage.checkAuthorization(user, Activity.UPLOAD);
+                    break;
+
+                case "srmRmdir":
+                case "srmRm" :
+                    storage.checkAuthorization(user, Activity.DELETE);
+                    break;
+
+                case "srmCheckPermission":
+                case "srmGetPermission":
+                    storage.checkAuthorization(user, Activity.READ_METADATA);
+                    break;
+
+                case "srmBringOnline":
+                case "srmPrepareToGet":
+                    storage.checkAuthorization(user, Activity.DOWNLOAD);
+                    break;
+
+                case "srmLs":
+                    storage.checkAuthorization(user, Activity.LIST);
+                    storage.checkAuthorization(user, Activity.READ_METADATA);
+                    break;
                 }
+
             } catch (SRMAuthorizationException e) {
                 LOGGER.info(e.getMessage());
                 return getFailedResponse(capitalizedRequestName, e.getStatusCode(), "Permission denied.");

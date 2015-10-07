@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
@@ -13,6 +14,7 @@ import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.SrmMvRequest;
 import org.dcache.srm.v2_2.SrmMvResponse;
 import org.dcache.srm.v2_2.TReturnStatus;
@@ -57,6 +59,10 @@ public class SrmMv
         try {
             URI to_surl = URI.create(request.getToSURL().toString());
             URI from_surl = URI.create(request.getFromSURL().toString());
+
+            storage.checkAuthorization(user, Surls.getParent(to_surl), Activity.MANAGE);
+            storage.checkAuthorization(user, Surls.getParent(to_surl), Activity.MANAGE);
+
             // [SRM 2.2, 4.6.3]     SRM_INVALID_PATH: status of fromSURL is SRM_FILE_BUSY.
             // [SRM 2.2, 4.6.2, c)] srmMv must fail on SURL that its status is SRM_FILE_BUSY,
             //                      and SRM_FILE_BUSY must be returned.

@@ -7,16 +7,19 @@ import org.springframework.dao.DataAccessException;
 import java.net.URI;
 import java.util.concurrent.Semaphore;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.RemoveFileCallback;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMInternalErrorException;
+import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMUser;
 import org.dcache.srm.request.GetFileRequest;
 import org.dcache.srm.request.PutFileRequest;
 import org.dcache.srm.scheduler.IllegalStateTransition;
+import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.ArrayOfTSURLReturnStatus;
 import org.dcache.srm.v2_2.SrmRmRequest;
 import org.dcache.srm.v2_2.SrmRmResponse;
@@ -89,6 +92,25 @@ public class SrmRm
             semaphore.acquire();
             returnStatuses[i] = new TSURLReturnStatus(surls[i], null);
             URI surl = URI.create(surls[i].toString());
+
+            boolean isRestricted;
+
+            try {
+                isRestricted = storage.isRestricted(user, surl, Activity.DELETE);
+            } catch (SRMInvalidPathException e) {
+                TReturnStatus status = returnStatuses[i].getStatus();
+                status.setExplanation("Badly formed SURL");
+                status.setStatusCode(TStatusCode.SRM_INVALID_PATH);
+                continue;
+            }
+
+            if (isRestricted) {
+                TReturnStatus status = returnStatuses[i].getStatus();
+                status.setExplanation("Permission denied.");
+                status.setStatusCode(TStatusCode.SRM_AUTHORIZATION_FAILURE);
+                continue;
+            }
+
             storage.removeFile(user, surl, new Callback(semaphore, returnStatuses[i]));
         }
         semaphore.acquire(sizeOfSingleRemoveBatch);

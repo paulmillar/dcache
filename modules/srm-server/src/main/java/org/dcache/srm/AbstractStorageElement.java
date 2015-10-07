@@ -66,6 +66,7 @@ documents or software obtained from this server.
 
 package org.dcache.srm;
 
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.CheckedFuture;
 
 import javax.annotation.Nonnull;
@@ -75,6 +76,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.v2_2.TMetaDataSpace;
 
 
@@ -578,4 +580,66 @@ public interface AbstractStorageElement {
     throws SRMException;
 
     String getStorageBackendVersion();
+
+    /**
+     * Check whether the supplied activity is ever allowed for the given user.
+     * @param user The user attempting some activity.
+     * @param activity The activity attempted by this user.
+     * @throws SRMAuthorizationException if the user is never allow to do this activity.
+     */
+    default void checkAuthorization(SRMUser user, Activity activity)
+            throws SRMAuthorizationException
+    {
+        if (alwaysRestricted(user, activity)) {
+            throw new SRMAuthorizationException("Permission denied.");
+        }
+    }
+
+    /**
+     * Check whether the supplied activity is allowed for the given user.
+     * @param user The user attempting some activity.
+     * @param surl The target of the activity.
+     * @param activity The activity attempted by this user.
+     * @throws SRMAuthorizationException if the user is not allow to do this activity.
+     * @throws org.dcache.srm.SRMInvalidPathException if the SURL is not local or badly formed.
+     */
+    default void checkAuthorization(SRMUser user, URI surl, Activity activity)
+            throws SRMAuthorizationException, SRMInvalidPathException
+    {
+        if (isRestricted(user, surl, activity)) {
+            throw new SRMAuthorizationException("Permission denied.");
+        }
+    }
+
+    /**
+     * Version of isRestricted where the SURL has already been verified.
+     */
+    default boolean isRestrictedVerifiedSurl(SRMUser user, URI surl, Activity activity)
+    {
+        try {
+            return isRestricted(user, surl, activity);
+        } catch (SRMInvalidPathException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Returns true if the user is never authorised to perform the operation on
+     * any SURL.
+     * @param user The user attempting the activity
+     * @param activity The activity requested by the user
+     * @return true if the user is not authorised for this activity.
+     */
+    boolean alwaysRestricted(SRMUser user, Activity activity);
+
+    /**
+     * Returns true if the user is not authorised to perform the operation on
+     * the supplied SURL.
+     * @param user The user attempting the activity
+     * @param surl The target of the activity
+     * @param activity The activity requested by the user
+     * @return true if the user is not authorised for this activity.
+     * @throws SRMInvalidPathException if the SURL is not local or badly formed.
+     */
+    boolean isRestricted(SRMUser user, URI surl, Activity activity) throws SRMInvalidPathException;
 }

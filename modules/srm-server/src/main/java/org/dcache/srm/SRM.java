@@ -97,6 +97,7 @@ import java.util.regex.Pattern;
 import diskCacheV111.srm.FileMetaData;
 import diskCacheV111.srm.RequestStatus;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.commons.stats.MonitoringProxy;
 import org.dcache.commons.stats.RequestCounters;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
@@ -127,6 +128,7 @@ import org.dcache.srm.scheduler.JobStorageFactory;
 import org.dcache.srm.scheduler.SchedulerContainer;
 import org.dcache.srm.scheduler.State;
 import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.TFileStorageType;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -464,13 +466,20 @@ public class SRM {
         }
     }
 
-    public void advisoryDelete(final SRMUser user, String[] SURLS) {
+    public void advisoryDelete(final SRMUser user, String[] SURLS)
+            throws SRMAuthorizationException, SRMInvalidPathException
+    {
         logger.debug("SRM.advisoryDelete");
         if (user == null) {
             String error = "advisoryDelete: user is unknown," +
                     " user needs authorization to delete ";
             logger.error(error);
             throw new IllegalArgumentException(error);
+        }
+
+        for (String surlArg : SURLS) {
+            URI surl = URI.create(surlArg);
+            storage.checkAuthorization(user, surl, Activity.DELETE);
         }
 
         TheAdvisoryDeleteCallbacks callabacks_array[] =
@@ -585,6 +594,18 @@ public class SRM {
                     }
                 }
             }
+
+            for (URI surl : from_urls) {
+                if (surl.getScheme().equals("srm")) {
+                    storage.checkAuthorization(user, surl, Activity.DOWNLOAD);
+                }
+            }
+            for (URI surl : to_urls) {
+                if (surl.getScheme().equals("srm")) {
+                    storage.checkAuthorization(user, surl, Activity.UPLOAD);
+                }
+            }
+
             long lifetime = configuration.getCopyLifetime();
             if (cred_lifetime < lifetime) {
                 logger.debug("credential lifetime is less than default lifetime, using credential lifetime =" + cred_lifetime);
@@ -663,6 +684,7 @@ public class SRM {
             URI[] uris = new URI[surls.length];
             for (int i = 0; i < surls.length; i++) {
                 uris[i] = new URI(surls[i]);
+                storage.checkAuthorization(user, uris[i], Activity.DOWNLOAD);
             }
             GetRequest r =
                     new GetRequest(user, uris, protocols,
@@ -707,7 +729,9 @@ public class SRM {
      *         the array of SURLs of files of interest
      * @return FileMetaData array assosiated with these SURLs
      */
-    public FileMetaData[] getFileMetaData(SRMUser user, String[] SURLS) {
+    public FileMetaData[] getFileMetaData(SRMUser user, String[] SURLS)
+            throws SRMAuthorizationException, SRMInvalidPathException
+    {
         StringBuilder sb = new StringBuilder();
         sb.append("getFileMetaData(");
         if (SURLS == null) {
@@ -722,6 +746,11 @@ public class SRM {
         }
         sb.append(")");
         logger.debug(sb.toString());
+
+        for (String surlParam : SURLS) {
+            URI surl = URI.create(surlParam);
+            storage.checkAuthorization(user, surl, Activity.READ_METADATA);
+        }
 
         FileMetaData[] fmds = new FileMetaData[len];
         // call getFileMetaData(String path) for each SURL in array
@@ -871,6 +900,11 @@ public class SRM {
                 errorsb.append(']');
                 return createFailedRequestStatus(errorsb.toString());
             }
+
+            for (URI surl : dests_urls) {
+                storage.checkAuthorization(user, Surls.getParent(surl), Activity.UPLOAD);
+            }
+
             // create a new put request
             PutRequest r = new PutRequest(user, dests_urls, sizes,
                     wantPerm, protocols, configuration.getPutLifetime(),

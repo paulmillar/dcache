@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
+import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAbortedException;
@@ -130,8 +131,10 @@ public class SrmExtendFileLifeTime
         status.setSurl(surl);
         TReturnStatus returnStatus;
         try {
+            URI otherSurl = URI.create(surl.toString());
+            storage.checkAuthorization(user, otherSurl, Activity.UPDATE_METADATA);
             long lifetimeLeftInMillis =
-                    storage.srmExtendSurlLifetime(user, URI.create(surl.toString()), newLifetimeInMillis);
+                    storage.srmExtendSurlLifetime(user, otherSurl, newLifetimeInMillis);
             status.setFileLifetime(toSeconds(lifetimeLeftInMillis));
             returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);
         } catch (SRMInternalErrorException e) {

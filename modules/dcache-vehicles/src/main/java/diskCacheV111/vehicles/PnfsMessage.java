@@ -2,11 +2,10 @@
 
 package diskCacheV111.vehicles;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.util.Collections;
 import java.util.Set;
 
+import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsId;
 
 import org.dcache.acl.enums.AccessMask;
@@ -20,6 +19,7 @@ public class PnfsMessage extends Message {
 
     private PnfsId _pnfsId;
     private String _path;
+
     private Set<AccessMask> _mask = Collections.emptySet();
 
     private static final long serialVersionUID = -3686370854772807059L;
@@ -32,6 +32,11 @@ public class PnfsMessage extends Message {
 
     public void setPnfsPath( String pnfsPath ){ _path = pnfsPath ; }
     public String getPnfsPath(){ return _path ;}
+
+    public FsPath getFsPath()
+    {
+        return new FsPath(_path);
+    }
 
     public PnfsId getPnfsId(){
 	return _pnfsId;
@@ -51,6 +56,7 @@ public class PnfsMessage extends Message {
         return _mask;
     }
 
+    @Override
     public String toString(){
         return _pnfsId==null?
                (_path==null?"NULL":("Path="+_path)):
