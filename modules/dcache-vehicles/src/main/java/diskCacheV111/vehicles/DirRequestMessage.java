@@ -15,35 +15,28 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package diskCacheV111.namespace;
+package diskCacheV111.vehicles;
 
-import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
 
-import org.dcache.auth.Subjects;
-import org.dcache.auth.attributes.Restrictions;
+import org.dcache.auth.attributes.Restriction;
 
 /**
- * Utility class to represent command arguments that may be
- * either a PNFS ID or a path.
+ * A request that the {@literal dir} cell list information about the specified
+ * path.
  */
-public class PnfsIdOrPath
+public class DirRequestMessage extends PoolIoFileMessage
 {
-    private final String s;
+    private final Restriction _restriction;
 
-    private PnfsIdOrPath(String s)
-    {
-        this.s = s;
+    public DirRequestMessage(String pool, PnfsId pnfsId, ProtocolInfo info,
+            Restriction restriction) {
+        super(pool, pnfsId, info);
+        _restriction = restriction;
     }
 
-    public PnfsId toPnfsId(NameSpaceProvider provider)
-            throws CacheException
+    public Restriction getRestriction()
     {
-        return PnfsId.isValid(s) ? new PnfsId(s) : provider.pathToPnfsid(Subjects.ROOT, Restrictions.none(), s, true);
-    }
-
-    public static PnfsIdOrPath valueOf(String s)
-    {
-        return new PnfsIdOrPath(s);
+        return _restriction;
     }
 }

@@ -31,6 +31,7 @@ import dmg.cells.nucleus.CellMessageSender;
 import dmg.cells.nucleus.CellPath;
 
 import org.dcache.acl.enums.AccessMask;
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -53,6 +54,7 @@ public class PnfsHandler
     private final CellStub _cellStub;
 
     private Subject _subject;
+    private Restriction _restriction;
 
     private static final Logger _logNameSpace =
         LoggerFactory.getLogger("logger.org.dcache.namespace." + PnfsHandler.class.getName());
@@ -104,12 +106,14 @@ public class PnfsHandler
      *
      * @param handler The PnfsHandler to copy
      * @param subject The Subject to apply to the copy
+     * @param restriction The Restriction applying to the current user
      */
-    public PnfsHandler(PnfsHandler handler, Subject subject)
+    public PnfsHandler(PnfsHandler handler, Subject subject, Restriction restriction)
     {
         _poolName = handler._poolName;
         _cellStub = handler._cellStub;
         _subject = subject;
+        _restriction = restriction;
     }
 
     @Override
@@ -123,6 +127,11 @@ public class PnfsHandler
         _subject = subject;
     }
 
+    public void setRestriction(Restriction restriction)
+    {
+        _restriction = restriction;
+    }
+
     /**
      * Sends a PnfsMessage to PnfsManager.
      */
@@ -134,6 +143,10 @@ public class PnfsHandler
 
         if (_subject != null) {
             msg.setSubject(_subject);
+        }
+
+        if (_restriction != null) {
+            msg.setRestriction(_restriction);
         }
 
         _cellStub.notify(msg);
@@ -231,6 +244,9 @@ public class PnfsHandler
         msg.setReplyRequired(true);
         if (_subject != null) {
             msg.setSubject(_subject);
+        }
+        if (_restriction != null) {
+            msg.setRestriction(_restriction);
         }
         return _cellStub.send(msg, timeout);
     }

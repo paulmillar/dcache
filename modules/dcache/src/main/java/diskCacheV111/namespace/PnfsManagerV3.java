@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Required;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Nullable;
 import javax.security.auth.Subject;
 
 import java.io.File;
@@ -77,17 +78,18 @@ import dmg.util.command.Command;
 import dmg.util.command.CommandLine;
 import dmg.util.command.Option;
 
-
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.CellStub;
 import org.dcache.chimera.UnixPermission;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.ListHandler;
-import org.dcache.namespace.PermissionHandler;
+import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
@@ -167,7 +169,7 @@ public class PnfsManagerV3
 
     private CellPath _cacheModificationRelay;
 
-    private PermissionHandler _permissionHandler;
+    private RestrictedPermissionHandler _permissionHandler;
     private NameSpaceProvider _nameSpaceProvider;
 
     /**
@@ -245,7 +247,7 @@ public class PnfsManagerV3
     }
 
     @Required
-    public void setPermissionHandler(PermissionHandler handler)
+    public void setPermissionHandler(RestrictedPermissionHandler handler)
     {
         _permissionHandler = handler;
     }
@@ -364,7 +366,7 @@ public class PnfsManagerV3
         PnfsId pnfsId;
         StringBuilder sb = new StringBuilder();
         try {
-            pnfsId = pathToPnfsid(ROOT, args.argv(0), false);
+            pnfsId = pathToPnfsid(ROOT, Restrictions.none(), args.argv(0), false);
             sb.append(pnfsId.toString());
         }catch(Exception e){
             sb.append("pnfsidof failed:").append(e.getMessage());
@@ -384,10 +386,10 @@ public class PnfsManagerV3
                 pnfsId   = new PnfsId( args.argv(0) ) ;
 
             }catch(Exception ee ){
-                pnfsId = pathToPnfsid(ROOT, args.argv(0), true );
+                pnfsId = pathToPnfsid(ROOT, Restrictions.none(), args.argv(0), true);
             }
 
-            List<String> locations = _nameSpaceProvider.getCacheLocation(ROOT, pnfsId);
+            List<String> locations = _nameSpaceProvider.getCacheLocation(ROOT, Restrictions.none(), pnfsId);
 
             for ( String location: locations ) {
                 sb.append(" ").append(location);
@@ -403,7 +405,7 @@ public class PnfsManagerV3
     public static final String hh_pathfinder = "<pnfsId>" ;
     public String ac_pathfinder_$_1( Args args ) throws Exception {
         PnfsId pnfsId = new PnfsId( args.argv(0) ) ;
-        return _nameSpaceProvider.pnfsidToPath(ROOT, pnfsId);
+        return _nameSpaceProvider.pnfsidToPath(ROOT, Restrictions.none(), pnfsId);
     }
 
     @Command(name = "set meta",
@@ -438,7 +440,7 @@ public class PnfsManagerV3
             if (PnfsId.isValid(pnfsidOrPath)) {
                 pnfsId = new PnfsId(pnfsidOrPath);
             } else {
-                pnfsId = pathToPnfsid(ROOT, pnfsidOrPath, true);
+                pnfsId = pathToPnfsid(ROOT, Restrictions.none(), pnfsidOrPath, true);
             }
 
             FileAttributes attributes = new FileAttributes();
@@ -446,7 +448,7 @@ public class PnfsManagerV3
             attributes.setGroup(gid);
             attributes.setMode(Integer.parseInt(perm, 8));
 
-            _nameSpaceProvider.setFileAttributes(ROOT, pnfsId, attributes,
+            _nameSpaceProvider.setFileAttributes(ROOT, Restrictions.none(), pnfsId, attributes,
                     EnumSet.noneOf(FileAttribute.class));
 
             return "Ok";
@@ -508,7 +510,7 @@ public class PnfsManagerV3
                     sb.append("PnfsId : ").append(pnfsId).append("\n");
                 }
             }else {
-                pnfsId = pathToPnfsid(ROOT, pnfsidOrPath, noLinks );
+                pnfsId = pathToPnfsid(ROOT, Restrictions.none(), pnfsidOrPath, noLinks );
                     if (verbose) {
                         sb.append("       Path : ").append(pnfsidOrPath)
                                 .append("\n");
@@ -517,7 +519,7 @@ public class PnfsManagerV3
             }
 
             FileAttributes attributes =
-                    _nameSpaceProvider.getFileAttributes(ROOT, pnfsId,
+                    _nameSpaceProvider.getFileAttributes(ROOT, Restrictions.none(), pnfsId,
                             EnumSet.of(FileAttribute.STORAGEINFO, FileAttribute.ACCESS_LATENCY,
                                     FileAttribute.RETENTION_POLICY,  FileAttribute.SIZE));
 
@@ -552,7 +554,7 @@ public class PnfsManagerV3
                     sb.append("PnfsId : ").append(pnfsId).append("\n");
                 }
             }catch(Exception ee ){
-                pnfsId = pathToPnfsid(ROOT, args.argv(0) , n ) ;
+                pnfsId = pathToPnfsid(ROOT, Restrictions.none(), args.argv(0) , n ) ;
 
                 if(v) {
                     sb.append("   Local Path : ").append(args.argv(0))
@@ -564,7 +566,7 @@ public class PnfsManagerV3
             }
 
             FileAttributes fileAttributes = _nameSpaceProvider
-                    .getFileAttributes(ROOT, pnfsId, EnumSet.of(OWNER, OWNER_GROUP, MODE, TYPE,
+                    .getFileAttributes(ROOT, Restrictions.none(), pnfsId, EnumSet.of(OWNER, OWNER_GROUP, MODE, TYPE,
                             CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME));
 
             SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
@@ -617,7 +619,7 @@ public class PnfsManagerV3
         {
             FileAttributes attributes = new FileAttributes();
             attributes.setFlags(args.optionsAsMap());
-            _nameSpaceProvider.setFileAttributes(ROOT, file.toPnfsId(_nameSpaceProvider), attributes,
+            _nameSpaceProvider.setFileAttributes(ROOT, Restrictions.none(), file.toPnfsId(_nameSpaceProvider), attributes,
                                                  EnumSet.noneOf(FileAttribute.class));
             return "";
         }
@@ -640,7 +642,7 @@ public class PnfsManagerV3
             PnfsId pnfsId = file.toPnfsId(_nameSpaceProvider);
 
             for (String flag : args.options().keySet()) {
-                _nameSpaceProvider.removeFileAttribute(ROOT, pnfsId, flag);
+                _nameSpaceProvider.removeFileAttribute(ROOT, Restrictions.none(), pnfsId, flag);
             }
             return "";
         }
@@ -658,7 +660,7 @@ public class PnfsManagerV3
         public String call() throws Exception
         {
             FileAttributes attributes =
-                    _nameSpaceProvider.getFileAttributes(ROOT, file.toPnfsId(_nameSpaceProvider),
+                    _nameSpaceProvider.getFileAttributes(ROOT, Restrictions.none(), file.toPnfsId(_nameSpaceProvider),
                                                          EnumSet.of(FileAttribute.FLAGS));
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<String,String> e: attributes.getFlags().entrySet()) {
@@ -708,7 +710,7 @@ public class PnfsManagerV3
             FileAttributes attributes = new FileAttributes();
             attributes.setSize(Long.parseLong(newsize));
 
-            _nameSpaceProvider.setFileAttributes(ROOT, pnfsId, attributes,
+            _nameSpaceProvider.setFileAttributes(ROOT, Restrictions.none(), pnfsId, attributes,
                     EnumSet.noneOf(FileAttribute.class));
 
             return "";
@@ -740,7 +742,7 @@ public class PnfsManagerV3
          }
         */
 
-        _nameSpaceProvider.addCacheLocation(ROOT, pnfsId, cacheLocation);
+        _nameSpaceProvider.addCacheLocation(ROOT, Restrictions.none(), pnfsId, cacheLocation);
 
         return "";
 
@@ -752,7 +754,7 @@ public class PnfsManagerV3
         PnfsId pnfsId = new PnfsId( args.argv(0));
         String cacheLocation = args.argv(1);
 
-        _nameSpaceProvider.clearCacheLocation(ROOT, pnfsId, cacheLocation, false);
+        _nameSpaceProvider.clearCacheLocation(ROOT, Restrictions.none(), pnfsId, cacheLocation, false);
 
         return "";
     }
@@ -786,8 +788,8 @@ public class PnfsManagerV3
             Checksum checksum = new Checksum(type, checksumValue);
             FileAttributes attributes = new FileAttributes();
             attributes.setChecksums(Collections.singleton(checksum));
-            _nameSpaceProvider.setFileAttributes(ROOT, pnfsId, attributes,
-                    EnumSet.noneOf(FileAttribute.class));
+            _nameSpaceProvider.setFileAttributes(ROOT, Restrictions.none(),
+                    pnfsId, attributes, EnumSet.noneOf(FileAttribute.class));
             return "";
         }
     }
@@ -810,7 +812,7 @@ public class PnfsManagerV3
         @Override
         public String call() throws CacheException
         {
-            _nameSpaceProvider.removeChecksum(ROOT, pnfsId, type);
+            _nameSpaceProvider.removeChecksum(ROOT, Restrictions.none(), pnfsId, type);
             return "";
         }
     }
@@ -833,7 +835,7 @@ public class PnfsManagerV3
         @Override
         public String call() throws CacheException, NoSuchAlgorithmException
         {
-            Checksum checksum = getChecksum(ROOT, pnfsId, type);
+            Checksum checksum = getChecksum(ROOT, Restrictions.none(), pnfsId, type);
             return (checksum == null) ? "" : checksum.toString();
         }
     }
@@ -930,13 +932,13 @@ public class PnfsManagerV3
         _log.warn( sb.toString() );
     }
 
-    private Checksum getChecksum(Subject subject, PnfsId pnfsId,
+    private Checksum getChecksum(Subject subject, Restriction restriction, PnfsId pnfsId,
                                  ChecksumType type)
         throws CacheException, NoSuchAlgorithmException
     {
         ChecksumFactory factory = ChecksumFactory.getFactory(type);
         FileAttributes attributes =
-            _nameSpaceProvider.getFileAttributes(subject, pnfsId,
+            _nameSpaceProvider.getFileAttributes(subject, restriction, pnfsId,
                                                  EnumSet.of(FileAttribute.CHECKSUM));
         return factory.find(attributes.getChecksums());
     }
@@ -951,7 +953,7 @@ public class PnfsManagerV3
             Checksum checksum = new Checksum(type, value);
             FileAttributes attributes = new FileAttributes();
             attributes.setChecksums(Collections.singleton(checksum));
-            _nameSpaceProvider.setFileAttributes(msg.getSubject(), pnfsId,
+            _nameSpaceProvider.setFileAttributes(msg.getSubject(), msg.getRestriction(), pnfsId,
                     attributes, EnumSet.noneOf(FileAttribute.class));
         }catch(FileNotFoundCacheException e) {
             msg.setFailed(CacheException.FILE_NOT_FOUND, e.getMessage() );
@@ -973,15 +975,16 @@ public class PnfsManagerV3
         String flagName  = pnfsMessage.getFlagName() ;
         String value     = pnfsMessage.getValue() ;
         Subject subject = pnfsMessage.getSubject();
+        Restriction restriction = pnfsMessage.getRestriction();
         _log.info("update flag "+operation+" flag="+flagName+" value="+
                   value+" for "+pnfsId);
 
         try{
 
             if( operation == PnfsFlagMessage.FlagOperation.GET ){
-                pnfsMessage.setValue( updateFlag(subject, pnfsId , operation , flagName , value ) );
+                pnfsMessage.setValue( updateFlag(subject, restriction, pnfsId , operation , flagName , value ) );
             }else{
-                updateFlag(subject, pnfsId , operation , flagName , value );
+                updateFlag(subject, restriction, pnfsId , operation , flagName , value );
             }
 
         } catch (FileNotFoundCacheException e) {
@@ -995,7 +998,7 @@ public class PnfsManagerV3
         }
     }
 
-    private String updateFlag(Subject subject, PnfsId pnfsId,
+    private String updateFlag(Subject subject, Restriction restriction, PnfsId pnfsId,
                               PnfsFlagMessage.FlagOperation operation,
                               String flagName, String value)
         throws CacheException
@@ -1006,26 +1009,26 @@ public class PnfsManagerV3
             _log.info("flags set " + pnfsId + " " + flagName + "=" + value);
             attributes = new FileAttributes();
             attributes.setFlags(Collections.singletonMap(flagName, value));
-            _nameSpaceProvider.setFileAttributes(subject, pnfsId, attributes,
+            _nameSpaceProvider.setFileAttributes(subject, restriction, pnfsId, attributes,
                     EnumSet.noneOf(FileAttribute.class));
             break;
         case SETNOOVERWRITE:
             _log.info("flags set (dontoverwrite) " + pnfsId + " " + flagName + "=" + value);
-            attributes = _nameSpaceProvider.getFileAttributes(subject, pnfsId, EnumSet.of(FileAttribute.FLAGS));
+            attributes = _nameSpaceProvider.getFileAttributes(subject, restriction, pnfsId, EnumSet.of(FileAttribute.FLAGS));
             String current = attributes.getFlags().get(flagName);
             if ((current == null) || (!current.equals(value))) {
-                updateFlag(subject, pnfsId, PnfsFlagMessage.FlagOperation.SET,
+                updateFlag(subject, restriction, pnfsId, PnfsFlagMessage.FlagOperation.SET,
                            flagName, value);
             }
             break;
         case GET:
-            attributes = _nameSpaceProvider.getFileAttributes(subject, pnfsId, EnumSet.of(FileAttribute.FLAGS));
+            attributes = _nameSpaceProvider.getFileAttributes(subject, restriction, pnfsId, EnumSet.of(FileAttribute.FLAGS));
             String v = attributes.getFlags().get(flagName);
             _log.info("flags ls " + pnfsId + " " + flagName + " -> " + v);
             return v;
         case REMOVE:
             _log.info("flags remove " + pnfsId + " " + flagName);
-            _nameSpaceProvider.removeFileAttribute(subject, pnfsId, flagName);
+            _nameSpaceProvider.removeFileAttribute(subject, restriction, pnfsId, flagName);
             break;
         }
         return null;
@@ -1056,6 +1059,7 @@ public class PnfsManagerV3
 
             checkMask(pnfsMessage);
             _nameSpaceProvider.addCacheLocation(pnfsMessage.getSubject(),
+                                                pnfsMessage.getRestriction(),
                                                 pnfsMessage.getPnfsId(),
                                                 pnfsMessage.getPoolName());
         } catch (FileNotFoundCacheException fnf ) {
@@ -1077,6 +1081,7 @@ public class PnfsManagerV3
         try {
             checkMask(pnfsMessage);
             _nameSpaceProvider.clearCacheLocation(pnfsMessage.getSubject(),
+                                                  pnfsMessage.getRestriction(),
                                                   pnfsId,
                                                   pnfsMessage.getPoolName(),
                                                   pnfsMessage.removeIfLast());
@@ -1095,12 +1100,13 @@ public class PnfsManagerV3
 
     public void getCacheLocations(PnfsGetCacheLocationsMessage pnfsMessage){
         Subject subject = pnfsMessage.getSubject();
+        Restriction restriction = pnfsMessage.getRestriction();
         try {
             PnfsId pnfsId = populatePnfsId(pnfsMessage);
             _log.info("get cache locations for " + pnfsId);
 
             checkMask(pnfsMessage);
-            pnfsMessage.setCacheLocations(_nameSpaceProvider.getCacheLocation(subject, pnfsId));
+            pnfsMessage.setCacheLocations(_nameSpaceProvider.getCacheLocation(subject, restriction, pnfsId));
             pnfsMessage.setSucceeded();
         } catch (FileNotFoundCacheException fnf ) {
             pnfsMessage.setFailed(CacheException.FILE_NOT_FOUND, fnf.getMessage() );
@@ -1120,11 +1126,10 @@ public class PnfsManagerV3
         PnfsId pnfsId;
         _log.info("create symlink {} to {}", pnfsMessage.getPath(), pnfsMessage.getDestination() );
         try {
-            File file = new File(pnfsMessage.getPath());
-            checkMask(pnfsMessage.getSubject(), file.getParent(),
-                      pnfsMessage.getAccessMask());
+            checkMaskOnPathParent(pnfsMessage);
 
             pnfsId = _nameSpaceProvider.createSymLink(pnfsMessage.getSubject(),
+                                                      pnfsMessage.getRestriction(),
                                                       pnfsMessage.getPath(),
                                                       pnfsMessage.getDestination(),
                                                       pnfsMessage.getUid(),
@@ -1147,11 +1152,10 @@ public class PnfsManagerV3
         PnfsId pnfsId;
         _log.info("create directory "+pnfsMessage.getPath());
         try {
-            File file = new File(pnfsMessage.getPath());
-            checkMask(pnfsMessage.getSubject(), file.getParent(),
-                      pnfsMessage.getAccessMask());
+            checkMaskOnPathParent(pnfsMessage);
 
             pnfsId = _nameSpaceProvider.createDirectory(pnfsMessage.getSubject(),
+                                                        pnfsMessage.getRestriction(),
                                                         pnfsMessage.getPath(),
                                                         pnfsMessage.getUid(), pnfsMessage.getGid(),
                                                         pnfsMessage.getMode());
@@ -1177,6 +1181,7 @@ public class PnfsManagerV3
                     pnfsMessage.getRequestedAttributes();
                 FileAttributes attrs =
                     _nameSpaceProvider.getFileAttributes(ROOT,
+                                                         Restrictions.none(),
                                                          pnfsId,
                                                          requested);
                 pnfsMessage.setFileAttributes(attrs);
@@ -1195,11 +1200,9 @@ public class PnfsManagerV3
 
     public void createEntry(PnfsCreateEntryMessage pnfsMessage){
 
-        _log.info("create entry "+pnfsMessage.getPath());
+        _log.info("create entry {}", pnfsMessage.getPath());
         try {
-            File file = new File(pnfsMessage.getPath());
-            checkMask(pnfsMessage.getSubject(), file.getParent(),
-                      pnfsMessage.getAccessMask());
+            checkMaskOnPathParent(pnfsMessage);
 
             Set<FileAttribute> requested =
                     pnfsMessage.getRequestedAttributes();
@@ -1208,6 +1211,7 @@ public class PnfsManagerV3
 
             FileAttributes attrs =
                     _nameSpaceProvider.createFile(pnfsMessage.getSubject(),
+                                                  pnfsMessage.getRestriction(),
                                                   pnfsMessage.getPath(),
                                                   pnfsMessage.getUid(),
                                                   pnfsMessage.getGid(),
@@ -1236,6 +1240,7 @@ public class PnfsManagerV3
     {
         try {
             FsPath uploadPath = _nameSpaceProvider.createUploadPath(message.getSubject(),
+                                                                    message.getRestriction(),
                                                                     message.getPath(),
                                                                     message.getRootPath(),
                                                                     message.getSize(),
@@ -1257,6 +1262,7 @@ public class PnfsManagerV3
     {
         try {
             PnfsId pnfsId = _nameSpaceProvider.commitUpload(message.getSubject(),
+                                                            message.getRestriction(),
                                                             message.getUploadPath(),
                                                             message.getPath(),
                                                             message.getOptions());
@@ -1264,7 +1270,7 @@ public class PnfsManagerV3
             Set<FileAttribute> attributes = message.getRequestedAttributes();
             if (!attributes.isEmpty()) {
                 message.setFileAttributes(
-                        _nameSpaceProvider.getFileAttributes(Subjects.ROOT, pnfsId, attributes));
+                        _nameSpaceProvider.getFileAttributes(Subjects.ROOT, Restrictions.none(), pnfsId, attributes));
             }
             message.setSucceeded();
         } catch (CacheException e) {
@@ -1278,7 +1284,7 @@ public class PnfsManagerV3
     void cancelUpload(PnfsCancelUpload message)
     {
         try {
-            _nameSpaceProvider.cancelUpload(message.getSubject(), message.getUploadPath(), message.getPath());
+            _nameSpaceProvider.cancelUpload(message.getSubject(), message.getRestriction(), message.getUploadPath(), message.getPath());
             message.setSucceeded();
         } catch (CacheException e) {
             message.setFailed(e.getRc(), e.getMessage());
@@ -1293,6 +1299,7 @@ public class PnfsManagerV3
         String path = pnfsMessage.getPnfsPath();
         PnfsId pnfsId = pnfsMessage.getPnfsId();
         Subject subject = pnfsMessage.getSubject();
+        Restriction restriction = pnfsMessage.getRestriction();
         Set<FileType> allowed = pnfsMessage.getAllowedFileTypes();
 
         try {
@@ -1304,13 +1311,13 @@ public class PnfsManagerV3
             if (path != null) {
                 _log.info("delete PNFS entry for {}", path);
                 if (pnfsId != null) {
-                    _nameSpaceProvider.deleteEntry(subject, allowed, pnfsId, path);
+                    _nameSpaceProvider.deleteEntry(subject, restriction, allowed, pnfsId, path);
                 } else {
-                    pnfsMessage.setPnfsId(_nameSpaceProvider.deleteEntry(subject, allowed, path));
+                    pnfsMessage.setPnfsId(_nameSpaceProvider.deleteEntry(subject, restriction, allowed, path));
                 }
             } else {
                 _log.info("delete PNFS entry for {}", pnfsId);
-                _nameSpaceProvider.deleteEntry(subject, allowed, pnfsId);
+                _nameSpaceProvider.deleteEntry(subject, restriction, allowed, pnfsId);
             }
 
             pnfsMessage.setSucceeded();
@@ -1337,10 +1344,10 @@ public class PnfsManagerV3
                 if (pnfsId == null) {
                     throw new InvalidMessageCacheException("Either path or pnfs id is required.");
                 }
-                sourcePath = _nameSpaceProvider.pnfsidToPath(msg.getSubject(), pnfsId);
+                sourcePath = _nameSpaceProvider.pnfsidToPath(msg.getSubject(), msg.getRestriction(), pnfsId);
             }
             _log.info("Rename {} to new name: {}", sourcePath, destinationPath);
-            _nameSpaceProvider.rename(msg.getSubject(), pnfsId, sourcePath, destinationPath, msg.getOverwrite());
+            _nameSpaceProvider.rename(msg.getSubject(), msg.getRestriction(), pnfsId, sourcePath, destinationPath, msg.getOverwrite());
         } catch (CacheException e){
             msg.setFailed(e.getRc(), e.getMessage());
         } catch (RuntimeException e) {
@@ -1350,16 +1357,17 @@ public class PnfsManagerV3
         }
     }
 
-    private String pathfinder(Subject subject, PnfsId pnfsId )
+    private String pathfinder(Subject subject, Restriction restriction, PnfsId pnfsId )
         throws CacheException
     {
-        return _nameSpaceProvider.pnfsidToPath(subject, pnfsId);
+        return _nameSpaceProvider.pnfsidToPath(subject, restriction, pnfsId);
     }
 
     public void mapPath( PnfsMapPathMessage pnfsMessage ){
         PnfsId pnfsId     = pnfsMessage.getPnfsId() ;
         String globalPath = pnfsMessage.getGlobalPath() ;
         Subject subject = pnfsMessage.getSubject();
+        Restriction restriction = pnfsMessage.getRestriction();
         boolean shouldResolve = pnfsMessage.shouldResolve();
 
         if( ( pnfsId == null ) && ( globalPath == null ) ){
@@ -1370,10 +1378,10 @@ public class PnfsManagerV3
         try {
             if (globalPath == null) {
                 _log.info("map:  id2path for " + pnfsId);
-                pnfsMessage.setGlobalPath(pathfinder(subject, pnfsId));
+                pnfsMessage.setGlobalPath(pathfinder(subject, restriction, pnfsId));
             } else {
                 _log.info("map:  path2id for " + globalPath);
-                pnfsMessage.setPnfsId(pathToPnfsid(subject, globalPath, shouldResolve));
+                pnfsMessage.setPnfsId(pathToPnfsid(subject, restriction, globalPath, shouldResolve));
             }
             checkMask(pnfsMessage);
         } catch(FileNotFoundCacheException fnf){
@@ -1392,7 +1400,7 @@ public class PnfsManagerV3
         try {
             PnfsId pnfsId = populatePnfsId(msg);
             checkMask(msg);
-            msg.setParent(_nameSpaceProvider.getParentOf(msg.getSubject(), pnfsId));
+            msg.setParent(_nameSpaceProvider.getParentOf(msg.getSubject(), msg.getRestriction(), pnfsId));
         } catch (CacheException e) {
             _log.warn(e.toString());
             msg.setFailed(e.getRc(), e.getMessage());
@@ -1477,9 +1485,7 @@ public class PnfsManagerV3
         }
 
         try {
-            String path = msg.getPnfsPath();
-
-            checkMask(msg.getSubject(), path, msg.getAccessMask());
+            checkMask(msg);
 
             long delay = envelope.getAdjustedTtl();
             long initialDelay =
@@ -1490,7 +1496,7 @@ public class PnfsManagerV3
             ListHandlerImpl handler =
                 new ListHandlerImpl(source, envelope.getUOID(),
                                     msg, initialDelay, delay);
-            _nameSpaceProvider.list(msg.getSubject(), path,
+            _nameSpaceProvider.list(msg.getSubject(), msg.getRestriction(), msg.getPnfsPath(),
                                     msg.getPattern(),
                                     msg.getRange(),
                                     msg.getRequestedAttributes(),
@@ -1699,6 +1705,7 @@ public class PnfsManagerV3
             FileAttributes attributesToUpdate = new FileAttributes();
             attributesToUpdate.setStorageInfo(pnfsMessage.getFileAttributes().getStorageInfo());
             _nameSpaceProvider.setFileAttributes(pnfsMessage.getSubject(),
+                                                 pnfsMessage.getRestriction(),
                                                  pnfsMessage.getPnfsId(), attributesToUpdate,
                                                  EnumSet.noneOf(FileAttribute.class));
 
@@ -1757,7 +1764,7 @@ public class PnfsManagerV3
     {
         try {
             _nameSpaceProvider.removeChecksum(message.getSubject(),
-                    message.getPnfsId(), message.getType());
+                    message.getRestriction(), message.getPnfsId(), message.getType());
         } catch (CacheException e) {
             message.setFailed(e.getRc(), e.getMessage());
         } catch(RuntimeException e) {
@@ -1771,10 +1778,10 @@ public class PnfsManagerV3
      *
      * Internally updates the path to database ID cache.
      */
-    private PnfsId pathToPnfsid(Subject subject, String path, boolean resolve)
+    private PnfsId pathToPnfsid(Subject subject, Restriction restriction, String path, boolean resolve)
         throws CacheException
     {
-        PnfsId pnfsId = _nameSpaceProvider.pathToPnfsid(subject, path, resolve);
+        PnfsId pnfsId = _nameSpaceProvider.pathToPnfsid(subject, restriction, path, resolve);
         updatePathToDatabaseIdCache(path, pnfsId.getDatabaseId());
         return pnfsId;
     }
@@ -1815,7 +1822,7 @@ public class PnfsManagerV3
          */
         PnfsId id;
         try {
-            id = _nameSpaceProvider.pathToPnfsid(ROOT, file.getPath(), true);
+            id = _nameSpaceProvider.pathToPnfsid(ROOT, Restrictions.none(), file.getPath(), true);
         } catch (CacheException e) {
             file = file.getParentFile();
             if (file == null) {
@@ -1834,14 +1841,14 @@ public class PnfsManagerV3
                 return file;
             }
 
-            PnfsId parentId = _nameSpaceProvider.pathToPnfsid(ROOT, parent, true);
+            PnfsId parentId = _nameSpaceProvider.pathToPnfsid(ROOT, Restrictions.none(), parent, true);
             while (parentId.getDatabaseId() == id.getDatabaseId()) {
                 file = new File(parent);
                 parent = file.getParent();
                 if (parent == null) {
                     return file;
                 }
-                parentId = _nameSpaceProvider.pathToPnfsid(ROOT, parent, true);
+                parentId = _nameSpaceProvider.pathToPnfsid(ROOT, Restrictions.none(), parent, true);
             }
 
             return file;
@@ -1907,6 +1914,7 @@ public class PnfsManagerV3
     {
         try {
             Subject subject = message.getSubject();
+            Restriction restriction = message.getRestriction();
             PnfsId pnfsId = populatePnfsId(message);
             checkMask(message);
             Set<FileAttribute> requested = message.getRequestedAttributes();
@@ -1931,6 +1939,7 @@ public class PnfsManagerV3
             }
             FileAttributes attrs =
                 _nameSpaceProvider.getFileAttributes(subject,
+                                                     restriction,
                                                      pnfsId,
                                                      requested);
 
@@ -1950,7 +1959,7 @@ public class PnfsManagerV3
                 if (attrs.getFileType() == FileType.REGULAR && Math.abs(now - attrs.getAccessTime()) > _atimeGap) {
                     FileAttributes atimeUpdateAttr = new FileAttributes();
                     atimeUpdateAttr.setAccessTime(now);
-                    _nameSpaceProvider.setFileAttributes(Subjects.ROOT, pnfsId, atimeUpdateAttr, EnumSet.noneOf(FileAttribute.class));
+                    _nameSpaceProvider.setFileAttributes(Subjects.ROOT, Restrictions.none(), pnfsId, atimeUpdateAttr, EnumSet.noneOf(FileAttribute.class));
                 }
             }
         } catch (FileNotFoundCacheException e){
@@ -1985,6 +1994,7 @@ public class PnfsManagerV3
 
             FileAttributes updated = _nameSpaceProvider.
                     setFileAttributes(message.getSubject(),
+                                      message.getRestriction(),
                                       pnfsId,
                                       attr,
                                       message.getAcquire());
@@ -2012,7 +2022,7 @@ public class PnfsManagerV3
                 throw new InvalidMessageCacheException("no pnfsid or path defined");
             }
 
-            pnfsId = pathToPnfsid(message.getSubject(), path, true);
+            pnfsId = pathToPnfsid(message.getSubject(), message.getRestriction(), path, true);
             message.setPnfsId(pnfsId);
         }
         return pnfsId;
@@ -2021,46 +2031,51 @@ public class PnfsManagerV3
     /**
      * Checks the access mask for a given message.
      */
-    private void checkMask(PnfsMessage message)
-        throws CacheException
+    private void checkMask(PnfsMessage message) throws CacheException
     {
-        if (message.getPnfsId() != null) {
-            checkMask(message.getSubject(), message.getPnfsId(), message.getAccessMask());
-        } else {
-            checkMask(message.getSubject(), message.getPnfsPath(), message.getAccessMask());
+        checkMask(message.getSubject(), message.getRestriction(),
+                message.getFsPath(), message.getPnfsId(), message.getAccessMask());
+    }
+
+    private void checkMaskOnPathParent(PnfsMessage message) throws CacheException
+    {
+        FsPath path = message.getFsPath();
+
+        if (path.isEmpty()) {
+            throw new CacheException("Root has no parent");
         }
+
+        checkMask(message.getSubject(), message.getRestriction(),
+                path.getParent(), null, message.getAccessMask());
     }
 
     /**
      * Checks an access mask.
      */
-    private void checkMask(Subject subject, PnfsId pnfsId, Set<AccessMask> mask)
-        throws CacheException
+    private void checkMask(Subject subject, Restriction restriction,
+            @Nullable FsPath path, @Nullable PnfsId pnfsId, Set<AccessMask> mask)
+            throws CacheException
     {
         if (!Subjects.isRoot(subject) && !mask.isEmpty()) {
-            Set<FileAttribute> required =
-                _permissionHandler.getRequiredAttributes();
-            FileAttributes attributes =
-                _nameSpaceProvider.getFileAttributes(subject, pnfsId, required);
-            if (!checkMask(subject, mask, attributes)) {
-                throw new PermissionDeniedCacheException("Access denied");
+            Set<FileAttribute> required = _permissionHandler.getRequiredAttributes();
+
+            if (pnfsId == null) {
+                if (path == null) {
+                    throw new IllegalArgumentException("Both PNFS-ID and path are null");
+                }
+                pnfsId = pathToPnfsid(ROOT, Restrictions.none(), path.toString(), false);
             }
-        }
-    }
 
-    /**
-     * Checks an access mask.
-     */
-    private void checkMask(Subject subject, String path, Set<AccessMask> mask)
-        throws CacheException
-    {
-        if (!Subjects.isRoot(subject) && !mask.isEmpty()) {
-            Set<FileAttribute> required =
-                _permissionHandler.getRequiredAttributes();
-            PnfsId pnfsId = pathToPnfsid(ROOT, path, false);
             FileAttributes attributes =
-                _nameSpaceProvider.getFileAttributes(subject, pnfsId, required);
-            if (!checkMask(subject, mask, attributes)) {
+                    _nameSpaceProvider.getFileAttributes(subject, restriction, pnfsId, required);
+
+            if (path == null) {
+                // If the request contains no path then we cannot apply the
+                // restriction.
+                restriction = Restrictions.none();
+            }
+
+            if (!isAllowed(subject, restriction, path, mask, attributes)) {
                 throw new PermissionDeniedCacheException("Access denied");
             }
         }
@@ -2071,12 +2086,15 @@ public class PnfsManagerV3
      * file system object.
      *
      * @param subject The Subject for which to check access rights
+     * @param restriction How this login session is restricted
      * @param mask The access right to check
      * @param attr The FileAttributes of the object to check access rights to
      * @return true if subject has all access rights in mask,
      *         false otherwise
      */
-    private boolean checkMask(Subject subject,
+    private boolean isAllowed(Subject subject,
+                              Restriction restriction,
+                              FsPath path,
                               Set<AccessMask> mask,
                               FileAttributes attr)
     {
@@ -2085,37 +2103,37 @@ public class PnfsManagerV3
             switch (m) {
             case READ_DATA:
                 access =
-                    access.and(_permissionHandler.canReadFile(subject, attr));
+                    access.and(_permissionHandler.canReadFile(subject, restriction, path, attr));
                 break;
             case LIST_DIRECTORY:
                 access =
-                    access.and(_permissionHandler.canListDir(subject, attr));
+                    access.and(_permissionHandler.canListDir(subject, restriction, path, attr));
                 break;
             case WRITE_DATA:
                 access =
-                    access.and(_permissionHandler.canWriteFile(subject, attr));
+                    access.and(_permissionHandler.canWriteFile(subject, restriction, path, attr));
                 break;
             case ADD_FILE:
                 access =
-                    access.and(_permissionHandler.canCreateFile(subject, attr));
+                    access.and(_permissionHandler.canCreateFile(subject, restriction, path, attr));
                 break;
             case APPEND_DATA:
                 /* Doesn't make much sense in dCache at the moment, so
                  * we simply translate this to WRITE_DATA.
                  */
                 access =
-                    access.and(_permissionHandler.canWriteFile(subject, attr));
+                    access.and(_permissionHandler.canWriteFile(subject, restriction, path, attr));
                 break;
             case ADD_SUBDIRECTORY:
                 access =
-                    access.and(_permissionHandler.canCreateSubDir(subject, attr));
+                    access.and(_permissionHandler.canCreateSubDir(subject, restriction, path, attr));
                 break;
             case EXECUTE:
                 /* Doesn't make sense for files in dCache, but for
                  * directories this is the lookup permission.
                  */
                 access =
-                    access.and(_permissionHandler.canLookup(subject, attr));
+                    access.and(_permissionHandler.canLookup(subject, restriction, path, attr));
                 break;
 
             case READ_ATTRIBUTES:

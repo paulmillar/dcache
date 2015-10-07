@@ -14,6 +14,7 @@ import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.RetentionPolicy;
 
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -69,8 +70,9 @@ public interface NameSpaceProvider
      * @return FileAttributes of newly created file
      * @throws CacheException
      */
-    FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
-                              Set<FileAttribute> requestedAttributes) throws CacheException;
+    FileAttributes createFile(Subject subject, Restriction restriction,
+            String path, int uid, int gid, int mode,
+            Set<FileAttribute> requestedAttributes) throws CacheException;
 
     /**
      * Create a directory for a given path and type.
@@ -83,7 +85,8 @@ public interface NameSpaceProvider
      * @return PnfsId of newly created object
      * @throws CacheException
      */
-    PnfsId createDirectory(Subject subject, String path, int uid, int gid, int mode) throws CacheException;
+    PnfsId createDirectory(Subject subject, Restriction restriction,
+            String path, int uid, int gid, int mode) throws CacheException;
 
     /**
      * Create a symbolic link with a given path.
@@ -96,7 +99,8 @@ public interface NameSpaceProvider
      * @return PnfsId of newly created object
      * @throws CacheException
      */
-    PnfsId createSymLink(Subject subject, String path, String dest, int uid, int gid) throws CacheException;
+    PnfsId createSymLink(Subject subject, Restriction restriction,
+            String path, String dest, int uid, int gid) throws CacheException;
 
     /**
      * remove file or directory associated with given pnfsid
@@ -105,7 +109,8 @@ public interface NameSpaceProvider
      * @param pnfsId
      * @throws CacheException
      */
-    void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId) throws CacheException;
+    void deleteEntry(Subject subject, Restriction restriction,
+            Set<FileType> allowed, PnfsId pnfsId) throws CacheException;
 
     /**
      * remove file or directory
@@ -114,7 +119,8 @@ public interface NameSpaceProvider
      * @param path
      * @throws CacheException
      */
-    PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path) throws CacheException;
+    PnfsId deleteEntry(Subject subject, Restriction restriction,
+            Set<FileType> allowed, String path) throws CacheException;
 
     /**
      * Remove file or directory. Path and PnfsID must describe the same object.
@@ -125,17 +131,24 @@ public interface NameSpaceProvider
      * @param path Path of file to delete
      * @throws CacheException
      */
-    void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path) throws CacheException;
+    void deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed,
+            PnfsId pnfsId, String path) throws CacheException;
 
-    void rename(Subject subject, @Nullable PnfsId pnfsId, String sourcePath, String destinationPath, boolean overwrite)
+    void rename(Subject subject, Restriction restriction, @Nullable PnfsId pnfsId,
+            String sourcePath, String destinationPath, boolean overwrite)
             throws CacheException;
 
-    String pnfsidToPath(Subject subject, PnfsId pnfsId) throws CacheException;
-    PnfsId pathToPnfsid(Subject subject, String path, boolean followLinks) throws CacheException;
+    String pnfsidToPath(Subject subject, Restriction restriction, PnfsId pnfsId)
+            throws CacheException;
 
-    PnfsId getParentOf(Subject subject, PnfsId pnfsId) throws CacheException;
+    PnfsId pathToPnfsid(Subject subject, Restriction restriction, String path,
+            boolean followLinks) throws CacheException;
 
-    void removeFileAttribute(Subject subject, PnfsId pnfsId, String attribute) throws CacheException;
+    PnfsId getParentOf(Subject subject, Restriction restriction, PnfsId pnfsId)
+            throws CacheException;
+
+    void removeFileAttribute(Subject subject, Restriction restriction,
+            PnfsId pnfsId, String attribute) throws CacheException;
 
     /**
      * Clears checksum value storage for the specific file and checksum type.
@@ -143,8 +156,8 @@ public interface NameSpaceProvider
      * @param type the type (or algorithm) of the checksum
      * @param pnfsId file
      */
-    void removeChecksum(Subject subject, PnfsId pnfsId, ChecksumType type)
-        throws CacheException;
+    void removeChecksum(Subject subject, Restriction restriction, PnfsId pnfsId,
+            ChecksumType type) throws CacheException;
 
     /**
      * add a cache location for a file
@@ -153,7 +166,8 @@ public interface NameSpaceProvider
      * @param cacheLocation the new location
      * @throws CacheException
      */
-    void addCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation) throws CacheException;
+    void addCacheLocation(Subject subject, Restriction restriction,
+            PnfsId pnfsId, String cacheLocation) throws CacheException;
 
     /**
      * get all cache location of the file
@@ -162,7 +176,8 @@ public interface NameSpaceProvider
      * @return list containing locations or empty list, if locations are unknown
      * @throws CacheException
      */
-    List<String> getCacheLocation(Subject subject, PnfsId pnfsId) throws CacheException;
+    List<String> getCacheLocation(Subject subject, Restriction restriction,
+            PnfsId pnfsId) throws CacheException;
 
     /**
      * clear cache locations
@@ -172,7 +187,8 @@ public interface NameSpaceProvider
      * @param removeIfLast remove entry from namespace if last known location is removed
      * @throws CacheException
      */
-    void clearCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation, boolean removeIfLast) throws CacheException;
+    void clearCacheLocation(Subject subject, Restriction restriction,
+            PnfsId pnfsId, String cacheLocation, boolean removeIfLast) throws CacheException;
 
     /**
      * Get files attributes defined by <code>attr</code>. It's allowed to return less
@@ -183,9 +199,8 @@ public interface NameSpaceProvider
      * @param attr array of requested attributes
      * @return
      */
-    FileAttributes getFileAttributes(Subject subject, PnfsId pnfsId,
-                                     Set<FileAttribute> attr)
-        throws CacheException;
+    FileAttributes getFileAttributes(Subject subject, Restriction restriction,
+            PnfsId pnfsId, Set<FileAttribute> attr) throws CacheException;
 
     /**
      * Set files attributes defined by <code>attr</code>.
@@ -199,8 +214,9 @@ public interface NameSpaceProvider
      * @param acquire attributes to query after the update, if any.
      * @return the updated attributes selected by acquire
      */
-    FileAttributes setFileAttributes(Subject subject, PnfsId pnfsId,
-            FileAttributes attr, Set<FileAttribute> fetch) throws CacheException;
+    FileAttributes setFileAttributes(Subject subject, Restriction restriction,
+            PnfsId pnfsId, FileAttributes attr, Set<FileAttribute> fetch)
+            throws CacheException;
 
     /**
      * Lists the content of a directory. The content is returned as a
@@ -227,9 +243,9 @@ public interface NameSpaceProvider
      * @param attrs The file attributes to query for each entry
      * @param handler Handler called for each entry
      */
-    void list(Subject subject, String path, Glob glob, Range<Integer> range,
-              Set<FileAttribute> attrs, ListHandler handler)
-        throws CacheException;
+    void list(Subject subject, Restriction restriction, String path, Glob glob,
+            Range<Integer> range, Set<FileAttribute> attrs, ListHandler handler)
+            throws CacheException;
 
     /**
      * Set up a temporary upload location for a file.
@@ -248,9 +264,9 @@ public interface NameSpaceProvider
      * @param options options specifying how the path should be created
      * @return A temporary upload path that must eventually be committed or cancelled
      */
-    FsPath createUploadPath(Subject subject, FsPath path, FsPath rootPath,
-                            Long size, AccessLatency al, RetentionPolicy rp, String spaceToken,
-                            Set<CreateOption> options)
+    FsPath createUploadPath(Subject subject, Restriction restriction,
+            FsPath path, FsPath rootPath, Long size, AccessLatency al,
+            RetentionPolicy rp, String spaceToken, Set<CreateOption> options)
             throws CacheException;
 
     /**
@@ -262,7 +278,8 @@ public interface NameSpaceProvider
      * @param options options specifying how the path should be committed
      * @return PnfsId of committed file
      */
-    PnfsId commitUpload(Subject subject, FsPath uploadPath, FsPath path, Set<CreateOption> options) throws CacheException;
+    PnfsId commitUpload(Subject subject, Restriction restriction,
+            FsPath uploadPath, FsPath path, Set<CreateOption> options) throws CacheException;
 
     /**
      * Remove temporary upload location.
@@ -275,5 +292,6 @@ public interface NameSpaceProvider
      * @param uploadPath the temporary path as returned by createUploadPath
      * @param path the path of file that is uploaded
      */
-    void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException;
+    void cancelUpload(Subject subject, Restriction restriction, FsPath uploadPath,
+            FsPath path) throws CacheException;
 }

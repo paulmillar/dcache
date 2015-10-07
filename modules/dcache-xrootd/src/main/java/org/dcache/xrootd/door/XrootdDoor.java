@@ -64,6 +64,7 @@ import dmg.cells.services.login.LoginManagerChildrenInfo;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Origin;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.cells.MessageCallback;
 import org.dcache.namespace.ACLPermissionHandler;
@@ -72,6 +73,7 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
+import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.poolmanager.PoolMonitor;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
@@ -130,12 +132,14 @@ public class XrootdDoor
 
     private PoolMonitor _poolMonitor;
 
-    private final PermissionHandler _pdp =
-            new ChainedPermissionHandler
-                    (
-                            new ACLPermissionHandler(),
-                            new PosixPermissionHandler()
-                    );
+    private final RestrictedPermissionHandler _pdp =
+            new RestrictedPermissionHandler(
+                new ChainedPermissionHandler
+                        (
+                                new ACLPermissionHandler(),
+                                new PosixPermissionHandler()
+                        )
+            );
 
     private int _moverTimeout = 180000;
     private TimeUnit _moverTimeoutUnit = TimeUnit.MILLISECONDS;
@@ -312,10 +316,11 @@ public class XrootdDoor
 
     private XrootdTransfer
         createTransfer(InetSocketAddress client, FsPath path,
-                       UUID uuid, InetSocketAddress local, Subject subject)
+                       UUID uuid, InetSocketAddress local, Subject subject,
+                       Restriction restriction)
     {
         XrootdTransfer transfer =
-            new XrootdTransfer(_pnfs, subject, path) {
+            new XrootdTransfer(_pnfs, subject, restriction, path) {
                 @Override
                 public synchronized void finished(CacheException error)
                 {
@@ -349,7 +354,7 @@ public class XrootdDoor
 
     public XrootdTransfer
         read(InetSocketAddress client, FsPath path, UUID uuid,
-             InetSocketAddress local, Subject subject)
+             InetSocketAddress local, Subject subject, Restriction restriction)
         throws CacheException, InterruptedException
     {
         if (!isReadAllowed(path)) {
@@ -357,7 +362,7 @@ public class XrootdDoor
         }
 
         XrootdTransfer transfer =
-            createTransfer(client, path, uuid, local, subject);
+            createTransfer(client, path, uuid, local, subject, restriction);
         int handle = transfer.getFileHandle();
 
         InetSocketAddress address = null;
@@ -395,7 +400,7 @@ public class XrootdDoor
     public XrootdTransfer
         write(InetSocketAddress client, FsPath path, UUID uuid,
               boolean createDir, boolean overwrite,
-              InetSocketAddress local, Subject subject)
+              InetSocketAddress local, Subject subject, Restriction restriction)
         throws CacheException, InterruptedException
     {
         if (!isWriteAllowed(path)) {
@@ -403,7 +408,7 @@ public class XrootdDoor
         }
 
         XrootdTransfer transfer =
-            createTransfer(client, path, uuid, local, subject);
+            createTransfer(client, path, uuid, local, subject, restriction);
         transfer.setOverwriteAllowed(overwrite);
         int handle = transfer.getFileHandle();
         InetSocketAddress address = null;
@@ -456,10 +461,10 @@ public class XrootdDoor
      * @throws CacheException Deletion of the file failed
      * @throws PermissionDeniedCacheException Caller does not have permission to delete the file
      */
-    public void deleteFile(FsPath path, Subject subject)
+    public void deleteFile(FsPath path, Subject subject, Restriction restriction)
         throws PermissionDeniedCacheException, CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
 
         if (!isWriteAllowed(path)) {
             throw new PermissionDeniedCacheException("Write permission denied");
@@ -490,10 +495,10 @@ public class XrootdDoor
      * @param path The path of the directory that is going to be deleted
      * @throws CacheException
      */
-    public void deleteDirectory(FsPath path,
-                                Subject subject) throws CacheException
+    public void deleteDirectory(FsPath path, Subject subject,
+            Restriction restriction) throws CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
 
         if (!isWriteAllowed(path)) {
             throw new PermissionDeniedCacheException("Write permission denied");
@@ -514,10 +519,10 @@ public class XrootdDoor
      */
     public void createDirectory(FsPath path,
                                 boolean createParents,
-                                Subject subject)
-                                                    throws CacheException
+                                Subject subject,
+                                Restriction restriction) throws CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
 
         if (!isWriteAllowed(path)) {
             throw new PermissionDeniedCacheException("Write permission denied");
@@ -539,9 +544,10 @@ public class XrootdDoor
      */
     public void moveFile(FsPath sourcePath,
                          FsPath targetPath,
-                         Subject subject) throws CacheException
+                         Subject subject,
+                         Restriction restriction) throws CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
 
         if (!isWriteAllowed(sourcePath)) {
             throw new PermissionDeniedCacheException("No write permission on" +
@@ -574,9 +580,10 @@ public class XrootdDoor
      */
     public void listPath(FsPath path,
                          Subject subject,
+                         Restriction restriction,
                          MessageCallback<PnfsListDirectoryMessage> callback)
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
 
         PnfsListDirectoryMessage msg =
             new PnfsListDirectoryMessage(
@@ -794,19 +801,20 @@ public class XrootdDoor
         }
     }
 
-    private int getFileStatusFlags(Subject subject, FileAttributes attributes)
+    private int getFileStatusFlags(Subject subject, Restriction restriction,
+            FsPath path, FileAttributes attributes)
     {
         int flags = 0;
         switch (attributes.getFileType()) {
         case DIR:
             boolean canListDir =
-                    _pdp.canListDir(subject, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canListDir(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
             boolean canLookup =
-                    _pdp.canLookup(subject, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canLookup(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
             boolean canCreateFile =
-                    _pdp.canCreateFile(subject, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateFile(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
             boolean canCreateDir =
-                    _pdp.canCreateSubDir(subject, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateSubDir(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
             flags |= kXR_isDir;
             if (canLookup) {
                 flags |= kXR_xset;
@@ -820,9 +828,9 @@ public class XrootdDoor
             break;
         case REGULAR:
             boolean canReadFile =
-                    _pdp.canReadFile(subject, attributes)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canReadFile(subject, restriction, path, attributes)== AccessType.ACCESS_ALLOWED;
             boolean canWriteFile =
-                    _pdp.canWriteFile(subject, attributes)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canWriteFile(subject, restriction, path, attributes)== AccessType.ACCESS_ALLOWED;
             if (canWriteFile) {
                 flags |= kXR_writable;
             }
@@ -840,20 +848,21 @@ public class XrootdDoor
         return flags;
     }
 
-    public Set<Checksum> getChecksums(FsPath fullPath, Subject subject) throws CacheException
+    public Set<Checksum> getChecksums(FsPath fullPath, Subject subject, Restriction restriction) throws CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
         Set<FileAttribute> requestedAttributes = EnumSet.of(CHECKSUM);
         FileAttributes attributes =
                 pnfsHandler.getFileAttributes(fullPath.toString(), requestedAttributes);
         return attributes.getChecksums();
     }
 
-    public FileStatus getFileStatus(FsPath fullPath, Subject subject, String clientHost) throws CacheException
+    public FileStatus getFileStatus(FsPath fullPath, Subject subject,
+            Restriction restriction, String clientHost) throws CacheException
     {
         /* Fetch file attributes.
          */
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
         Set<FileAttribute> requestedAttributes = EnumSet.of(TYPE, SIZE, MODIFICATION_TIME, STORAGEINFO);
         requestedAttributes.addAll(PoolMonitorV5.getRequiredAttributesForFileLocality());
         requestedAttributes.addAll(_pdp.getRequiredAttributes());
@@ -863,7 +872,7 @@ public class XrootdDoor
 
         /* Determine file locality.
          */
-        int flags = getFileStatusFlags(subject, attributes);
+        int flags = getFileStatusFlags(subject, restriction, fullPath, attributes);
         if (attributes.getFileType() != FileType.DIR) {
             FileLocality locality =
                     _poolMonitor.getFileLocality(attributes, clientHost);
@@ -878,9 +887,10 @@ public class XrootdDoor
         return new FileStatus(0, attributes.getSizeIfPresent().or(0L), flags, attributes.getModificationTime() / 1000);
     }
 
-    public int[] getMultipleFileStatuses(FsPath[] allPaths, Subject subject) throws CacheException
+    public int[] getMultipleFileStatuses(FsPath[] allPaths, Subject subject,
+            Restriction restriction) throws CacheException
     {
-        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfsHandler = new PnfsHandler(_pnfs, subject, restriction);
         int[] flags = new int[allPaths.length];
         // TODO: Use SpreadAndWait
         for (int i = 0; i < allPaths.length; i++) {
@@ -889,7 +899,7 @@ public class XrootdDoor
                 requestedAttributes.addAll(_pdp.getRequiredAttributes());
                 FileAttributes attributes =
                         pnfsHandler.getFileAttributes(allPaths[i].toString(), requestedAttributes);
-                flags[i] = getFileStatusFlags(subject, attributes);
+                flags[i] = getFileStatusFlags(subject, restriction, allPaths[i], attributes);
             } catch (CacheException e) {
                 if (e.getRc() != CacheException.FILE_NOT_FOUND &&
                         e.getRc() != CacheException.NOT_IN_TRASH) {

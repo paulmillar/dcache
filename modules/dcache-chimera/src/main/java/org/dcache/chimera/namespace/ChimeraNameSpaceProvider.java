@@ -17,7 +17,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.security.auth.Subject;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
@@ -51,6 +50,9 @@ import dmg.cells.nucleus.CellInfoProvider;
 import org.dcache.acl.ACE;
 import org.dcache.acl.ACL;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.chimera.ChimeraFsException;
 import org.dcache.chimera.DirNotEmptyHimeraFsException;
 import org.dcache.chimera.DirectoryStreamB;
@@ -71,7 +73,7 @@ import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.ListHandler;
-import org.dcache.namespace.PermissionHandler;
+import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.Glob;
@@ -99,7 +101,7 @@ public class ChimeraNameSpaceProvider
     private boolean _inheritFileOwnership;
     private boolean _verifyAllLookups;
     private boolean _aclEnabled;
-    private PermissionHandler _permissionHandler;
+    private RestrictedPermissionHandler _permissionHandler;
     private String _uploadDirectory;
 
     private final ThreadLocal<Integer> threadId = new ThreadLocal<Integer>() {
@@ -135,7 +137,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Required
-    public void setPermissionHandler(PermissionHandler handler)
+    public void setPermissionHandler(RestrictedPermissionHandler handler)
     {
         _permissionHandler = handler;
     }
@@ -168,7 +170,7 @@ public class ChimeraNameSpaceProvider
         _uploadDirectory = path;
     }
 
-    private ExtendedInode pathToInode(Subject subject, String path)
+    private ExtendedInode pathToInode(Subject subject, Restriction restriction, String path)
         throws ChimeraFsException, CacheException
     {
         if (Subjects.isRoot(subject)) {
@@ -181,7 +183,7 @@ public class ChimeraNameSpaceProvider
                 if (inode.isDirectory()) {
                     FileAttributes attributes =
                         getFileAttributesForPermissionHandler(inode);
-                    if (_permissionHandler.canLookup(subject, attributes) != ACCESS_ALLOWED) {
+                    if (_permissionHandler.canLookup(subject, restriction, new FsPath(path), attributes) != ACCESS_ALLOWED) {
                         throw new PermissionDeniedCacheException("Access denied: " + path);
                     }
                 }
@@ -191,7 +193,7 @@ public class ChimeraNameSpaceProvider
                 if (inode.isDirectory()) {
                     FileAttributes attributes =
                         getFileAttributesForPermissionHandler(inode);
-                    if (_permissionHandler.canLookup(subject, attributes) != ACCESS_ALLOWED) {
+                    if (_permissionHandler.canLookup(subject, restriction, new FsPath(path), attributes) != ACCESS_ALLOWED) {
                         throw new PermissionDeniedCacheException("Access denied: " + path);
                     }
                     /* dCache only checks the lookup permissions of
@@ -205,22 +207,22 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
+    public FileAttributes createFile(Subject subject, Restriction restriction, String path, int uid, int gid, int mode,
                                      Set<FileAttribute> requestedAttributes)
             throws CacheException
     {
         try {
-            File newEntryFile = new File(path);
-            String parentPath = newEntryFile.getParent();
+            FsPath newEntry = new FsPath(path);
+            FsPath parentPath = newEntry.getParent();
             if (parentPath == null) {
                 throw new FileExistsCacheException("File exists: " + path);
             }
-            ExtendedInode parent = pathToInode(subject, parentPath);
+            ExtendedInode parent = pathToInode(subject, restriction, parentPath.toString());
 
             if (!Subjects.isRoot(subject)) {
                 FileAttributes attributes
                         = getFileAttributesForPermissionHandler(parent);
-                if (_permissionHandler.canCreateFile(subject, attributes) != ACCESS_ALLOWED) {
+                if (_permissionHandler.canCreateFile(subject, restriction, newEntry, attributes) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " + path);
                 }
             }
@@ -245,7 +247,7 @@ public class ChimeraNameSpaceProvider
                 mode = parent.statCache().getMode() & UMASK_FILE;
             }
 
-            ExtendedInode inode = parent.create(newEntryFile.getName(), uid, gid, mode);
+            ExtendedInode inode = parent.create(newEntry.getName(), uid, gid, mode);
             FileAttributes fileAttributes = getFileAttributes(inode, requestedAttributes);
             if (parent.getTags().containsKey(TAG_EXPECTED_SIZE)) {
                 ImmutableList<String> size = parent.getTag(TAG_EXPECTED_SIZE);
@@ -267,18 +269,18 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId createDirectory(Subject subject, String path, int uid, int gid, int mode)
+    public PnfsId createDirectory(Subject subject, Restriction restriction, String path, int uid, int gid, int mode)
             throws CacheException {
         ExtendedInode inode;
 
         try {
-            File newEntryFile = new File(path);
-            String parentPath = newEntryFile.getParent();
+            FsPath newEntry = new FsPath(path);
+            FsPath parentPath = newEntry.getParent();
             if (parentPath == null) {
                 throw new FileExistsCacheException("File exists: " + path);
             }
-            ExtendedInode parent = pathToInode(subject, parentPath);
-            inode = mkdir(subject, parent, newEntryFile.getName(), uid, gid, mode);
+            ExtendedInode parent = pathToInode(subject, restriction, parentPath.toString());
+            inode = mkdir(subject, restriction, parent, newEntry, uid, gid, mode);
         } catch (NotDirChimeraException e) {
             throw new NotDirCacheException("Not a directory: " + path);
         } catch (FileNotFoundHimeraFsException e) {
@@ -294,23 +296,23 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId createSymLink(Subject subject, String path, String dest, int uid, int gid)
+    public PnfsId createSymLink(Subject subject, Restriction restriction, String path, String dest, int uid, int gid)
         throws CacheException
     {
         FsInode inode;
 
         try {
-            File newEntryFile = new File(path);
-            String parentPath = newEntryFile.getParent();
+            FsPath newEntry = new FsPath(path);
+            FsPath parentPath = newEntry.getParent();
             if (parentPath == null) {
                 throw new FileExistsCacheException("File exists: " + path);
             }
-            ExtendedInode parent = pathToInode(subject, parentPath);
+            ExtendedInode parent = pathToInode(subject, restriction, parentPath.toString());
 
             if (!Subjects.isRoot(subject)) {
                 FileAttributes attributes
                         = getFileAttributesForPermissionHandler(parent);
-                if (_permissionHandler.canCreateFile(subject, attributes) != ACCESS_ALLOWED) {
+                if (_permissionHandler.canCreateFile(subject, restriction, newEntry, attributes) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " + path);
                 }
             }
@@ -331,7 +333,7 @@ public class ChimeraNameSpaceProvider
                 }
             }
 
-            inode = _fs.createLink(parent, newEntryFile.getName(), uid, gid,
+            inode = _fs.createLink(parent, newEntry.getName(), uid, gid,
                                    SYMLINK_MODE, dest.getBytes(Charsets.UTF_8));
         } catch (NotDirChimeraException e) {
             throw new NotDirCacheException("Not a directory: " + path);
@@ -359,7 +361,7 @@ public class ChimeraNameSpaceProvider
         }
     }
 
-    private boolean canDelete(Subject subject, ExtendedInode parent, ExtendedInode inode)
+    private boolean canDelete(Subject subject, Restriction restriction, FsPath path, ExtendedInode parent, ExtendedInode inode)
             throws ChimeraFsException, CacheException
     {
         FileAttributes parentAttributes = getFileAttributesForPermissionHandler(parent);
@@ -367,12 +369,16 @@ public class ChimeraNameSpaceProvider
 
         if (inode.isDirectory()) {
             if (_permissionHandler.canDeleteDir(subject,
+                                                restriction,
+                                                path,
                                                 parentAttributes,
                                                 fileAttributes) != ACCESS_ALLOWED) {
                 return false;
             }
         } else {
             if (_permissionHandler.canDeleteFile(subject,
+                                                 restriction,
+                                                 path,
                                                  parentAttributes,
                                                  fileAttributes) != ACCESS_ALLOWED) {
                 return false;
@@ -382,7 +388,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId)
+    public void deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, PnfsId pnfsId)
         throws CacheException
     {
         try {
@@ -390,7 +396,8 @@ public class ChimeraNameSpaceProvider
 
             checkAllowed(allowed, inode);
 
-            if (!Subjects.isRoot(subject) && !canDelete(subject, inode.getParent(), inode)) {
+            // FIXME: without the path we cannot enforce the restriction.
+            if (!Subjects.isRoot(subject) && !canDelete(subject, Restrictions.none(), null, inode.getParent(), inode)) {
                 throw new PermissionDeniedCacheException("Access denied: " + pnfsId);
             }
 
@@ -406,24 +413,23 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path)
+    public PnfsId deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, String path)
         throws CacheException
     {
         try {
-            File filePath = new File(path);
-
-            String parentPath = filePath.getParent();
+            FsPath filePath = new FsPath(path);
+            FsPath parentPath = filePath.getParent();
             if (parentPath == null) {
                 throw new CacheException("Cannot delete file system root.");
             }
 
-            ExtendedInode parent = pathToInode(subject, parentPath);
+            ExtendedInode parent = pathToInode(subject, restriction, parentPath.toString());
             String name = filePath.getName();
 
             ExtendedInode inode = parent.inodeOf(name, STAT);
             checkAllowed(allowed, inode);
 
-            if (!Subjects.isRoot(subject) && !canDelete(subject, parent, inode)) {
+            if (!Subjects.isRoot(subject) && !canDelete(subject, restriction, filePath, parent, inode)) {
                 throw new PermissionDeniedCacheException("Access denied: " + path);
             }
 
@@ -441,18 +447,18 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path)
+    public void deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, PnfsId pnfsId, String path)
             throws CacheException
     {
         try {
-            File filePath = new File(path);
+            FsPath filePath = new FsPath(path);
 
-            String parentPath = filePath.getParent();
+            FsPath parentPath = filePath.getParent();
             if (parentPath == null) {
                 throw new CacheException("Cannot delete file system root.");
             }
 
-            ExtendedInode parent = pathToInode(subject, parentPath);
+            ExtendedInode parent = pathToInode(subject, restriction, parentPath.toString());
             String name = filePath.getName();
             ExtendedInode inode = parent.inodeOf(name, STAT);
 
@@ -462,7 +468,7 @@ public class ChimeraNameSpaceProvider
 
             checkAllowed(allowed, inode);
 
-            if (!Subjects.isRoot(subject) && !canDelete(subject, parent, inode)) {
+            if (!Subjects.isRoot(subject) && !canDelete(subject, restriction, filePath, parent, inode)) {
                 throw new PermissionDeniedCacheException("Access denied: " + path);
             }
 
@@ -477,21 +483,22 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void rename(Subject subject, @Nullable PnfsId pnfsId,
+    public void rename(Subject subject, Restriction restriction, @Nullable PnfsId pnfsId,
                        String sourcePath, String destinationPath, boolean overwrite)
         throws CacheException
     {
         try {
             /* Resolve the source directory.
              */
-            File source = new File(sourcePath);
-            ExtendedInode sourceDir = pathToInode(subject, source.getParent());
+            FsPath source = new FsPath(sourcePath);
+            FsPath sourceDirPath = source.getParent();
+            ExtendedInode sourceDir = pathToInode(subject, restriction, sourceDirPath.toString());
             FileAttributes sourceDirAttributes =
                 getFileAttributesForPermissionHandler(sourceDir);
 
             /* Resolve the target directory.
              */
-            File dest = new File(destinationPath);
+            FsPath dest = new FsPath(destinationPath);
             ExtendedInode destDir;
             FileAttributes destDirAttributes;
             try {
@@ -499,7 +506,7 @@ public class ChimeraNameSpaceProvider
                     destDir = sourceDir;
                     destDirAttributes = sourceDirAttributes;
                 } else {
-                    destDir = pathToInode(subject, dest.getParent());
+                    destDir = pathToInode(subject, restriction, dest.getParent().toString());
                     destDirAttributes =
                         getFileAttributesForPermissionHandler(destDir);
                 }
@@ -515,7 +522,7 @@ public class ChimeraNameSpaceProvider
                 inode = new ExtendedInode(_fs, pnfsId.toIdString());
             } else {
                 if (!Subjects.isRoot(subject) &&
-                    _permissionHandler.canLookup(subject, sourceDirAttributes) != ACCESS_ALLOWED) {
+                    _permissionHandler.canLookup(subject, restriction, sourceDirPath, sourceDirAttributes) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " + sourcePath);
                 }
                 inode = sourceDir.inodeOf(source.getName(), STAT);
@@ -526,6 +533,9 @@ public class ChimeraNameSpaceProvider
             if (!Subjects.isRoot(subject) || !overwrite) {
                 if (!Subjects.isRoot(subject) &&
                     _permissionHandler.canRename(subject,
+                                                 restriction,
+                                                 source,
+                                                 dest,
                                                  sourceDirAttributes,
                                                  destDirAttributes,
                                                  inode.isDirectory()) != ACCESS_ALLOWED) {
@@ -546,12 +556,16 @@ public class ChimeraNameSpaceProvider
                             getFileAttributesForPermissionHandler(destInode);
                     if (destInode.isDirectory()) {
                         if (_permissionHandler.canDeleteDir(subject,
+                                                            restriction,
+                                                            dest,
                                                             destDirAttributes,
                                                             destAttributes) != ACCESS_ALLOWED) {
                             throw new PermissionDeniedCacheException("Access denied: " + destinationPath);
                         }
                     } else {
                         if (_permissionHandler.canDeleteFile(subject,
+                                                             restriction,
+                                                             dest,
                                                              destDirAttributes,
                                                              destAttributes) != ACCESS_ALLOWED) {
                             throw new PermissionDeniedCacheException("Access denied: " + destinationPath);
@@ -582,7 +596,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void addCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation) throws CacheException {
+    public void addCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId, String cacheLocation) throws CacheException {
 
         _log.debug ("add cache location {} for {}", cacheLocation, pnfsId);
 
@@ -598,7 +612,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public List<String> getCacheLocation(Subject subject, PnfsId pnfsId) throws CacheException {
+    public List<String> getCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId) throws CacheException {
 
         try {
             List<String> locations = new ArrayList<>();
@@ -617,7 +631,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void clearCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation, boolean removeIfLast) throws CacheException {
+    public void clearCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId, String cacheLocation, boolean removeIfLast) throws CacheException {
 
         _log.debug("clearCacheLocation : {} for {}", cacheLocation, pnfsId) ;
 
@@ -643,7 +657,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public String pnfsidToPath(Subject subject, PnfsId pnfsId) throws CacheException {
+    public String pnfsidToPath(Subject subject, Restriction restriction, PnfsId pnfsId) throws CacheException {
         try {
             ExtendedInode inode = new ExtendedInode(_fs, pnfsId.toIdString());
 
@@ -657,12 +671,12 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId pathToPnfsid(Subject subject, String path, boolean followLink)
+    public PnfsId pathToPnfsid(Subject subject, Restriction restriction, String path, boolean followLink)
         throws CacheException
     {
         ExtendedInode inode;
         try {
-            inode = pathToInode(subject, path);
+            inode = pathToInode(subject, restriction, path);
         } catch (FileNotFoundHimeraFsException e) {
             throw new FileNotFoundCacheException("No such file or directory " + path);
         } catch (IOException e) {
@@ -673,7 +687,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void removeFileAttribute(Subject subject, PnfsId pnfsId, String attribute)
+    public void removeFileAttribute(Subject subject, Restriction restriction, PnfsId pnfsId, String attribute)
         throws CacheException
     {
         try {
@@ -691,7 +705,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void removeChecksum(Subject subject, PnfsId pnfsId, ChecksumType type)
+    public void removeChecksum(Subject subject, Restriction restriction, PnfsId pnfsId, ChecksumType type)
         throws CacheException
     {
         try {
@@ -721,7 +735,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId getParentOf(Subject subject, PnfsId pnfsId) throws CacheException {
+    public PnfsId getParentOf(Subject subject, Restriction restriction, PnfsId pnfsId) throws CacheException {
         ExtendedInode inodeOfResource = new ExtendedInode(_fs, pnfsId.toIdString());
         ExtendedInode inodeParent = inodeOfResource.getParent();
         if (inodeParent == null) {
@@ -849,7 +863,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public FileAttributes getFileAttributes(Subject subject, PnfsId pnfsId,
+    public FileAttributes getFileAttributes(Subject subject, Restriction restriction, PnfsId pnfsId,
                                             Set<FileAttribute> attr)
         throws CacheException
     {
@@ -873,7 +887,8 @@ public class ChimeraNameSpaceProvider
             /* The permission check is performed after we fetched the
              * attributes to avoid fetching the attributes twice.
              */
-            if (_permissionHandler.canGetAttributes(subject, fileAttributes, attr) != ACCESS_ALLOWED) {
+            // FIXME: cannot perform restriction check as path is not known.
+            if (_permissionHandler.canGetAttributes(subject, Restrictions.none(), null, fileAttributes, attr) != ACCESS_ALLOWED) {
                 throw new PermissionDeniedCacheException("Access denied: " + pnfsId);
             }
             return fileAttributes;
@@ -886,7 +901,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public FileAttributes setFileAttributes(Subject subject, PnfsId pnfsId,
+    public FileAttributes setFileAttributes(Subject subject, Restriction restriction, PnfsId pnfsId,
                                   FileAttributes attr, Set<FileAttribute> acquire)
         throws CacheException
     {
@@ -899,7 +914,8 @@ public class ChimeraNameSpaceProvider
                 FileAttributes attributes =
                     getFileAttributesForPermissionHandler(inode);
 
-                if (_permissionHandler.canSetAttributes(subject, attributes,
+                // FIXME: cannot enforce restriction as path is not known.
+                if (_permissionHandler.canSetAttributes(subject, Restrictions.none(), null, attributes,
                                                         attr.getDefinedAttributes()) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " + pnfsId);
                 }
@@ -1006,13 +1022,14 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void list(Subject subject, String path, Glob glob, Range<Integer> range,
+    public void list(Subject subject, Restriction restriction, String path, Glob glob, Range<Integer> range,
                      Set<FileAttribute> attrs, ListHandler handler)
         throws CacheException
     {
         try {
+            FsPath dirPath = new FsPath(path);
             Pattern pattern = (glob == null) ? null : glob.toPattern();
-            ExtendedInode dir = pathToInode(subject, path);
+            ExtendedInode dir = pathToInode(subject, restriction, path);
             if (!dir.isDirectory()) {
                 throw new NotDirCacheException("Not a directory: " + path);
             }
@@ -1022,7 +1039,7 @@ public class ChimeraNameSpaceProvider
                     getFileAttributesForPermissionHandler(dir);
                 if (!dir.isDirectory()) {
                     throw new NotDirCacheException("Not a directory");
-                } else if (_permissionHandler.canListDir(subject, attributes) != ACCESS_ALLOWED) {
+                } else if (_permissionHandler.canListDir(subject, restriction, dirPath, attributes) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " +
                                                              path);
                 }
@@ -1034,10 +1051,12 @@ public class ChimeraNameSpaceProvider
                 for (HimeraDirectoryEntry entry : dirStream) {
                     try {
                         String name = entry.getName();
+                        FsPath itemPath = new FsPath(dirPath).add(name);
                         if (!name.equals(".") && !name.equals("..") &&
                                 (pattern == null || pattern.matcher(name)
                                         .matches()) &&
-                                range.contains(counter++)) {
+                                range.contains(counter++) &&
+                                !restriction.isRestricted(Activity.READ_METADATA, itemPath)) {
                             // FIXME: actually, HimeraDirectoryEntry
                             // already contains most of attributes
                             FileAttributes fa =
@@ -1062,14 +1081,14 @@ public class ChimeraNameSpaceProvider
         }
     }
 
-    private ExtendedInode mkdir(Subject subject, ExtendedInode parent, String name, int uid, int gid, int mode)
+    private ExtendedInode mkdir(Subject subject, Restriction restriction, ExtendedInode parent, FsPath path, int uid, int gid, int mode)
             throws ChimeraFsException, CacheException
     {
         if (!Subjects.isRoot(subject)) {
             FileAttributes attributesOfParent
                     = getFileAttributesForPermissionHandler(parent);
-            if (_permissionHandler.canCreateSubDir(subject, attributesOfParent) != ACCESS_ALLOWED) {
-                throw new PermissionDeniedCacheException("Access denied: " + new FsPath(parent.getPath(), name));
+            if (_permissionHandler.canCreateSubDir(subject, restriction, path, attributesOfParent) != ACCESS_ALLOWED) {
+                throw new PermissionDeniedCacheException("Access denied: " + new FsPath(parent.getPath(), path.getName()));
             }
         }
         if (uid == DEFAULT) {
@@ -1089,7 +1108,7 @@ public class ChimeraNameSpaceProvider
         if (mode == DEFAULT) {
             mode = parent.statCache().getMode() & UMASK_DIR;
         }
-        return parent.mkdir(name, uid, gid, mode);
+        return parent.mkdir(path.getName(), uid, gid, mode);
     }
 
     private ExtendedInode installSystemDirectory(FsPath path, int mode, List<ACE> acl, Map<String, byte[]> tags)
@@ -1097,42 +1116,42 @@ public class ChimeraNameSpaceProvider
     {
         ExtendedInode inode;
         try {
-            inode = lookupDirectory(Subjects.ROOT, path);
+            inode = lookupDirectory(Subjects.ROOT, Restrictions.none(), path);
         } catch (FileNotFoundCacheException e) {
-            ExtendedInode parentOfPath = installDirectory(Subjects.ROOT, path.getParent(), mode);
+            ExtendedInode parentOfPath = installDirectory(Subjects.ROOT, Restrictions.none(), path.getParent(), mode);
             try {
                 inode = parentOfPath.mkdir(path.getName(), 0, 0, mode, acl, tags);
             } catch (FileExistsChimeraFsException e1) {
                 /* Concurrent directory creation. Do another lookup.
                  */
-                inode = lookupDirectory(Subjects.ROOT, path);
+                inode = lookupDirectory(Subjects.ROOT, Restrictions.none(), path);
             }
         }
         return inode;
     }
 
-    private ExtendedInode installDirectory(Subject subject, FsPath path, int mode) throws ChimeraFsException, CacheException
+    private ExtendedInode installDirectory(Subject subject, Restriction restriction, FsPath path, int mode) throws ChimeraFsException, CacheException
     {
         ExtendedInode inode;
         try {
-            inode = lookupDirectory(subject, path);
+            inode = lookupDirectory(subject, restriction, path);
         } catch (FileNotFoundCacheException e) {
-            ExtendedInode parentOfPath = installDirectory(subject, path.getParent(), mode);
+            ExtendedInode parentOfPath = installDirectory(subject, restriction, path.getParent(), mode);
             try {
-                inode = mkdir(subject, parentOfPath, path.getName(), DEFAULT, DEFAULT, mode);
+                inode = mkdir(subject, restriction, parentOfPath, path, DEFAULT, DEFAULT, mode);
             } catch (FileExistsChimeraFsException e1) {
                 /* Concurrent directory creation. Do another lookup.
                  */
-                inode = lookupDirectory(subject, path);
+                inode = lookupDirectory(subject, restriction, path);
             }
         }
         return inode;
     }
 
-    private ExtendedInode lookupDirectory(Subject subject, FsPath path) throws ChimeraFsException, CacheException
+    private ExtendedInode lookupDirectory(Subject subject, Restriction restriction, FsPath path) throws ChimeraFsException, CacheException
     {
         try {
-            ExtendedInode inode = pathToInode(subject, path.toString());
+            ExtendedInode inode = pathToInode(subject, restriction, path.toString());
             if (!inode.isDirectory()) {
                 throw new NotDirCacheException("Not a directory: " + path);
             }
@@ -1143,7 +1162,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public FsPath createUploadPath(Subject subject, FsPath path, FsPath rootPath,
+    public FsPath createUploadPath(Subject subject, Restriction restriction, FsPath path, FsPath rootPath,
                                    Long size, AccessLatency al, RetentionPolicy rp, String spaceToken,
                                    Set<CreateOption> options)
             throws CacheException
@@ -1153,8 +1172,8 @@ public class ChimeraNameSpaceProvider
              */
             ExtendedInode parentOfPath =
                     options.contains(CreateOption.CREATE_PARENTS)
-                            ? installDirectory(subject, path.getParent(), DEFAULT)
-                            : lookupDirectory(subject, path.getParent());
+                            ? installDirectory(subject, restriction, path.getParent(), DEFAULT)
+                            : lookupDirectory(subject, restriction, path.getParent());
 
             FileAttributes attributesOfParent =
                     !Subjects.isRoot(subject)
@@ -1175,6 +1194,8 @@ public class ChimeraNameSpaceProvider
                     FileAttributes attributesOfPath =
                             getFileAttributesForPermissionHandler(inodeOfPath);
                     if (_permissionHandler.canDeleteFile(subject,
+                                                         restriction,
+                                                         path,
                                                          attributesOfParent,
                                                          attributesOfPath) != ACCESS_ALLOWED) {
                         throw new PermissionDeniedCacheException("Access denied: " + path);
@@ -1186,7 +1207,7 @@ public class ChimeraNameSpaceProvider
             /* User must be authorized to create file.
              */
             if (!Subjects.isRoot(subject)) {
-                if (_permissionHandler.canCreateFile(subject, attributesOfParent) != ACCESS_ALLOWED) {
+                if (_permissionHandler.canCreateFile(subject, restriction, path, attributesOfParent) != ACCESS_ALLOWED) {
                     throw new PermissionDeniedCacheException("Access denied: " + path);
                 }
             }
@@ -1273,7 +1294,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId commitUpload(Subject subject, FsPath temporaryPath, FsPath finalPath, Set<CreateOption> options)
+    public PnfsId commitUpload(Subject subject, Restriction restriction, FsPath temporaryPath, FsPath finalPath, Set<CreateOption> options)
             throws CacheException
     {
         try {
@@ -1317,6 +1338,8 @@ public class ChimeraNameSpaceProvider
                     FileAttributes attributesOfFile =
                             getFileAttributesForPermissionHandler(inodeOfExistingFile);
                     if (_permissionHandler.canDeleteFile(subject,
+                                                         restriction,
+                                                         finalPath,
                                                          attributesOfParent,
                                                          attributesOfFile) != ACCESS_ALLOWED) {
                         throw new PermissionDeniedCacheException("Overwrite denied: " + finalPath);
@@ -1341,7 +1364,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void cancelUpload(Subject subject, FsPath temporaryPath, FsPath finalPath) throws CacheException
+    public void cancelUpload(Subject subject, Restriction restriction, FsPath temporaryPath, FsPath finalPath) throws CacheException
     {
         try {
             FsPath temporaryDir = getParentOfFile(temporaryPath);

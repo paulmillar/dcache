@@ -8,14 +8,18 @@
     <context:property-placeholder/>
 
     <bean id="permission-handler"
-          class="org.dcache.namespace.ChainedPermissionHandler">
+          class="org.dcache.namespace.RestrictedPermissionHandler">
         <description>Permission handler</description>
-        <property name="chain">
-            <list>
-                <bean class="org.dcache.namespace.ACLPermissionHandler"/>
-                <bean class="org.dcache.namespace.PosixPermissionHandler"/>
-            </list>
-        </property>
+        <constructor-arg>
+            <bean class="org.dcache.namespace.ChainedPermissionHandler">
+                <property name="chain">
+                    <list>
+                        <bean class="org.dcache.namespace.ACLPermissionHandler"/>
+                        <bean class="org.dcache.namespace.PosixPermissionHandler"/>
+                    </list>
+                </property>
+            </bean>
+        </constructor-arg>
     </bean>
 
     <bean id="noroutetocell" class="org.dcache.cells.LogNoRouteToCellExceptionReceiver">
