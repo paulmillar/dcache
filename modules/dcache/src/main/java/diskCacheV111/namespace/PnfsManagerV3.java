@@ -79,6 +79,8 @@ import dmg.util.command.Option;
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.chimera.UnixPermission;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
@@ -98,9 +100,10 @@ import org.dcache.vehicles.PnfsListDirectoryMessage;
 import org.dcache.vehicles.PnfsRemoveChecksumMessage;
 import org.dcache.vehicles.PnfsSetFileAttributes;
 
-import static org.dcache.acl.enums.AccessType.*;
 import static org.dcache.auth.Subjects.ROOT;
 import static org.dcache.namespace.FileAttribute.*;
+import static org.dcache.acl.enums.AccessType.*;
+import static org.dcache.auth.attributes.Activity.*;
 
 public class PnfsManagerV3
     extends AbstractCellComponent
@@ -972,7 +975,7 @@ public class PnfsManagerV3
                   value+" for "+pnfsId);
 
         try{
-
+            // REVISIT: cannot enforce restriction.
             if( operation == PnfsFlagMessage.FlagOperation.GET ){
                 pnfsMessage.setValue( updateFlag(subject, pnfsId , operation , flagName , value ) );
             }else{
@@ -1050,6 +1053,7 @@ public class PnfsManagerV3
             */
 
             checkMask(pnfsMessage);
+            checkRestriction(pnfsMessage, UPDATE_METADATA);
             _nameSpaceProvider.addCacheLocation(pnfsMessage.getSubject(),
                                                 pnfsMessage.getPnfsId(),
                                                 pnfsMessage.getPoolName());
@@ -1071,6 +1075,7 @@ public class PnfsManagerV3
         _log.info("clearCacheLocation : "+pnfsMessage.getPoolName()+" for "+pnfsId);
         try {
             checkMask(pnfsMessage);
+            checkRestriction(pnfsMessage, UPDATE_METADATA);
             _nameSpaceProvider.clearCacheLocation(pnfsMessage.getSubject(),
                                                   pnfsId,
                                                   pnfsMessage.getPoolName(),
@@ -1095,6 +1100,7 @@ public class PnfsManagerV3
             _log.info("get cache locations for " + pnfsId);
 
             checkMask(pnfsMessage);
+            checkRestriction(pnfsMessage, READ_METADATA);
             pnfsMessage.setCacheLocations(_nameSpaceProvider.getCacheLocation(subject, pnfsId));
             pnfsMessage.setSucceeded();
         } catch (FileNotFoundCacheException fnf ) {
@@ -1118,7 +1124,7 @@ public class PnfsManagerV3
             File file = new File(pnfsMessage.getPath());
             checkMask(pnfsMessage.getSubject(), file.getParent(),
                       pnfsMessage.getAccessMask());
-
+            checkRestrictionOnParent(pnfsMessage, MANAGE);
             pnfsId = _nameSpaceProvider.createSymLink(pnfsMessage.getSubject(),
                                                       pnfsMessage.getPath(),
                                                       pnfsMessage.getDestination(),
@@ -1145,7 +1151,7 @@ public class PnfsManagerV3
             File file = new File(pnfsMessage.getPath());
             checkMask(pnfsMessage.getSubject(), file.getParent(),
                       pnfsMessage.getAccessMask());
-
+            checkRestrictionOnParent(pnfsMessage, MANAGE);
             pnfsId = _nameSpaceProvider.createDirectory(pnfsMessage.getSubject(),
                                                         pnfsMessage.getPath(),
                                                         pnfsMessage.getUid(), pnfsMessage.getGid(),
@@ -1195,6 +1201,7 @@ public class PnfsManagerV3
             File file = new File(pnfsMessage.getPath());
             checkMask(pnfsMessage.getSubject(), file.getParent(),
                       pnfsMessage.getAccessMask());
+            checkRestriction(pnfsMessage, UPLOAD);
 
             Set<FileAttribute> requested =
                     pnfsMessage.getRequestedAttributes();
@@ -1230,6 +1237,7 @@ public class PnfsManagerV3
     void createUploadPath(PnfsCreateUploadPath message)
     {
         try {
+            checkRestriction(message, UPLOAD);
             FsPath uploadPath = _nameSpaceProvider.createUploadPath(message.getSubject(),
                                                                     message.getPath(),
                                                                     message.getRootPath(),
@@ -1251,6 +1259,7 @@ public class PnfsManagerV3
     void commitUpload(PnfsCommitUpload message)
     {
         try {
+            checkRestriction(message, UPLOAD);
             PnfsId pnfsId = _nameSpaceProvider.commitUpload(message.getSubject(),
                                                             message.getUploadPath(),
                                                             message.getPath(),
@@ -1273,6 +1282,7 @@ public class PnfsManagerV3
     void cancelUpload(PnfsCancelUpload message)
     {
         try {
+            checkRestriction(message, UPLOAD);
             _nameSpaceProvider.cancelUpload(message.getSubject(), message.getUploadPath(), message.getPath());
             message.setSucceeded();
         } catch (CacheException e) {
@@ -1296,6 +1306,7 @@ public class PnfsManagerV3
             }
 
             checkMask(pnfsMessage);
+            checkRestriction(pnfsMessage, DELETE);
             if (path != null) {
                 _log.info("delete PNFS entry for {}", path);
                 if (pnfsId != null) {
@@ -1335,7 +1346,11 @@ public class PnfsManagerV3
                 sourcePath = _nameSpaceProvider.pnfsidToPath(msg.getSubject(), pnfsId);
             }
             _log.info("Rename {} to new name: {}", sourcePath, destinationPath);
-            _nameSpaceProvider.rename(msg.getSubject(), pnfsId, sourcePath, destinationPath, msg.getOverwrite());
+            checkRestriction(msg, MANAGE, new FsPath(sourcePath).getParent());
+            checkRestriction(msg, MANAGE, new FsPath(destinationPath).getParent());
+            boolean overwrite = msg.getOverwrite()
+                    && !msg.getRestriction().isRestricted(DELETE, new FsPath(destinationPath));
+            _nameSpaceProvider.rename(msg.getSubject(), pnfsId, sourcePath, destinationPath, overwrite);
         } catch (CacheException e){
             msg.setFailed(e.getRc(), e.getMessage());
         } catch (RuntimeException e) {
@@ -1365,9 +1380,12 @@ public class PnfsManagerV3
         try {
             if (globalPath == null) {
                 _log.info("map:  id2path for " + pnfsId);
-                pnfsMessage.setGlobalPath(pathfinder(subject, pnfsId));
+                String path = pathfinder(subject, pnfsId);
+                checkRestriction(pnfsMessage, READ_METADATA, new FsPath(path));
+                pnfsMessage.setGlobalPath(path);
             } else {
                 _log.info("map:  path2id for " + globalPath);
+                checkRestriction(pnfsMessage, READ_METADATA, new FsPath(globalPath));
                 pnfsMessage.setPnfsId(pathToPnfsid(subject, globalPath, shouldResolve));
             }
             checkMask(pnfsMessage);
@@ -1475,6 +1493,7 @@ public class PnfsManagerV3
             String path = msg.getPnfsPath();
 
             checkMask(msg.getSubject(), path, msg.getAccessMask());
+            checkRestriction(msg, LIST);
 
             long delay = envelope.getAdjustedTtl();
             long initialDelay =
@@ -1691,6 +1710,7 @@ public class PnfsManagerV3
     public void processFlushMessage(CellMessage envelope, PoolFileFlushedMessage pnfsMessage)
     {
         try {
+            // REVISIT: cannot enforce Restriction as no path is provided.
             FileAttributes attributesToUpdate = new FileAttributes();
             attributesToUpdate.setStorageInfo(pnfsMessage.getFileAttributes().getStorageInfo());
             _nameSpaceProvider.setFileAttributes(pnfsMessage.getSubject(),
@@ -1751,6 +1771,7 @@ public class PnfsManagerV3
     private void removeChecksum(PnfsRemoveChecksumMessage message)
     {
         try {
+            // REVISIT: cannot enforce restriction as no path is specified.
             _nameSpaceProvider.removeChecksum(message.getSubject(),
                     message.getPnfsId(), message.getType());
         } catch (CacheException e) {
@@ -1904,6 +1925,7 @@ public class PnfsManagerV3
             Subject subject = message.getSubject();
             PnfsId pnfsId = populatePnfsId(message);
             checkMask(message);
+            checkRestriction(message, READ_METADATA);
             Set<FileAttribute> requested = message.getRequestedAttributes();
             if (message.getUpdateAtime() && _atimeGap != -1) {
                 requested.add(ACCESS_TIME);
@@ -1970,6 +1992,7 @@ public class PnfsManagerV3
            }
             PnfsId pnfsId = populatePnfsId(message);
             checkMask(message);
+            checkRestriction(message, UPDATE_METADATA);
             if (attr.getDefinedAttributes().contains(FileAttribute.LOCATIONS)) {
                 for (String pool: attr.getLocations()) {
                     PnfsMessage msg =
@@ -2135,5 +2158,79 @@ public class PnfsManagerV3
             }
         }
         return (access == ACCESS_ALLOWED);
+    }
+
+    private static Activity toActivity(AccessMask mask)
+    {
+        switch (mask) {
+        case READ_DATA:
+            return DOWNLOAD;
+        case LIST_DIRECTORY:
+            return LIST;
+        case WRITE_DATA:
+        case APPEND_DATA:
+            return UPLOAD;
+        case ADD_FILE:
+        case ADD_SUBDIRECTORY:
+            return MANAGE;
+        case DELETE_CHILD:
+        case DELETE:
+            return DELETE;
+        case READ_NAMED_ATTRS:
+        case EXECUTE:
+        case READ_ATTRIBUTES:
+        case READ_ACL:
+            return READ_METADATA;
+        case WRITE_NAMED_ATTRS:
+        case WRITE_ATTRIBUTES:
+        case WRITE_ACL:
+        case WRITE_OWNER:
+        case SYNCHRONIZE:
+            return UPDATE_METADATA;
+        }
+        throw new RuntimeException("Unexpected AccessMask: " + mask);
+    }
+
+    private static void checkRestrictionOnParent(PnfsMessage message, Activity activity)
+            throws PermissionDeniedCacheException
+    {
+        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
+            checkRestriction(message.getRestriction(), message.getAccessMask(),
+                    activity, message.getFsPath().getParent());
+        }
+    }
+
+    private static void checkRestriction(PnfsMessage message, Activity activity)
+            throws PermissionDeniedCacheException
+    {
+        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() == null) {
+            checkRestriction(message.getRestriction(), message.getAccessMask(),
+                    activity, message.getFsPath());
+        }
+    }
+
+    private static void checkRestriction(PnfsMessage message, Activity activity,
+            FsPath path) throws PermissionDeniedCacheException
+    {
+        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() == null) {
+            checkRestriction(message.getRestriction(), message.getAccessMask(),
+                    activity, path);
+        }
+    }
+
+    private static void checkRestriction(Restriction restriction, Set<AccessMask> mask, Activity activity, FsPath path)
+            throws PermissionDeniedCacheException
+    {
+        if (mask.isEmpty()) {
+            if (restriction.isRestricted(activity, path)) {
+                throw new PermissionDeniedCacheException("Permission denied: " + path);
+            }
+        } else {
+            if (mask.stream()
+                    .map(PnfsManagerV3::toActivity)
+                    .anyMatch(a -> restriction.isRestricted(a, path))) {
+                throw new PermissionDeniedCacheException("Permission denied: " + path);
+            }
+        }
     }
 }

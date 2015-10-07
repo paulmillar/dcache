@@ -72,9 +72,9 @@ public class FsPath {
         return sb.toString();
     }
 
-    public void add(String path) {
+    public FsPath add(String path) {
         if ((path == null) || (path.length() == 0)) {
-            return;
+            return this;
         }
         if (path.startsWith("/")) {
             _list.clear();
@@ -83,6 +83,7 @@ public class FsPath {
         while (st.hasMoreTokens()) {
             addSingleItem(st.nextToken());
         }
+        return this;
     }
 
     private void addSingleItem(String item) {
