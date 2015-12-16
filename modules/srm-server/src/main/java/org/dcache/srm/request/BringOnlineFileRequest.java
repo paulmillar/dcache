@@ -84,7 +84,6 @@ import java.util.concurrent.TimeoutException;
 
 import diskCacheV111.srm.RequestFileStatus;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
@@ -333,8 +332,6 @@ public final class BringOnlineFileRequest extends FileRequest<BringOnlineRequest
     public final void run() throws SRMFileBusyException, IllegalStateTransition,
             SRMInvalidRequestException, SRMAuthorizationException, SRMInvalidPathException
     {
-        getStorage().checkAuthorization(getUser(), surl, Activity.DOWNLOAD);
-
         logger.trace("run");
         if (!getState().isFinal() && getPinId() == null) {
             // [ SRM 2.2, 5.4.3] SRM_FILE_BUSY: client requests for a file which there is an

@@ -9,6 +9,8 @@ import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsId;
 
 import org.dcache.acl.enums.AccessMask;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -19,6 +21,7 @@ public class PnfsMessage extends Message {
 
     private PnfsId _pnfsId;
     private String _path;
+    private Restriction _restriction = Restrictions.none();
 
     private Set<AccessMask> _mask = Collections.emptySet();
 
@@ -35,7 +38,7 @@ public class PnfsMessage extends Message {
 
     public FsPath getFsPath()
     {
-        return new FsPath(_path);
+        return _path == null ? null : new FsPath(_path);
     }
 
     public PnfsId getPnfsId(){
@@ -54,6 +57,16 @@ public class PnfsMessage extends Message {
     public Set<AccessMask> getAccessMask()
     {
         return _mask;
+    }
+
+    public void setRestriction(Restriction restriction)
+    {
+        _restriction = checkNotNull(restriction);
+    }
+
+    public Restriction getRestriction()
+    {
+        return _restriction;
     }
 
     @Override

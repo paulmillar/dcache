@@ -171,6 +171,8 @@ import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Origin;
 import org.dcache.auth.Subjects;
 import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.attributes.Restriction;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.AbstractMessageCallback;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.ACLPermissionHandler;
@@ -598,7 +600,7 @@ public final class Storage
         // Catches replies for which the callback timed out
         if (msg.isReply() && msg.getReturnCode() == 0) {
             _pnfsStub.notify(
-                    new PnfsCancelUpload(msg.getSubject(), new FsPath(msg.getUploadPath()), msg.getPath()));
+                    new PnfsCancelUpload(msg.getSubject(), msg.getRestriction(), new FsPath(msg.getUploadPath()), msg.getPath()));
         }
     }
 
@@ -1037,6 +1039,7 @@ public final class Storage
         try {
             DcacheUser user = asDcacheUser(srmUser);
             Subject subject = user.getSubject();
+            Restriction restriction = user.getRestriction();
             FsPath fullPath = config.getPath(surl);
 
             if (!verifyUserPathIsRootSubpath(fullPath, user)) {
@@ -1088,7 +1091,7 @@ public final class Storage
                 options.add(CreateOption.CREATE_PARENTS);
             }
             PnfsCreateUploadPath msg =
-                    new PnfsCreateUploadPath(subject, fullPath, user.getRoot(),
+                    new PnfsCreateUploadPath(subject, restriction, fullPath, user.getRoot(),
                                              size, al, rp, spaceToken, options);
 
             final SettableFuture<String> future = SettableFuture.create();
@@ -1133,6 +1136,7 @@ public final class Storage
     {
         try {
             Subject subject = asDcacheUser(user).getSubject();
+            Restriction restriction = asDcacheUser(user).getRestriction();
             FsPath fullPath = config.getPath(surl);
             EnumSet<CreateOption> options = EnumSet.noneOf(CreateOption.class);
             if (overwrite) {
@@ -1140,6 +1144,7 @@ public final class Storage
             }
             PnfsCommitUpload msg =
                     new PnfsCommitUpload(subject,
+                                         restriction,
                                          new FsPath(localTransferPath),
                                          fullPath,
                                          options,
@@ -1179,9 +1184,10 @@ public final class Storage
     {
         try {
             Subject subject = (user == null) ? Subjects.ROOT : asDcacheUser(user).getSubject();
+            Restriction restriction = (user == null) ? Restrictions.none() : asDcacheUser(user).getRestriction();
             FsPath actualPnfsPath = config.getPath(surl);
             PnfsCancelUpload msg =
-                    new PnfsCancelUpload(subject, new FsPath(localTransferPath), actualPnfsPath);
+                    new PnfsCancelUpload(subject, restriction, new FsPath(localTransferPath), actualPnfsPath);
             _pnfsStub.sendAndWait(msg);
 
             DoorRequestInfoMessage infoMsg =
@@ -1454,12 +1460,13 @@ public final class Storage
      * @throws SRMInvalidPathException if {@code dir} is not a directory.
      * @throws SRMException in case of other errors.
      */
-    private void listSubdirectoriesRecursivelyForDelete(Subject subject, FsPath dir, FileAttributes attributes,
+    private void listSubdirectoriesRecursivelyForDelete(Subject subject,
+            Restriction restriction, FsPath dir, FileAttributes attributes,
                                                         List<FsPath> result)
             throws SRMException
     {
         List<DirectoryEntry> children = new ArrayList<>();
-        try (DirectoryStream list = _listSource.list(subject, dir, null, Range.<Integer>all(), attributesRequiredForRmdir)) {
+        try (DirectoryStream list = _listSource.list(subject, restriction, dir, null, Range.<Integer>all(), attributesRequiredForRmdir)) {
             for (DirectoryEntry child: list) {
                 FileAttributes childAttributes = child.getFileAttributes();
                 AccessType canDelete = permissionHandler.canDeleteDir(subject, attributes, childAttributes);
@@ -1488,12 +1495,12 @@ public final class Storage
         // Result list uses post-order so directories will be deleted bottom-up.
         for (DirectoryEntry child : children) {
             FsPath path = new FsPath(dir, child.getName());
-            listSubdirectoriesRecursivelyForDelete(subject, path, child.getFileAttributes(), result);
+            listSubdirectoriesRecursivelyForDelete(subject, restriction, path, child.getFileAttributes(), result);
             result.add(path);
         }
     }
 
-    private void removeSubdirectories(Subject subject, FsPath path) throws SRMException
+    private void removeSubdirectories(Subject subject, Restriction restriction, FsPath path) throws SRMException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, subject);
 
@@ -1519,7 +1526,7 @@ public final class Storage
         }
 
         List<FsPath> directories = new ArrayList<>();
-        listSubdirectoriesRecursivelyForDelete(subject, path, attributes, directories);
+        listSubdirectoriesRecursivelyForDelete(subject, restriction, path, attributes, directories);
 
         for (FsPath directory: directories) {
             try {
@@ -1546,6 +1553,7 @@ public final class Storage
         throws SRMException
     {
         Subject subject = asDcacheUser(user).getSubject();
+        Restriction restriction = asDcacheUser(user).getRestriction();
         FsPath path = config.getPath(surl);
 
         if (path.isEmpty()) {
@@ -1553,7 +1561,7 @@ public final class Storage
         }
 
         if (recursive) {
-            removeSubdirectories(subject, path);
+            removeSubdirectories(subject, restriction, path);
         }
 
         try {
@@ -1569,7 +1577,7 @@ public final class Storage
             throw new SRMAuthorizationException("Permission denied", e);
         } catch (CacheException e) {
             try {
-                int count = _listSource.printDirectory(subject, new NullListPrinter(), path, null, Range.<Integer>all());
+                int count = _listSource.printDirectory(subject, restriction, new NullListPrinter(), path, null, Range.<Integer>all());
                 if (count > 0) {
                     throw new SRMNonEmptyDirectoryException("Directory is not empty", e);
                 }
@@ -1899,21 +1907,6 @@ public final class Storage
     private final Map<Long,TransferInfo> callerIdToHandler =
         new ConcurrentHashMap<>();
 
-    @Override
-    public boolean alwaysRestricted(SRMUser abstractUser, Activity activity)
-    {
-        DcacheUser user = (DcacheUser) abstractUser;
-        return user.getRestriction().alwaysRestricted(activity);
-    }
-
-    @Override
-    public boolean isRestricted(SRMUser abstractUser, URI surl, Activity activity) throws SRMInvalidPathException
-    {
-        DcacheUser user = (DcacheUser) abstractUser;
-        FsPath path = config.getPath(surl);
-        return user.getRestriction().isRestricted(activity, path);
-    }
-
     private static class TransferInfo
     {
         final long transferId;
@@ -1935,6 +1928,7 @@ public final class Storage
         final List<URI> result = new ArrayList<>();
         final String base = addTrailingSlash(surl.toString());
         Subject subject = asDcacheUser(user).getSubject();
+        Restriction restriction = asDcacheUser(user).getRestriction();
         DirectoryListPrinter printer =
             new DirectoryListPrinter()
             {
@@ -1952,7 +1946,7 @@ public final class Storage
             };
 
         try {
-            _listSource.printDirectory(subject, printer, path, null,
+            _listSource.printDirectory(subject, restriction, printer, path, null,
                                        Range.<Integer>all());
             return result;
         } catch (TimeoutCacheException e) {
@@ -1980,11 +1974,12 @@ public final class Storage
         try {
             FsPath path = config.getPath(surl);
             Subject subject = asDcacheUser(user).getSubject();
+            Restriction restriction = asDcacheUser(user).getRestriction();
             FmdListPrinter printer =
                 verbose ? new VerboseListPrinter() : new FmdListPrinter();
             Range<Integer> range = offset < Integer.MAX_VALUE - count ?
                     Range.closedOpen(offset, offset + count) : Range.atLeast(offset);
-            _listSource.printDirectory(subject, printer, path, null, range);
+            _listSource.printDirectory(subject, restriction, printer, path, null, range);
             return printer.getResult();
         } catch (TimeoutCacheException e) {
             throw new SRMInternalErrorException("Internal name space timeout", e);

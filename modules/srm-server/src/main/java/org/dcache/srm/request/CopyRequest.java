@@ -66,7 +66,6 @@ COPYRIGHT STATUS:
 
 package org.dcache.srm.request;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -83,16 +82,12 @@ import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.dcache.auth.attributes.Activity;
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
-import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMFileRequestNotFoundException;
 import org.dcache.srm.SRMInvalidPathException;
@@ -113,7 +108,6 @@ import org.dcache.srm.qos.QOSTicket;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
-import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.ArrayOfTCopyRequestFileStatus;
 import org.dcache.srm.v2_2.SrmCopyResponse;
 import org.dcache.srm.v2_2.SrmStatusOfCopyRequestResponse;
@@ -292,7 +286,6 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
         }
         LOG.debug("Processing request");
         identify();
-        failUnauthorisedCopying();
         getTURLs();
     }
 
@@ -353,45 +346,6 @@ public final class CopyRequest extends ContainerRequest<CopyFileRequest>
             }
         } finally {
             wunlock();
-        }
-    }
-
-    private void failUnauthorisedCopying()
-    {
-        AbstractStorageElement storage = getStorage();
-        SRMUser user = getUser();
-
-        if (isSourceSrm() && isSourceLocal()) {
-            getFileRequests().stream()
-                    .filter(j -> storage.isRestrictedVerifiedSurl(user, j.getSourceSurl(), Activity.DOWNLOAD))
-                    .filter(j -> !j.getState().isFinal())
-                    .forEach((j) -> {
-                        try {
-                    j.setStateAndStatusCode(State.FAILED, "Not allowed.", TStatusCode.SRM_AUTHORIZATION_FAILURE);
-                } catch (IllegalStateTransition e) {
-                    LOG.error("Unable to set file to failed: {}", e.getMessage());
-                }
-            });
-        }
-
-        if (isDestinationSrm() && isDestinationLocal()) {
-            getFileRequests().stream()
-                    .filter(j -> {
-                        try {
-                            URI parent = Surls.getParent(j.getDestinationSurl());
-                            return storage.isRestrictedVerifiedSurl(user, parent, Activity.UPLOAD);
-                        } catch (SRMInvalidPathException e) {
-                            return true;
-                        }
-                    })
-                    .filter(j -> !j.getState().isFinal())
-                    .forEach((j) -> {
-                try {
-                    j.setStateAndStatusCode(State.FAILED, "Permission denied.", TStatusCode.SRM_AUTHORIZATION_FAILURE);
-                } catch (IllegalStateTransition e) {
-                    LOG.error("Unable to set file to failed: {}", e.getMessage());
-                }
-            });
         }
     }
 

@@ -51,11 +51,13 @@ import diskCacheV111.util.RetentionPolicy;
 import diskCacheV111.vehicles.StorageInfo;
 
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.chimera.namespace.ChimeraNameSpaceProvider;
 import org.dcache.chimera.namespace.ChimeraOsmStorageInfoExtractor;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PosixPermissionHandler;
+import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
@@ -207,7 +209,7 @@ public class PerformanceTest extends Thread
                                                                  StorageInfo.DEFAULT_RETENTION_POLICY));
         provider.setFileSystem(fileSystem);
         provider.setInheritFileOwnership(false);
-        provider.setPermissionHandler(new PosixPermissionHandler());
+        provider.setPermissionHandler(new RestrictedPermissionHandler(new PosixPermissionHandler()));
         provider.setUploadDirectory("/upload");
         provider.setVerifyAllLookups(true);
         tx = new TransactionTemplate(txManager);
@@ -256,7 +258,7 @@ public class PerformanceTest extends Thread
 
     private PnfsId getPnfsid(String path) throws CacheException
     {
-        return provider.pathToPnfsid(Subjects.ROOT, path, true);
+        return provider.pathToPnfsid(Subjects.ROOT, Restrictions.none(), path, true);
     }
 
     private void processOperation(Operation aOp, String path)
@@ -265,57 +267,57 @@ public class PerformanceTest extends Thread
             FileAttributes fileAttributes;
             switch (aOp) {
             case CREATE_ENTRY:
-                provider.createFile(Subjects.ROOT, path, UID, GID, 0664, EnumSet.noneOf(FileAttribute.class));
+                provider.createFile(Subjects.ROOT, Restrictions.none(), path, UID, GID, 0664, EnumSet.noneOf(FileAttribute.class));
                 break;
             case PATH_TO_PNFS_ID:
                 getPnfsid(path);
                 break;
             case FILE_META_DATA:
-                provider.getFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.getFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            EnumSet.of(OWNER, OWNER_GROUP, MODE, TYPE, SIZE,
                                                       CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME, CHANGE_TIME));
                 break;
             case DELETE_ENTRY:
-                provider.deleteEntry(Subjects.ROOT, EnumSet.allOf(FileType.class), path);
+                provider.deleteEntry(Subjects.ROOT, Restrictions.none(), EnumSet.allOf(FileType.class), path);
                 break;
             case PNFS_ID_TO_PATH:
-                provider.pnfsidToPath(Subjects.ROOT, getPnfsid(path));
+                provider.pnfsidToPath(Subjects.ROOT, Restrictions.none(), getPnfsid(path));
                 break;
             case GET_PARENT:
-                provider.getParentOf(Subjects.ROOT, getPnfsid(path));
+                provider.getParentOf(Subjects.ROOT, Restrictions.none(), getPnfsid(path));
                 break;
             case ADD_CHECKSUM:
                 fileAttributes = new FileAttributes();
                 fileAttributes.setChecksums(Collections.singleton(CHECKSUM));
-                provider.setFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.setFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            fileAttributes, EnumSet.noneOf(FileAttribute.class));
                 break;
             case GET_CHECKSUMS:
-                provider.getFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.getFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            EnumSet.of(FileAttribute.CHECKSUM)).getChecksums();
                 break;
             case SET_FILE_ATTR:
                 fileAttributes = new FileAttributes();
                 fileAttributes.setAccessLatency(AccessLatency.ONLINE);
                 fileAttributes.setRetentionPolicy(RetentionPolicy.REPLICA);
-                provider.setFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.setFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            fileAttributes, EnumSet.noneOf(FileAttribute.class));
                 break;
             case GET_FILE_ATTR:
-                provider.getFileAttributes(Subjects.ROOT, getPnfsid(path), EnumSet.allOf(FileAttribute.class));
+                provider.getFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path), EnumSet.allOf(FileAttribute.class));
                 break;
             case ADD_CACHE_LOC:
-                provider.addCacheLocation(Subjects.ROOT, getPnfsid(path), CACHE_LOCATION);
+                provider.addCacheLocation(Subjects.ROOT, Restrictions.none(), getPnfsid(path), CACHE_LOCATION);
                 break;
             case GET_CACHE_LOC:
-                provider.getCacheLocation(Subjects.ROOT, getPnfsid(path));
+                provider.getCacheLocation(Subjects.ROOT, Restrictions.none(), getPnfsid(path));
                 break;
             case STORAGE_INFO:
-                provider.getFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.getFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            EnumSet.of(FileAttribute.STORAGEINFO)).getStorageInfo();
                 break;
             case SET_STORAGE_INFO:
-                StorageInfo info = provider.getFileAttributes(Subjects.ROOT, getPnfsid(path),
+                StorageInfo info = provider.getFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                                               EnumSet.of(FileAttribute.STORAGEINFO)).getStorageInfo();
                 info.setHsm("hsm");
                 info.setKey("store", "test");
@@ -323,14 +325,14 @@ public class PerformanceTest extends Thread
                 info.addLocation(new URI("osm://hsm/?store=test&group=disk&bdif=1234"));
                 FileAttributes attributesToUpdate = new FileAttributes();
                 attributesToUpdate.setStorageInfo(info);
-                provider.setFileAttributes(Subjects.ROOT, getPnfsid(path),
+                provider.setFileAttributes(Subjects.ROOT, Restrictions.none(), getPnfsid(path),
                                            attributesToUpdate, EnumSet.noneOf(FileAttribute.class));
                 break;
             case MKDIR:
-                provider.createDirectory(Subjects.ROOT, path, UID, GID, 0755);
+                provider.createDirectory(Subjects.ROOT, Restrictions.none(), path, UID, GID, 0755);
                 break;
             case RMDIR:
-                provider.deleteEntry(Subjects.ROOT, EnumSet.of(FileType.DIR), path);
+                provider.deleteEntry(Subjects.ROOT, Restrictions.none(), EnumSet.of(FileType.DIR), path);
                 break;
             default:
                 break;

@@ -1,6 +1,5 @@
 package org.dcache.auth.attributes;
 
-import java.util.EnumSet;
 
 import diskCacheV111.util.FsPath;
 
@@ -14,12 +13,6 @@ public class ReadOnly implements Restriction
 
     protected ReadOnly()
     {
-    }
-
-    @Override
-    public boolean alwaysRestricted(Activity activity)
-    {
-        return activity.isModifying();
     }
 
     @Override

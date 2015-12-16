@@ -185,6 +185,7 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
+import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.services.login.RemoteLoginStrategy;
 import org.dcache.util.Args;
 import org.dcache.util.AsynchronousRedirectedTransfer;
@@ -204,6 +205,8 @@ import static com.google.common.collect.Iterables.*;
 import static java.lang.Math.min;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static org.dcache.ftp.door.AnonymousPermission.ALLOW_ANONYMOUS_USER;
+import static org.dcache.ftp.door.AnonymousPermission.FORBID_ANONYMOUS_USER;
 import static org.dcache.namespace.FileAttribute.*;
 import static org.dcache.util.NetLoggerBuilder.Level.INFO;
 
@@ -213,6 +216,11 @@ import static org.dcache.util.NetLoggerBuilder.Level.INFO;
 @interface Help
 {
     String value();
+}
+
+enum AnonymousPermission
+{
+    ALLOW_ANONYMOUS_USER, FORBID_ANONYMOUS_USER;
 }
 
 /**
@@ -642,7 +650,8 @@ public abstract class AbstractFtpDoorV1
         {
             super(AbstractFtpDoorV1.this._executor,
                   AbstractFtpDoorV1.this._pnfs,
-                  AbstractFtpDoorV1.this._subject, path);
+                  AbstractFtpDoorV1.this._subject,
+                  AbstractFtpDoorV1.this._authz, path);
 
             setDomainName(_cellAddress.getCellDomainName());
             setCellName(_cellAddress.getCellName());
@@ -1189,6 +1198,7 @@ public abstract class AbstractFtpDoorV1
 
         _pnfs = _settings.createPnfsHandler(_cellEndpoint);
         _pnfs.setSubject(mappedSubject);
+        _pnfs.setRestriction(_authz);
         _listSource = new ListDirectoryHandler(_pnfs);
 
         _subject = mappedSubject;
@@ -1518,39 +1528,14 @@ public abstract class AbstractFtpDoorV1
 
     protected abstract void secure_reply(String answer, String code);
 
-    protected void checkLoggedIn()
-        throws FTPCommandException
+    protected void checkLoggedIn(AnonymousPermission mode) throws FTPCommandException
     {
         if (_subject == null) {
             throw new FTPCommandException(530, "Not logged in.");
         }
-    }
 
-    protected void checkNotNobody() throws FTPCommandException
-    {
-        if (Subjects.isNobody(_subject)) {
-            throw new FTPCommandException(554, "Anonymous write access not permitted");
-        }
-    }
-
-    private void checkAuthorizedOnParent(Activity activity, FsPath path)
-            throws FTPCommandException
-    {
-        // Some crazy clients attempt commands on the root path ("/") that just
-        // cannot succeed (e.g., "MKD /").  For this reason, we handle
-        // empty paths differently.
-        checkAuthorized(activity, path.isEmpty() ? null : path.getParent());
-    }
-
-    private void checkAuthorized(Activity activity, FsPath path)
-            throws FTPCommandException
-    {
-        if (activity.isModifying()) {
-            checkNotNobody();
-        }
-
-        if (path != null && _authz.isRestricted(activity, path)) {
-            throw new FTPCommandException(550,"Permission denied");
+        if (mode == FORBID_ANONYMOUS_USER && Subjects.isNobody(_subject)) {
+            throw new FTPCommandException(554, "Anonymous usage not permitted.");
         }
     }
 
@@ -1707,10 +1692,9 @@ public abstract class AbstractFtpDoorV1
          *    450, 550
          *    500, 501, 502, 421, 530
          */
-        checkLoggedIn();
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         FsPath path = absolutePath(arg);
-        checkAuthorized(Activity.DELETE, path);
         try {
             PnfsId pnfsId =
                     _pnfs.deletePnfsEntry(path.toString(), EnumSet.of(FileType.REGULAR, FileType.LINK));
@@ -1785,7 +1769,7 @@ public abstract class AbstractFtpDoorV1
          *   250
          *   500, 501, 502, 421, 530, 550
          */
-        checkLoggedIn();
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             reply(err("RMD",arg));
@@ -1794,7 +1778,6 @@ public abstract class AbstractFtpDoorV1
 
         try {
             FsPath path = absolutePath(arg);
-            checkAuthorized(Activity.DELETE, path);
             _pnfs.deletePnfsEntry(path.toString(), EnumSet.of(FileType.DIR));
             reply("250 OK");
         }
@@ -1825,14 +1808,13 @@ public abstract class AbstractFtpDoorV1
          *   257
          *   500, 501, 502, 421, 530, 550
          */
-        checkLoggedIn();
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             reply(err("MKD",arg));
             return;
         }
         FsPath path = absolutePath(arg);
-        checkAuthorizedOnParent(Activity.MANAGE, path);
         FsPath relativePath = new FsPath(_cwd);
         relativePath.add(arg);
         String properDirectoryStringReply = relativePath.toString().replaceAll("\"","\"\"");
@@ -1973,8 +1955,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_allo(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
-        checkNotNobody();
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         _allo = 0;
 
@@ -1998,7 +1979,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_pwd(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (!arg.equals("")) {
             reply(err("PWD",arg));
@@ -2011,11 +1992,10 @@ public abstract class AbstractFtpDoorV1
     public void ftp_cwd(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         try {
             FsPath newcwd = absolutePath(arg);
-            checkAuthorizedOnParent(Activity.READ_METADATA, newcwd);
             checkIsDirectory(newcwd);
             _cwd = _doorRootPath.relativize(newcwd).toString();
             reply("250 CWD command succcessful. New CWD is <" + _cwd + ">");
@@ -2142,7 +2122,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_port(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         String[] st = arg.split(",");
         if (st.length != 6) {
@@ -2160,7 +2140,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_pasv(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
         if (_sessionAllPassive) {
             throw new FTPCommandException(503, "PASV not allowed after EPSV ALL");
         }
@@ -2202,7 +2182,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_eprt(String arg)
             throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         setActive(getExtendedAddressOf(arg));
         _allowDelayed = false;
@@ -2217,7 +2197,7 @@ public abstract class AbstractFtpDoorV1
         if (!_allowDelayed) {
             checkIpV6();
         }
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if  ("ALL".equalsIgnoreCase(arg)) {
             _sessionAllPassive = true;
@@ -2289,7 +2269,7 @@ public abstract class AbstractFtpDoorV1
     @Help("MFMT <SP> <time-val> <SP> <path> - Adjust modify timestamp")
     public void ftp_mfmt(String arg) throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         int spaceIndex = arg.indexOf(' ');
         if (spaceIndex == -1) {
@@ -2298,7 +2278,6 @@ public abstract class AbstractFtpDoorV1
         }
 
         String pathname = arg.substring(spaceIndex + 1);
-        checkAuthorized(Activity.UPDATE_METADATA, absolutePath(pathname));
         String timeval = arg.substring(0, spaceIndex);
         long when = parseTimeval(timeval, "");
 
@@ -2316,7 +2295,7 @@ public abstract class AbstractFtpDoorV1
     @Help("MFCT <SP> <time-val> <SP> <path> - Adjust creation timestamp")
     public void ftp_mfct(String arg) throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         int spaceIndex = arg.indexOf(' ');
         if (spaceIndex == -1) {
@@ -2325,7 +2304,6 @@ public abstract class AbstractFtpDoorV1
         }
 
         String pathname = arg.substring(spaceIndex + 1);
-        checkAuthorized(Activity.UPDATE_METADATA, absolutePath(pathname));
         String timeval = arg.substring(0, spaceIndex);
         long when = parseTimeval(timeval, "");
 
@@ -2343,7 +2321,7 @@ public abstract class AbstractFtpDoorV1
     @Help("MFF <SP> <fact> = <value> ; [<fact> = <value> ; ...] <SP> <path> - Update facts about file or directory")
     public void ftp_mff(String arg) throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         int spaceIndex = arg.indexOf(' ');
         if (spaceIndex == -1) {
@@ -2352,7 +2330,6 @@ public abstract class AbstractFtpDoorV1
         }
 
         String pathname = arg.substring(spaceIndex + 1);
-        checkAuthorized(Activity.UPDATE_METADATA, absolutePath(pathname));
         String facts = arg.substring(0, spaceIndex);
 
         FileAttributes updates = new FileAttributes();
@@ -2480,7 +2457,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_site(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             reply("500 must supply the site specific command");
@@ -2551,7 +2528,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_cksm(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         List<String> st = Splitter.on(' ').limit(4).splitToList(arg);
         if (st.size() != 4) {
@@ -2598,14 +2575,12 @@ public abstract class AbstractFtpDoorV1
             throw new FTPCommandException(504, "Unsupported checksum over partial file offset");
         }
 
-        FsPath absolutePath = absolutePath(path);
-        checkAuthorized(Activity.READ_METADATA, absolutePath);
-
         try {
             ChecksumFactory cf =
                 ChecksumFactory.getFactory(ChecksumType.getChecksumType(algo));
             FileAttributes attributes =
-                _pnfs.getFileAttributes(absolutePath, EnumSet.of(CHECKSUM));
+                _pnfs.getFileAttributes(absolutePath(path), EnumSet.of(CHECKSUM));
+
             Checksum checksum = cf.find(attributes.getChecksums());
             if (checksum == null) {
                 throw new FTPCommandException(504, "Checksum is not available, dynamic checksum calculation is not supported");
@@ -2623,7 +2598,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_scks(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         String[] st = arg.split("\\s+");
         if (st.length != 2) {
@@ -2651,9 +2626,7 @@ public abstract class AbstractFtpDoorV1
     public void doChmod(String permstring, String path)
         throws FTPCommandException
     {
-        checkLoggedIn();
-        FsPath absolutePath = absolutePath(path);
-        checkAuthorized(Activity.UPDATE_METADATA, absolutePath);
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (path.equals("")){
             reply(err("SITE CHMOD",path));
@@ -2666,7 +2639,7 @@ public abstract class AbstractFtpDoorV1
             int newperms = Integer.parseInt(permstring, 8);
 
             attributes =
-                _pnfs.getFileAttributes(absolutePath, EnumSet.of(PNFSID, TYPE));
+                _pnfs.getFileAttributes(absolutePath(path), EnumSet.of(PNFSID, TYPE));
 
             if (attributes.getFileType() == FileType.LINK) {
                 reply("502 chmod of symbolic links is not yet supported.");
@@ -2693,9 +2666,7 @@ public abstract class AbstractFtpDoorV1
      */
     public void doChgrp(String group, String path) throws FTPCommandException
     {
-        checkLoggedIn();
-        FsPath absolutePath = absolutePath(path);
-        checkAuthorized(Activity.UPDATE_METADATA, absolutePath);
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (path.equals("")){
             reply(err("SITE CHGRP", path));
@@ -2728,7 +2699,7 @@ public abstract class AbstractFtpDoorV1
 
         FileAttributes attributes;
         try {
-            attributes = _pnfs.getFileAttributes(absolutePath, EnumSet.of(PNFSID, TYPE));
+            attributes = _pnfs.getFileAttributes(absolutePath(path), EnumSet.of(PNFSID, TYPE));
 
             if (attributes.getFileType() == FileType.LINK) {
                 throw new FTPCommandException(504, "chgrp of symbolic links is not yet supported.");
@@ -2750,22 +2721,20 @@ public abstract class AbstractFtpDoorV1
 
     public void doSymlinkFrom(String path) throws FTPCommandException
     {
-        checkLoggedIn();
-        FsPath absolutePath = absolutePath(path);
-        checkAuthorizedOnParent(Activity.MANAGE, absolutePath);
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (path.equals("")) {
             throw new FTPCommandException(501, "Command requires path argument.");
         }
 
-        _symlinkPath = absolutePath.toString();
+        _symlinkPath = path;
 
         reply("350 Send SITE SYMLINKTO to continue.");
     }
 
     public void doSymlinkTo(String target) throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (target.equals("")){
             throw new FTPCommandException(501, "Command requires path.");
@@ -2779,7 +2748,7 @@ public abstract class AbstractFtpDoorV1
         // {@code #doSymlinkFrom}.
 
         try {
-            _pnfs.createSymLink(_symlinkPath, target,
+            _pnfs.createSymLink(absolutePath(_symlinkPath).toString(), target,
                     (int)Subjects.getUid(_subject), (int)Subjects.getPrimaryGid(_subject));
             reply ("257 symlink '" + _symlinkPath + "' created.");
         } catch (PermissionDeniedCacheException e) {
@@ -3060,9 +3029,7 @@ public abstract class AbstractFtpDoorV1
     {
         /* Check preconditions.
          */
-        checkLoggedIn();
-        FsPath absolutePath = absolutePath(file);
-        checkAuthorized(Activity.DOWNLOAD, absolutePath);
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (file.isEmpty()) {
             throw new FTPCommandException(501, "Missing path");
@@ -3081,7 +3048,7 @@ public abstract class AbstractFtpDoorV1
         }
 
         FtpTransfer transfer =
-            new FtpTransfer(absolutePath,
+            new FtpTransfer(absolutePath(file),
                             offset, size,
                             mode,
                             xferMode,
@@ -3193,10 +3160,7 @@ public abstract class AbstractFtpDoorV1
                        ProtocolFamily protocolFamily, int version)
         throws FTPCommandException
     {
-        checkLoggedIn();
-
-        FsPath absPath = absolutePath(file);
-        checkAuthorizedOnParent(Activity.UPLOAD, absPath);
+        checkLoggedIn(FORBID_ANONYMOUS_USER);
 
         if (file.equals("")) {
             throw new FTPCommandException(501, "STOR command not understood");
@@ -3212,7 +3176,7 @@ public abstract class AbstractFtpDoorV1
         }
 
         FtpTransfer transfer =
-            new FtpTransfer(absPath,
+            new FtpTransfer(absolutePath(file),
                             0, 0,
                             mode,
                             xferMode,
@@ -3284,7 +3248,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_size(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             reply(err("SIZE",""));
@@ -3292,8 +3256,6 @@ public abstract class AbstractFtpDoorV1
         }
 
         FsPath path = absolutePath(arg);
-        checkAuthorized(Activity.READ_METADATA, path);
-
         long filelength;
         try {
             FileAttributes attributes =
@@ -3313,7 +3275,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_mdtm(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             reply(err("MDTM",""));
@@ -3322,7 +3284,6 @@ public abstract class AbstractFtpDoorV1
 
         try {
             FsPath path = absolutePath(arg);
-            checkAuthorized(Activity.READ_METADATA, path);
             long modification_time;
             FileAttributes attributes =
                 _pnfs.getFileAttributes(path.toString(),
@@ -3389,7 +3350,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_list(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         Args args = new Args(arg);
         boolean listLong =
@@ -3401,7 +3362,6 @@ public abstract class AbstractFtpDoorV1
         }
 
         FsPath path = absolutePath(arg);
-        checkAuthorized(Activity.LIST, path);
         try {
             try {
                 openDataSocket();
@@ -3421,12 +3381,12 @@ public abstract class AbstractFtpDoorV1
                     : new ShortListPrinter(writer);
 
                 try {
-                    total = _listSource.printDirectory(null, printer, path, null,
-                                                       Range.<Integer>all());
+                    total = _listSource.printDirectory(_subject, _authz, printer,
+                            path, null, Range.<Integer>all());
                 } catch (NotDirCacheException e) {
                     /* path exists, but it is not a directory.
                      */
-                    _listSource.printFile(null, printer, path);
+                    _listSource.printFile(_subject, _authz, printer, path);
                     total = 1;
                 } catch (FileNotFoundCacheException e) {
                     /* If f does not exist, then it could be a
@@ -3434,8 +3394,9 @@ public abstract class AbstractFtpDoorV1
                      * repeat the list.
                      */
                     total =
-                        _listSource.printDirectory(null, printer, path.getParent(),
-                                                   new Glob(path.getName()), Range.<Integer>all());
+                        _listSource.printDirectory(_subject, _authz, printer,
+                                path.getParent(), new Glob(path.getName()),
+                                Range.<Integer>all());
                 }
 
                 writer.close();
@@ -3467,7 +3428,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_nlst(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         if (arg.equals("")) {
             arg = ".";
@@ -3500,14 +3461,12 @@ public abstract class AbstractFtpDoorV1
                     new PrintWriter(new OutputStreamWriter(new BufferedOutputStream(_dataSocket.getOutputStream()), "US-ASCII"));
                 DirectoryListPrinter printer = new ShortListPrinter(writer);
                 if ( pathIsPattern ) {
-                    total =
-                        _listSource.printDirectory(null, printer, path.getParent(),
-                                                   new Glob(path.getName()),
-                                                   Range.<Integer>all());
+                    total = _listSource.printDirectory(null, Restrictions.none(),
+                            printer, path.getParent(), new Glob(path.getName()),
+                            Range.<Integer>all());
                 } else {
-                    total = _listSource.printDirectory(null, printer,
-                                                       path, null,
-                                                       Range.<Integer>all());
+                    total = _listSource.printDirectory(null, Restrictions.none(),
+                            printer, path, null, Range.<Integer>all());
                 }
                 writer.close();
             } finally {
@@ -3538,7 +3497,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_mlst(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         try {
             FsPath path = absolutePath(arg);
@@ -3546,7 +3505,7 @@ public abstract class AbstractFtpDoorV1
             PrintWriter pw = new PrintWriter(sw);
             pw.print("250- Listing " + arg + "\r\n");
             pw.print(' ');
-            _listSource.printFile(null, new MlstFactPrinter(pw), path);
+            _listSource.printFile(null, Restrictions.none(), new MlstFactPrinter(pw), path);
             pw.print("250 End");
             reply(sw.toString());
         } catch (InterruptedException e) {
@@ -3570,7 +3529,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_mlsd(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         try {
             FsPath path;
@@ -3599,9 +3558,9 @@ public abstract class AbstractFtpDoorV1
                 PrintWriter writer =
                     new PrintWriter(new OutputStreamWriter(new BufferedOutputStream(_dataSocket.getOutputStream()), "UTF-8"));
 
-                total = _listSource.printDirectory(null, new MlsdFactPrinter(writer),
-                                                   path, null,
-                                                   Range.<Integer>all());
+                total = _listSource.printDirectory(null, Restrictions.none(),
+                        new MlsdFactPrinter(writer), path, null,
+                        Range.<Integer>all());
                 writer.close();
             } finally {
                 closeDataSocket();
@@ -3625,7 +3584,7 @@ public abstract class AbstractFtpDoorV1
 
     @Help("RNFR <SP> <path> - Rename from <path>.")
     public void ftp_rnfr(String arg) throws FTPCommandException {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         try {
             _filepath = null;
@@ -3649,7 +3608,7 @@ public abstract class AbstractFtpDoorV1
 
     @Help("RNTO <SP> <path> - Rename file specified by RNTO to <path>.")
     public void ftp_rnto(String arg) throws FTPCommandException {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         try {
             if (_filepath == null) {
@@ -3734,7 +3693,7 @@ public abstract class AbstractFtpDoorV1
     public void ftp_abor(String arg)
         throws FTPCommandException
     {
-        checkLoggedIn();
+        checkLoggedIn(ALLOW_ANONYMOUS_USER);
 
         FtpTransfer transfer = getTransfer();
         if (transfer != null) {
@@ -4166,7 +4125,7 @@ public abstract class AbstractFtpDoorV1
      }
 
     /** A short format which only includes the file name. */
-    class ShortListPrinter implements DirectoryListPrinter
+    static class ShortListPrinter implements DirectoryListPrinter
     {
         private final PrintWriter _out;
 
@@ -4184,10 +4143,7 @@ public abstract class AbstractFtpDoorV1
         @Override
         public void print(FsPath dir, FileAttributes dirAttr, DirectoryEntry entry)
         {
-            FsPath path = new FsPath(dir).add(entry.getName());
-            if (!_authz.isRestricted(Activity.READ_METADATA, path)) {
-                _out.append(entry.getName()).append("\r\n");
-            }
+            _out.append(entry.getName()).append("\r\n");
         }
     }
 
@@ -4196,12 +4152,12 @@ public abstract class AbstractFtpDoorV1
     {
         private final String _userName;
         private final PrintWriter _out;
-        private final PermissionHandler _pdp =
-            new ChainedPermissionHandler
-            (
-                new ACLPermissionHandler(),
-                new PosixPermissionHandler()
-            );
+        private final RestrictedPermissionHandler _pdp =
+                new RestrictedPermissionHandler(
+                    new ChainedPermissionHandler (
+                        new ACLPermissionHandler(),
+                        new PosixPermissionHandler()
+                ));
 
         public LongListPrinter(PrintWriter writer)
         {
@@ -4221,23 +4177,19 @@ public abstract class AbstractFtpDoorV1
         @Override
         public void print(FsPath dir, FileAttributes dirAttr, DirectoryEntry entry)
         {
-            FsPath path = new FsPath(dir).add(entry.getName());
-            if (_authz.isRestricted(Activity.READ_METADATA, path)) {
-                return;
-            }
-
             StringBuilder mode = new StringBuilder();
             FileAttributes attr = entry.getFileAttributes();
+            FsPath path = new FsPath(dir).add(entry.getName());
 
             if (attr.getFileType() == FileType.DIR) {
                 boolean canListDir =
-                    _pdp.canListDir(_subject, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canListDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
                 boolean canLookup =
-                    _pdp.canLookup(_subject, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canLookup(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
                 boolean canCreateFile =
-                    _pdp.canCreateFile(_subject, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
                 boolean canCreateDir =
-                    _pdp.canCreateSubDir(_subject, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateSubDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
                 mode.append('d');
                 mode.append(canListDir ? 'r' : '-');
                 mode.append(canCreateFile || canCreateDir ? 'w' : '-');
@@ -4245,7 +4197,7 @@ public abstract class AbstractFtpDoorV1
                 mode.append("------");
             } else {
                 boolean canReadFile =
-                    _pdp.canReadFile(_subject, attr)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canReadFile(_subject, _authz, path, attr)== AccessType.ACCESS_ALLOWED;
                 mode.append('-');
                 mode.append(canReadFile ? 'r' : '-');
                 mode.append('-');
@@ -4282,12 +4234,12 @@ public abstract class AbstractFtpDoorV1
 
         protected final PrintWriter _out;
 
-        private final PermissionHandler _pdp =
-            new ChainedPermissionHandler
-            (
-                new ACLPermissionHandler(),
-                new PosixPermissionHandler()
-            );
+        private final RestrictedPermissionHandler _pdp =
+                new RestrictedPermissionHandler(
+                    new ChainedPermissionHandler (
+                        new ACLPermissionHandler(),
+                        new PosixPermissionHandler()
+                ));
 
         public FactPrinter(PrintWriter writer)
         {
@@ -4354,9 +4306,6 @@ public abstract class AbstractFtpDoorV1
         public void print(FsPath dir, FileAttributes dirAttr, DirectoryEntry entry)
         {
             FsPath path = new FsPath(dir).add(entry.getName());
-            if (_authz.isRestricted(Activity.READ_METADATA, path)) {
-                return;
-            }
 
             if (!_currentFacts.isEmpty()) {
                 AccessType access;
@@ -4367,7 +4316,7 @@ public abstract class AbstractFtpDoorV1
                     case SIZE:
                         if (attr.isDefined(SIZE) && attr.getFileType() != FileType.DIR) {
                             access =
-                                _pdp.canGetAttributes(_subject, attr,
+                                _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                       EnumSet.of(SIZE));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printSizeFact(attr);
@@ -4377,7 +4326,7 @@ public abstract class AbstractFtpDoorV1
                     case CREATE:
                         if (attr.isDefined(CREATION_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(CREATION_TIME));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printCreateFact(attr);
@@ -4387,7 +4336,7 @@ public abstract class AbstractFtpDoorV1
                     case MODIFY:
                         if (attr.isDefined(MODIFICATION_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(MODIFICATION_TIME));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printModifyFact(attr);
@@ -4397,7 +4346,7 @@ public abstract class AbstractFtpDoorV1
                     case CHANGE:
                         if (attr.isDefined(CHANGE_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(CHANGE_TIME));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printChangeFact(attr);
@@ -4407,7 +4356,7 @@ public abstract class AbstractFtpDoorV1
                     case ACCESS:
                         if (attr.isDefined(ACCESS_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(ACCESS_TIME));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printAccessFact(attr);
@@ -4417,7 +4366,7 @@ public abstract class AbstractFtpDoorV1
                     case TYPE:
                         if (attr.isDefined(TYPE)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(TYPE));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printTypeFact(attr);
@@ -4429,16 +4378,16 @@ public abstract class AbstractFtpDoorV1
                         break;
                     case PERM:
                         access =
-                            _pdp.canGetAttributes(_subject, attr,
+                            _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                   EnumSet.of(MODE, ACL));
                         if (access == AccessType.ACCESS_ALLOWED) {
-                            printPermFact(dirAttr, attr);
+                            printPermFact(path, dirAttr, attr);
                         }
                         break;
                     case OWNER:
                         if (attr.isDefined(OWNER)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(OWNER));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printOwnerFact(attr);
@@ -4448,7 +4397,7 @@ public abstract class AbstractFtpDoorV1
                     case GROUP:
                         if (attr.isDefined(OWNER_GROUP)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(OWNER_GROUP));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printGroupFact(attr);
@@ -4458,7 +4407,7 @@ public abstract class AbstractFtpDoorV1
                     case MODE:
                         if (attr.isDefined(MODE)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, attr,
+                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
                                                           EnumSet.of(MODE));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printModeFact(attr);
@@ -4570,28 +4519,28 @@ public abstract class AbstractFtpDoorV1
          * rather expensive as the permission information must be
          * retrieved.
          */
-        private void printPermFact(FileAttributes parentAttr, FileAttributes attr)
+        private void printPermFact(FsPath path, FileAttributes parentAttr, FileAttributes attr)
         {
             StringBuilder s = new StringBuilder();
             if (attr.getFileType() == FileType.DIR) {
-                if (_pdp.canCreateFile(_subject, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canCreateFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('c');
                 }
-                if (_pdp.canDeleteDir(_subject, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canDeleteDir(_subject, _authz, path, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('d');
                 }
                 s.append('e');
-                if (_pdp.canListDir(_subject, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canListDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('l');
                 }
-                if (_pdp.canCreateSubDir(_subject, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canCreateSubDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('m');
                 }
             } else {
-                if (_pdp.canDeleteFile(_subject, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canDeleteFile(_subject, _authz, path, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('d');
                 }
-                if (_pdp.canReadFile(_subject, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canReadFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('r');
                 }
             }

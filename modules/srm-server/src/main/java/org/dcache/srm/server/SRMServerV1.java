@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.rmi.RemoteException;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.commons.stats.RequestCounters;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
 import org.dcache.srm.AbstractStorageElement;
@@ -88,7 +87,6 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
               requestCredential = srmAuth.getRequestCredential();
               user = srmAuth.getRequestUser();
-              storage.checkAuthorization(user, Activity.UPLOAD);
           } catch (SRMException sae) {
               log.error(sae.getMessage());
               throw new java.rmi.RemoteException(sae.getMessage());
@@ -123,7 +121,6 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
              requestCredential = srmAuth.getRequestCredential();
              user = srmAuth.getRequestUser();
-             storage.checkAuthorization(user, Activity.DOWNLOAD);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());
@@ -162,7 +159,6 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           try {
              requestCredential = srmAuth.getRequestCredential();
              user = srmAuth.getRequestUser();
-             storage.checkAuthorization(user, Activity.MANAGE);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());
@@ -337,7 +333,6 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           SRMUser user;
           try {
               user = srmAuth.getRequestUser();
-              storage.checkAuthorization(user, Activity.READ_METADATA);
           } catch (SRMException sae) {
               log.error(sae.getMessage());
               throw new java.rmi.RemoteException(sae.getMessage());
@@ -475,7 +470,6 @@ public class SRMServerV1 implements org.dcache.srm.client.axis.ISRM_PortType{
           SRMUser user;
           try {
               user = srmAuth.getRequestUser();
-              storage.checkAuthorization(user, Activity.DELETE);
           }
           catch (SRMException sae) {
               log.error(sae.getMessage());

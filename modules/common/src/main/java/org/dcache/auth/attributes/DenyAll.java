@@ -14,12 +14,6 @@ public class DenyAll implements Restriction
     }
 
     @Override
-    public boolean alwaysRestricted(Activity activity)
-    {
-        return true;
-    }
-
-    @Override
     public boolean isRestricted(Activity activity, FsPath path)
     {
         return true;

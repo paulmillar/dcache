@@ -13,6 +13,7 @@ import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.RetentionPolicy;
 
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -25,7 +26,7 @@ public class AbstractNameSpaceProvider
     implements NameSpaceProvider
 {
     @Override
-    public FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
+    public FileAttributes createFile(Subject subject, Restriction restriction, String path, int uid, int gid, int mode,
                                      Set<FileAttribute> requestedAttributes)
         throws CacheException
     {
@@ -33,102 +34,102 @@ public class AbstractNameSpaceProvider
     }
 
     @Override
-    public PnfsId createDirectory(Subject subject, String path, int uid, int gid, int mode)
+    public PnfsId createDirectory(Subject subject, Restriction restriction, String path, int uid, int gid, int mode)
             throws CacheException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public PnfsId createSymLink(Subject subject, String path, String dest, int uid, int gid)
+    public PnfsId createSymLink(Subject subject, Restriction restriction, String path, String dest, int uid, int gid)
             throws CacheException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId)
+    public void deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, PnfsId pnfsId)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path)
+    public PnfsId deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, String path)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path) throws CacheException
+    public void deleteEntry(Subject subject, Restriction restriction, Set<FileType> allowed, PnfsId pnfsId, String path) throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void rename(Subject subject, PnfsId pnfsId, String source, String destination, boolean overwrite)
+    public void rename(Subject subject, Restriction restriction, PnfsId pnfsId, String source, String destination, boolean overwrite)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public String pnfsidToPath(Subject subject, PnfsId pnfsId)
+    public String pnfsidToPath(Subject subject, Restriction restriction, PnfsId pnfsId)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public PnfsId pathToPnfsid(Subject subject, String path, boolean followLinks)
+    public PnfsId pathToPnfsid(Subject subject, Restriction restriction, String path, boolean followLinks)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public PnfsId getParentOf(Subject subject, PnfsId pnfsId)
+    public PnfsId getParentOf(Subject subject, Restriction restriction, PnfsId pnfsId)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void removeFileAttribute(Subject subject, PnfsId pnfsId, String attribute)
+    public void removeFileAttribute(Subject subject, Restriction restriction, PnfsId pnfsId, String attribute)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void removeChecksum(Subject subject, PnfsId pnfsId, ChecksumType type)
+    public void removeChecksum(Subject subject, Restriction restriction, PnfsId pnfsId, ChecksumType type)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void addCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation)
+    public void addCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId, String cacheLocation)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public List<String> getCacheLocation(Subject subject, PnfsId pnfsId)
+    public List<String> getCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void clearCacheLocation(Subject subject, PnfsId pnfsId, String cacheLocation, boolean removeIfLast)
+    public void clearCacheLocation(Subject subject, Restriction restriction, PnfsId pnfsId, String cacheLocation, boolean removeIfLast)
         throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public FileAttributes getFileAttributes(Subject subject, PnfsId pnfsId,
+    public FileAttributes getFileAttributes(Subject subject, Restriction restriction, PnfsId pnfsId,
                                             Set<FileAttribute> attr)
         throws CacheException
     {
@@ -136,14 +137,14 @@ public class AbstractNameSpaceProvider
     }
 
     @Override
-    public FileAttributes setFileAttributes(Subject subject, PnfsId pnfsId,
+    public FileAttributes setFileAttributes(Subject subject, Restriction restriction, PnfsId pnfsId,
             FileAttributes attr, Set<FileAttribute> acquire) throws CacheException
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void list(Subject subject, String path, Glob glob, Range<Integer> range,
+    public void list(Subject subject, Restriction restriction, String path, Glob glob, Range<Integer> range,
                      Set<FileAttribute> attrs, ListHandler handler)
         throws CacheException
     {
@@ -151,7 +152,7 @@ public class AbstractNameSpaceProvider
     }
 
     @Override
-    public FsPath createUploadPath(Subject subject, FsPath path, FsPath rootPath,
+    public FsPath createUploadPath(Subject subject, Restriction restriction, FsPath path, FsPath rootPath,
                                    Long size, AccessLatency al, RetentionPolicy rp, String spaceToken,
                                    Set<CreateOption> options) throws CacheException
     {
@@ -159,13 +160,13 @@ public class AbstractNameSpaceProvider
     }
 
     @Override
-    public PnfsId commitUpload(Subject subject, FsPath uploadPath, FsPath pnfsPath, Set<CreateOption> options)
+    public PnfsId commitUpload(Subject subject, Restriction restriction, FsPath uploadPath, FsPath pnfsPath, Set<CreateOption> options)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException
+    public void cancelUpload(Subject subject, Restriction restriction, FsPath uploadPath, FsPath path) throws CacheException
     {
         throw new UnsupportedOperationException();
     }

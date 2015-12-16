@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
@@ -72,8 +71,6 @@ public class SrmSetPermission
             throws SRMException
     {
         URI surl = URI.create(request.getSURL().toString());
-
-        storage.checkAuthorization(user, surl, Activity.UPDATE_METADATA);
 
         FileMetaData fmd = storage.getFileMetaData(user, surl, false);
 

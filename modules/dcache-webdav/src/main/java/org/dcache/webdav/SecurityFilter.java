@@ -1,6 +1,5 @@
 package org.dcache.webdav;
 
-import io.milton.http.AbstractRequest;
 import io.milton.http.Auth;
 import io.milton.http.Filter;
 import io.milton.http.FilterChain;
@@ -15,7 +14,6 @@ import javax.security.auth.Subject;
 import javax.servlet.http.HttpServletRequest;
 
 import java.io.File;
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
@@ -33,13 +31,10 @@ import org.dcache.auth.LoginStrategy;
 import org.dcache.auth.Origin;
 import org.dcache.auth.PasswordCredential;
 import org.dcache.auth.Subjects;
-import org.dcache.auth.attributes.Activity;
-import org.dcache.auth.attributes.Unrestricted;
 import org.dcache.auth.attributes.HomeDirectory;
 import org.dcache.auth.attributes.LoginAttribute;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.auth.attributes.Restriction;
-import org.dcache.auth.attributes.ReadOnly;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.util.CertificateFactories;
 import org.dcache.util.NetLoggerBuilder;
@@ -95,32 +90,21 @@ public class SecurityFilter implements Filter
                         final Response response)
     {
         HttpManager manager = filterChain.getHttpManager();
-        Subject subject = null;
-
-        try {
-            checkAuthorised(request, _doorRestriction);
-        } catch (PermissionDeniedCacheException e) {
-            _log.debug("Failing {} from {} due to door restriction {}",
-                    request.getMethod(), request.getRemoteAddr(), _doorRestriction);
-            manager.getResponseHandler().respondMethodNotAllowed(new EmptyResource(request), response, request);
-        }
+        Subject subject = new Subject();
 
         try {
             HttpServletRequest servletRequest = ServletRequest.getRequest();
 
-            subject = new Subject();
             addX509ChainToSubject(servletRequest, subject);
             addOriginToSubject(servletRequest, subject);
             addPasswordCredentialToSubject(request, subject);
 
             LoginReply login = _loginStrategy.login(subject);
             subject = login.getSubject();
-            Restriction userRestriction = login.getRestriction();
+            Restriction userRestriction = Restrictions.concat(_doorRestriction, login.getRestriction());
 
             servletRequest.setAttribute(DCACHE_SUBJECT_ATTRIBUTE, subject);
             servletRequest.setAttribute(DCACHE_RESTRICTION_ATTRIBUTE, userRestriction);
-
-            checkAuthorised(request, userRestriction);
 
             checkRootPath(request, login);
 
@@ -149,84 +133,6 @@ public class SecurityFilter implements Filter
         } catch (CacheException e) {
             _log.error("Internal server error: " + e);
             manager.getResponseHandler().respondServerError(request, response, e.getMessage());
-        }
-    }
-
-    private void checkAuthorised(Restriction restriction, Activity activity, FsPath path)
-            throws PermissionDeniedCacheException
-    {
-        if (restriction.isRestricted(activity, path)) {
-            throw new PermissionDeniedCacheException("Permission denied.");
-        }
-    }
-
-    private void checkAuthorised(Request request, Restriction restriction)
-            throws PermissionDeniedCacheException
-    {
-        String requestPath = request.getAbsolutePath();
-        FsPath fullPath = new FsPath(_rootPath, new FsPath(requestPath));
-
-        switch (request.getMethod()) {
-        case CONNECT:
-        case TRACE:
-        case OPTIONS:
-            return;
-
-        case GET:
-        case HEAD:
-            checkAuthorised(restriction, Activity.DOWNLOAD, fullPath);
-            break;
-
-        case PROPFIND:
-            switch (request.getDepthHeader()) {
-            case 0:
-                checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
-                break;
-            case 1:
-            case AbstractRequest.INFINITY:
-            default:
-                checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
-                checkAuthorised(restriction, Activity.LIST, fullPath);
-                break;
-            }
-            break;
-
-        case REPORT:
-            checkAuthorised(restriction, Activity.READ_METADATA, fullPath);
-            break;
-
-        case POST:
-            /* POST is difficult to describe as its affect on the filesystem,
-             * if any, is ill-defined.  Currently we allow all POST requests
-             * through and rely on any code handling these requests to provide
-             * the necessary security checks.
-             */
-            break;
-
-        case PROPPATCH:
-        case ACL:
-        case LOCK:
-        case UNLOCK:
-            checkAuthorised(restriction, Activity.UPDATE_METADATA, fullPath);
-            break;
-
-        case PUT:
-            checkAuthorised(restriction, Activity.UPLOAD, fullPath.getParent());
-            break;
-
-        case DELETE:
-            checkAuthorised(restriction, Activity.DELETE, fullPath);
-            break;
-
-        case COPY:
-        case MOVE:
-        case MKCOL:
-            checkAuthorised(restriction, Activity.MANAGE, fullPath);
-            break;
-
-        case MKCALENDAR:
-        default:
-            throw new PermissionDeniedCacheException("Permission denied.");
         }
     }
 

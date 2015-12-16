@@ -14,12 +14,6 @@ public class Unrestricted implements Restriction
     }
 
     @Override
-    public boolean alwaysRestricted(Activity activity)
-    {
-        return false;
-    }
-
-    @Override
     public boolean isRestricted(Activity activity, FsPath path)
     {
         return false;

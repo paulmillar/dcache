@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
@@ -16,7 +15,6 @@ import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMNonEmptyDirectoryException;
 import org.dcache.srm.SRMUser;
 import org.dcache.srm.request.PutFileRequest;
-import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.SrmRmdirRequest;
 import org.dcache.srm.v2_2.SrmRmdirResponse;
 import org.dcache.srm.v2_2.TReturnStatus;
@@ -73,8 +71,6 @@ public class SrmRmdir
             throws SRMException
     {
         URI surl = URI.create(request.getSURL().toString());
-        storage.checkAuthorization(user, surl, Activity.DELETE);
-
         String path = getPath(surl);
 
         /* If surl is a prefix to any active upload, then we report the directory as

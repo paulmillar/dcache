@@ -79,7 +79,6 @@ import java.util.Objects;
 
 import diskCacheV111.srm.RequestFileStatus;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMDuplicationException;
@@ -91,7 +90,6 @@ import org.dcache.srm.SRMUser;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
-import org.dcache.srm.util.Surls;
 import org.dcache.srm.v2_2.TAccessLatency;
 import org.dcache.srm.v2_2.TPutRequestFileStatus;
 import org.dcache.srm.v2_2.TRetentionPolicy;
@@ -335,8 +333,6 @@ public final class PutFileRequest extends FileRequest<PutRequest> {
     {
         logger.trace("run");
         if (!getState().isFinal()) {
-            getStorage().checkAuthorization(getUser(), Surls.getParent(surl), Activity.UPLOAD);
-
             if (getFileId() == null) {
                 // [SRM 2.2, 5.5.2, t)] Upon srmPrepareToPut, SURL entry is inserted to the name space, and any
                 // methods that access the SURL such as srmLs, srmBringOnline and srmPrepareToGet must return

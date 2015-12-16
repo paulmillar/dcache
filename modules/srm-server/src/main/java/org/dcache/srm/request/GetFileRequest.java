@@ -82,11 +82,9 @@ import java.net.URI;
 
 import diskCacheV111.srm.RequestFileStatus;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
-import org.dcache.srm.SRMAuthorizationException;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMFileBusyException;
 import org.dcache.srm.SRMInternalErrorException;
@@ -367,8 +365,6 @@ public final class GetFileRequest extends FileRequest<GetRequest> {
     {
         logger.trace("run");
         if (!getState().isFinal()) {
-            getStorage().checkAuthorization(getUser(), surl, Activity.DOWNLOAD);
-
             if (getPinId() == null) {
                 // [ SRM 2.2, 5.2.2, g)] The file request must fail with an error SRM_FILE_BUSY
                 // if srmPrepareToGet requests for files which there is an active srmPrepareToPut

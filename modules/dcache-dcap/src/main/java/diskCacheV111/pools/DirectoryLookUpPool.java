@@ -10,6 +10,8 @@ import dmg.util.command.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.Subject;
+
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -22,7 +24,6 @@ import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileNotFoundCacheException;
 import diskCacheV111.util.FsPath;
 import diskCacheV111.util.NotDirCacheException;
-import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.vehicles.DCapProtocolInfo;
@@ -33,7 +34,7 @@ import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.DelayedReply;
 import dmg.cells.nucleus.NoRouteToCellException;
 
-import org.dcache.auth.attributes.Activity;
+import org.dcache.auth.Subjects;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.AbstractCell;
@@ -105,42 +106,17 @@ public class DirectoryLookUpPool extends AbstractCell
     /**
      * List a directory.
      */
-    private String list(FsPath path, Restriction restriction)
+    private String list(FsPath path, Subject subject, Restriction restriction)
         throws InterruptedException, CacheException
     {
         StringBuilder sb = new StringBuilder();
         try {
-            try {
-                // If target is a directory prevent any listing; if target is a file
-                // this has no effect.
-                Restriction listingRestriction = restriction;
-                if (listingRestriction.isRestricted(Activity.LIST, path)) {
-                    listingRestriction = Restrictions.denyAll();
-                }
-
-                _list.printDirectory(null, new DirectoryPrinter(sb, listingRestriction),
-                                     path, null, Range.<Integer>all());
-
-                if (listingRestriction.isRestricted(Activity.LIST, path)) {
-                    throw new PermissionDeniedCacheException("Not authorised");
-                }
-            } catch (NotDirCacheException e) {
-                /*
-                 *  Target path is not a directory, return information about this
-                 *  specific file.
-                 */
-                if (restriction.isRestricted(Activity.LIST, path.getParent())) {
-                    throw new PermissionDeniedCacheException("Not authorised");
-                }
-
-                if (restriction.isRestricted(Activity.READ_METADATA, path)) {
-                    throw new FileNotFoundCacheException("No such file.");
-                } else {
-                    _list.printFile(null, new FilePrinter(sb), path);
-                }
-            }
+            _list.printDirectory(subject, restriction, new DirectoryPrinter(sb),
+                                 path, null, Range.<Integer>all());
         } catch (FileNotFoundCacheException e) {
             sb.append("Path ").append(path).append(" does not exist.");
+        } catch (NotDirCacheException e) {
+            _list.printFile(subject, restriction, new FilePrinter(sb), path);
         }
         return sb.toString();
     }
@@ -151,12 +127,10 @@ public class DirectoryLookUpPool extends AbstractCell
     class DirectoryPrinter implements DirectoryListPrinter
     {
         private final StringBuilder _out;
-        private final Restriction _restriction;
 
-        public DirectoryPrinter(StringBuilder out, Restriction restriction)
+        public DirectoryPrinter(StringBuilder out)
         {
             _out = out;
-            _restriction = restriction;
         }
 
         @Override
@@ -168,11 +142,6 @@ public class DirectoryLookUpPool extends AbstractCell
         @Override
         public void print(FsPath dir, FileAttributes dirAttr, DirectoryEntry entry)
         {
-            FsPath path = new FsPath(dir).add(entry.getName());
-            if (_restriction.isRestricted(Activity.READ_METADATA, path)) {
-                return;
-            }
-
             FileAttributes attr = entry.getFileAttributes();
             _out.append(attr.getPnfsId());
             switch (attr.getFileType()) {
@@ -236,7 +205,7 @@ public class DirectoryLookUpPool extends AbstractCell
         {
             try {
                 try {
-                    reply(list(_path, Restrictions.none()));
+                    reply(list(_path, Subjects.ROOT, Restrictions.none()));
                 } catch (CacheException e) {
                     reply(e);
                 }
@@ -284,7 +253,8 @@ public class DirectoryLookUpPool extends AbstractCell
         DCapProtocolInfo dcap = (DCapProtocolInfo) message.getProtocolInfo();
         PnfsId pnfsId = message.getPnfsId();
         Restriction restriction = message.getRestriction();
-        DirectoryService service = new DirectoryService(dcap, pnfsId, restriction);
+        Subject subject = message.getSubject();
+        DirectoryService service = new DirectoryService(subject, restriction, dcap, pnfsId);
         new Thread(service, "list[" + pnfsId + "]").start();
         message.setSucceeded();
         return message;
@@ -304,6 +274,7 @@ public class DirectoryLookUpPool extends AbstractCell
         private final DCapProtocolInfo dcap;
         private final PnfsId pnfsId;
         private final int sessionId;
+        private final Subject subject;
         private final Restriction restriction;
 
         private DCapDataOutputStream ostream;
@@ -312,11 +283,12 @@ public class DirectoryLookUpPool extends AbstractCell
         private DCapDataOutputStream cntOut;
         private DataInputStream cntIn;
 
-        DirectoryService(DCapProtocolInfo dcap, PnfsId pnfsId, Restriction restriction)
+        DirectoryService(Subject subject, Restriction restriction, DCapProtocolInfo dcap, PnfsId pnfsId)
         {
             this.dcap = dcap;
             this.pnfsId = pnfsId;
             this.sessionId = dcap.getSessionId();
+            this.subject = subject;
             this.restriction = restriction;
         }
 
@@ -331,7 +303,7 @@ public class DirectoryLookUpPool extends AbstractCell
 
             try {
                 FsPath path = _pnfs.getPathByPnfsId(pnfsId);
-                String dirList = list(path, restriction);
+                String dirList = list(path, subject, restriction);
 
                 connectToClinet();
 

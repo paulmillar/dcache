@@ -1,3 +1,20 @@
+/* dCache - http://www.dcache.org/
+ *
+ * Copyright (C) 2015 Deutsches Elektronen-Synchrotron
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.dcache.auth.attributes;
 
 import java.io.Serializable;
@@ -32,7 +49,7 @@ import diskCacheV111.util.FsPath;
  *
  *     <dt>List contents of a directory</dt>
  *     <dd>
- *         Requires {@code Activity.READ} on the directory path.  Each child
+ *         Requires {@code Activity.LIST} on the directory path.  Each child
  *         of the directory that does not have {@code Activity.READ_METADATA}
  *         is excluded from the list.
  *     </dd>
@@ -60,7 +77,7 @@ import diskCacheV111.util.FsPath;
  *
  *     <dt>Creating an internal copy of a file</dt>
  *     <dd>
- *         Requires {@code Activity.READ} on source file and
+ *         Requires {@code Activity.DOWNLOAD} on source file and
  *         {@code Activity.UPLOAD} on the target directory.
  *     </dd>
  * </dl>
@@ -72,34 +89,12 @@ import diskCacheV111.util.FsPath;
  * permissions, it is safe to check only the longest (or most specific) path
  * against the user's activity.
  * <p>
- * As a further optimisation, Restriction has two methods.  The
- * {@code #alwaysRestricted} method allows the caller to distinguish between
- * an Activity that is always restricted from those that may be restricted for
- * some paths.  This is useful in situations where establishing the full
- * path incurs some expense.
- * <p>
- * Note that alwaysRestricted <em>must</em> return {@literal false} whenever
- * there is at least one path for which {@code #isRestricted} returns
- * {@literal false} for the same Action.  Although not required, it is
- * recommended that {@code #alwaysRestricted} returns {@literal true} whenever
- * there is no path for which {@literal isRestricted} can return
- * {@literal false} for the same Action.
+ * Restrictions can form a subsumption hierarchy.  A restriction A is said to
+ * subsume a restriction B if a denied operations in A are also denied by B.
+ * Intuitively, B subsumes A if B is at least as strict as A.
  */
 public interface Restriction extends LoginAttribute, Serializable
 {
-    /**
-     * This method returns {@literal false} if there is at least one
-     * {@literal path} for which {@code #isRestricted} method returns
-     * {@literal false} for the same Activity value.  Although not required,
-     * it is recommended this method returns {@literal true} if there is
-     * no path for which {@literal isRestricted} will return {@literal false}
-     * for the supplied activity.
-     * @param activity What the user is attempting.
-     * @return false if there is at least one path where #isRestricted returns
-     * false for this activity.
-     */
-    boolean alwaysRestricted(Activity activity);
-
     /**
      * Discover if the user is restricted for this activity and path.
      * @param activity What the user is attempting.
@@ -119,9 +114,10 @@ public interface Restriction extends LoginAttribute, Serializable
     boolean equals(Object other);
 
     /**
-     * Check whether {@literal other} includes all of this restrictions.
-     * This is a transitive relationship. Note that {@literal A.isSubsumedBy(B)}
-     * and {@literal B.isSubsumedBy(A)} implies {@literal A.equals(B)}.
+     * Check whether {@literal other} denies all operations that this
+     * restriction denies.  This is a transitive relationship. Note that
+     * {@literal A.isSubsumedBy(B)} and {@literal B.isSubsumedBy(A)} implies
+     * {@literal A.equals(B)}.
      * @param other The Restriction to compare.
      * @return true iff {@code other#isRestricted} returns true for all
      * (activity,path) pairs that {@code #isRestricted} returns true.

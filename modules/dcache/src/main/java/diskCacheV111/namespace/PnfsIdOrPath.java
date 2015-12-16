@@ -21,6 +21,7 @@ import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
 
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restrictions;
 
 /**
  * Utility class to represent command arguments that may be
@@ -38,7 +39,7 @@ public class PnfsIdOrPath
     public PnfsId toPnfsId(NameSpaceProvider provider)
             throws CacheException
     {
-        return PnfsId.isValid(s) ? new PnfsId(s) : provider.pathToPnfsid(Subjects.ROOT, s, true);
+        return PnfsId.isValid(s) ? new PnfsId(s) : provider.pathToPnfsid(Subjects.ROOT, Restrictions.none(), s, true);
     }
 
     public static PnfsIdOrPath valueOf(String s)

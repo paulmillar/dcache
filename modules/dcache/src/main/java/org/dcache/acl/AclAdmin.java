@@ -16,6 +16,7 @@ import dmg.cells.nucleus.CellCommandListener;
 import org.dcache.acl.enums.RsType;
 import org.dcache.acl.parser.ACEParser;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restrictions;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.util.Args;
 import org.dcache.vehicles.FileAttributes;
@@ -92,7 +93,7 @@ public class AclAdmin
 
         PnfsId pnfsId = getPnfsId(args.argv(0));
         FileAttributes attr =
-            _nameSpaceProvider.getFileAttributes(Subjects.ROOT, pnfsId,
+            _nameSpaceProvider.getFileAttributes(Subjects.ROOT, Restrictions.none(), pnfsId,
                                                  EnumSet.of(FileAttribute.ACL));
         ACL acl = attr.getAcl();
         if (acl != null) {
@@ -236,7 +237,7 @@ public class AclAdmin
 
         FileAttributes attributes = new FileAttributes();
         attributes.setAcl(new ACL(rsType, aces));
-        _nameSpaceProvider.setFileAttributes(Subjects.ROOT, pnfsId, attributes,
+        _nameSpaceProvider.setFileAttributes(Subjects.ROOT, Restrictions.none(), pnfsId, attributes,
                 EnumSet.noneOf(FileAttribute.class));
         return "Done";
     }
@@ -247,7 +248,7 @@ public class AclAdmin
         if (PnfsId.isValid(s)) {
             return new PnfsId(s);
         } else {
-            return _nameSpaceProvider.pathToPnfsid(Subjects.ROOT, s, true);
+            return _nameSpaceProvider.pathToPnfsid(Subjects.ROOT, Restrictions.none(), s, true);
         }
     }
 
@@ -255,7 +256,7 @@ public class AclAdmin
         throws CacheException
     {
         FileAttributes attributes =
-            _nameSpaceProvider.getFileAttributes(Subjects.ROOT, pnfsId,
+            _nameSpaceProvider.getFileAttributes(Subjects.ROOT, Restrictions.none(), pnfsId,
                                                  EnumSet.of(FileAttribute.TYPE));
         switch (attributes.getFileType()) {
         case DIR:
