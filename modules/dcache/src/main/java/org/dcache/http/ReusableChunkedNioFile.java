@@ -3,6 +3,8 @@ package org.dcache.http;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.stream.ChunkedInput;
 
 import java.nio.ByteBuffer;
@@ -26,7 +28,7 @@ import org.dcache.pool.repository.RepositoryChannel;
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-public class ReusableChunkedNioFile implements ChunkedInput<ByteBuf>
+public class ReusableChunkedNioFile implements ChunkedInput<HttpContent>
 {
     private final RepositoryChannel _channel;
     private final long _endOffset;
@@ -88,7 +90,7 @@ public class ReusableChunkedNioFile implements ChunkedInput<ByteBuf>
      * @return ChannelBuffer containing the read bytes
      */
     @Override
-    public ByteBuf readChunk(ChannelHandlerContext ctx) throws Exception
+    public HttpContent readChunk(ChannelHandlerContext ctx) throws Exception
     {
         long offset = _offset;
 
@@ -113,7 +115,7 @@ public class ReusableChunkedNioFile implements ChunkedInput<ByteBuf>
 
         _offset = offset;
 
-        return chunk;
+        return new DefaultHttpContent(chunk);
     }
 
     /**

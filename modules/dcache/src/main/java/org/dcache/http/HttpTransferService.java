@@ -20,6 +20,7 @@ package org.dcache.http;
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.logging.LoggingHandler;
@@ -159,6 +160,7 @@ public class HttpTransferService extends NettyTransferService<HttpProtocolInfo>
                                               0,
                                               clientIdleTimeout,
                                               clientIdleTimeoutUnit));
+        pipeline.addLast("compress", new HttpContentCompressor());
         pipeline.addLast("chunkedWriter", new ChunkedWriteHandler());
 
         if (!customHeaders.isEmpty()) {

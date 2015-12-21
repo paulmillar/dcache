@@ -15,8 +15,10 @@ import io.milton.http.Request;
 import io.milton.http.ResourceFactory;
 import io.milton.resource.Resource;
 import io.milton.servlet.ServletRequest;
+import io.milton.servlet.ServletResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import org.eclipse.jetty.http.HttpHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Required;
@@ -26,6 +28,7 @@ import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
 
 import javax.security.auth.Subject;
+import javax.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,6 +106,7 @@ import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.dcache.namespace.FileAttribute.*;
 import static org.dcache.namespace.FileType.*;
+import static org.dcache.webdav.DcacheFileResource.dispositionFor;
 
 /**
  * This ResourceFactory exposes the dCache name space through the
@@ -744,6 +749,17 @@ public class DcacheResourceFactory
         return uri;
     }
 
+    public static boolean isCompressionExpected()
+    {
+        HttpServletRequest request = ServletRequest.getRequest();
+
+        String acceptEncoding = request.getHeader("Accept-Encoding");
+
+        // Disable compression for secure communication: BREACH vulnerability.
+        return !request.isSecure() && acceptEncoding != null &&
+                (acceptEncoding.contains("gzip") || acceptEncoding.contains("deflate"));
+    }
+
 
     /**
      * Reads the content of a file. The door will relay all data from
@@ -754,9 +770,17 @@ public class DcacheResourceFactory
             throws CacheException, InterruptedException, IOException,
                    URISyntaxException
     {
+        Map<String,String> headers = new HashMap<>();
+        if (range != null) {
+            headers.put("Range", String.format("bytes=%d-%d", range.getStart(), range.getFinish()));
+        }
+        if (isCompressionExpected()) {
+            headers.put("Accept-Encoding",
+                    ServletRequest.getRequest().getHeader("Accept-Encoding"));
+        }
         ReadTransfer transfer = beginRead(path, pnfsid, true, null);
         try {
-            transfer.relayData(outputStream, range);
+            transfer.relayData(outputStream, headers);
         } catch (CacheException e) {
             transfer.notifyBilling(e.getRc(), e.getMessage());
             throw e;
@@ -1306,7 +1330,7 @@ public class DcacheResourceFactory
             }
         }
 
-        public void relayData(OutputStream outputStream, io.milton.http.Range range)
+        public void relayData(OutputStream outputStream, Map<String,String> headers)
             throws IOException, CacheException, InterruptedException
         {
             setStatus("Mover " + getPool() + "/" + getMoverId() +
@@ -1317,11 +1341,10 @@ public class DcacheResourceFactory
                     (HttpURLConnection) url.openConnection();
                 try {
                     connection.setRequestProperty("Connection", "Close");
-                    if (range != null) {
-                        connection.addRequestProperty("Range", String.format("bytes=%d-%d", range.getStart(), range.getFinish()));
-                    }
-
+                    headers.entrySet().stream().forEach(e -> connection.setRequestProperty(e.getKey(), e.getValue()));
                     connection.connect();
+                    ServletResponse.getResponse().setHeader("Content-Encoding",
+                            connection.getHeaderField("Content-Encoding"));
                     try (InputStream inputStream = connection
                             .getInputStream()) {
                         setStatus("Mover " + getPool() + "/" + getMoverId() +

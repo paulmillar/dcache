@@ -16,6 +16,7 @@ import io.milton.servlet.ServletRequest;
 import io.milton.servlet.ServletResponse;
 import org.eclipse.jetty.io.EofException;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.xml.namespace.QName;
 
 import java.io.IOException;
@@ -149,7 +150,7 @@ public class DcacheFileResource
     @Override
     public Long getContentLength()
     {
-        return _attributes.getSizeIfPresent().orNull();
+        return DcacheResourceFactory.isCompressionExpected() ? null : _attributes.getSizeIfPresent().orNull();
     }
 
     public static HttpProtocolInfo.Disposition dispositionFor(String action)
