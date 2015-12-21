@@ -31,7 +31,7 @@ public enum Activity
      * <p>
      * This Activity is undefined against a non-directory item.
      */
-    LIST(false),
+    LIST,
 
     /**
      * Read the contents of the target.  For files, this represents the
@@ -41,7 +41,7 @@ public enum Activity
      * <p>
      * This Activity is undefined against a directory.
      */
-    DOWNLOAD(false),
+    DOWNLOAD,
 
     /**
      * Manage existing content.  The target of this action is always a
@@ -53,7 +53,7 @@ public enum Activity
      * <p>
      * This Activity is undefined against a non-directory item.
      */
-    MANAGE(true),
+    MANAGE,
 
     /**
      * Create a new file or symbolic link within dCache.  Note that creating
@@ -62,36 +62,24 @@ public enum Activity
      * <p>
      * This Activity is undefined against a non-directory item.
      */
-    UPLOAD(true),
+    UPLOAD,
 
     /**
      * Remove the target.  The target can be any directory item: file, symbolic
      * link or directory.  Note that if a user has MANAGE and limited DELETE
      * then they can DELETE all items they can MANAGE.
      */
-    DELETE(true),
+    DELETE,
 
     /**
      * Read any metadata associated with the target.  For a directory, this
      * also represents attempts for that user to change directory.
      */
-    READ_METADATA(false),
+    READ_METADATA,
 
     /**
      * Update metadata about the target.  This includes modifying a file's
      * permissions, ownership, ACL, etc.
      */
-    UPDATE_METADATA(true);
-
-    private final boolean _isModifying;
-
-    Activity(boolean isModifying)
-    {
-        _isModifying = isModifying;
-    }
-
-    public boolean isModifying()
-    {
-        return _isModifying;
-    }
+    UPDATE_METADATA;
 }

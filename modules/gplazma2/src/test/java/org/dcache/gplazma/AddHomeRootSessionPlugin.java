@@ -7,10 +7,8 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.dcache.auth.UserNamePrincipal;
-import org.dcache.auth.attributes.Unrestricted;
 import org.dcache.auth.attributes.HomeDirectory;
 import org.dcache.auth.attributes.Restriction;
-import org.dcache.auth.attributes.ReadOnly;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.gplazma.plugins.GPlazmaSessionPlugin;

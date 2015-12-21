@@ -15,7 +15,6 @@ import org.dcache.auth.FQANPrincipal;
 import org.dcache.auth.GidPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
 import org.dcache.auth.UidPrincipal;
-import org.dcache.auth.attributes.Unrestricted;
 import org.dcache.auth.attributes.HomeDirectory;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.Restrictions;

@@ -3,17 +3,13 @@ package org.dcache.auth;
 import javax.annotation.Nonnull;
 import javax.security.auth.Subject;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
-import org.dcache.auth.attributes.DenyAll;
 import org.dcache.auth.attributes.LoginAttribute;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.Restrictions;
-import org.dcache.auth.attributes.Unrestricted;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.filter;
@@ -93,18 +89,16 @@ public class LoginReply
         Restriction restriction = null;
 
         for (Restriction r : restrictions) {
-            if (r instanceof DenyAll) {
-                return Restrictions.denyAll();
-            }
-
-            if (r instanceof Unrestricted) {
-                continue;
-            }
-
             if (restriction == null) {
                 restriction = r;
             } else {
-                return Restrictions.concat(restrictions);
+                if (restriction.isSubsumedBy(r)) {
+                    restriction = r;
+                } else if (r.isSubsumedBy(restriction)) {
+                    // skip r, restriction is already more restrictive.
+                } else {
+                    return Restrictions.concat(restrictions);
+                }
             }
         }
 

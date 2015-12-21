@@ -17,14 +17,15 @@
  */
 package org.dcache.auth.attributes;
 
-import com.google.common.collect.ImmutableList;
-
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
 import diskCacheV111.util.FsPath;
 
+import static org.dcache.auth.attributes.Activity.*;
 import static java.util.Arrays.asList;
 
 /**
@@ -32,9 +33,14 @@ import static java.util.Arrays.asList;
  */
 public class Restrictions
 {
-    private static final Restriction UNRESTRICTED = new Unrestricted();
-    private static final Restriction DENY_ALL = new DenyAll();
-    private static final Restriction READ_ONLY = new ReadOnly();
+    private static final Restriction UNRESTRICTED =
+            new OnlyAllowedActivity(EnumSet.allOf(Activity.class));
+
+    private static final Restriction DENY_ALL =
+            new OnlyAllowedActivity(EnumSet.noneOf(Activity.class));
+
+    private static final Restriction READ_ONLY =
+            new OnlyAllowedActivity(EnumSet.of(LIST, DOWNLOAD, READ_METADATA));
 
     private Restrictions()
     {
@@ -92,7 +98,13 @@ public class Restrictions
         CompositeRestrictionBuilder composite = new CompositeRestrictionBuilder();
 
         for (Restriction r : restrictions) {
-            composite.with(r);
+            if (r instanceof CompositeRestriction) {
+                for (Restriction inner : ((CompositeRestriction) r).restrictions) {
+                    composite.with(inner);
+                }
+            } else {
+                composite.with(r);
+            }
         }
 
         return composite.build();
@@ -103,28 +115,24 @@ public class Restrictions
      */
     private static class CompositeRestrictionBuilder
     {
-        private List<Restriction> restrictions = new ArrayList<>();
+        private final List<Restriction> restrictions = new ArrayList<>();
 
-        private void with(Restriction r)
+        private void with(Restriction newRestriction)
         {
-            if (r instanceof Unrestricted) {
-                return;
+            Iterator<Restriction> i = restrictions.iterator();
+            while (i.hasNext()) {
+                Restriction existing = i.next();
+
+                if (newRestriction.isSubsumedBy(existing)) {
+                    return;
+                }
+
+                if (existing.isSubsumedBy(newRestriction)) {
+                    i.remove();
+                }
             }
 
-            if (r instanceof DenyAll) {
-                restrictions = ImmutableList.of(DENY_ALL);
-                return;
-            }
-
-            if (restrictions.size() == 1 && restrictions.get(0) == DENY_ALL) {
-                return;
-            }
-
-            if (r instanceof CompositeRestriction) {
-                restrictions.addAll(((CompositeRestriction)r).restrictions);
-            } else {
-                restrictions.add(r);
-            }
+            restrictions.add(newRestriction);
         }
 
         private Restriction build()

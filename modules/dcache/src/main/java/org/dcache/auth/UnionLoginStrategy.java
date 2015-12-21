@@ -16,8 +16,6 @@ import java.util.Set;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PermissionDeniedCacheException;
 
-import org.dcache.auth.attributes.Unrestricted;
-import org.dcache.auth.attributes.ReadOnly;
 import org.dcache.auth.attributes.Restrictions;
 
 /**
