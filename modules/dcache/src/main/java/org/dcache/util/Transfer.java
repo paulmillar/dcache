@@ -84,6 +84,12 @@ public class Transfer implements Comparable<Transfer>
             new TimebasedCounter();
 
     private static final BaseEncoding SESSION_ENCODING = BaseEncoding.base64().omitPadding();
+    public static final EnumSet<FileAttribute> REQUIRED_ATTRIBUTES;
+
+    static {
+        REQUIRED_ATTRIBUTES = EnumSet.of(PNFSID, TYPE, STORAGEINFO, SIZE);
+        REQUIRED_ATTRIBUTES.addAll(PoolMgrSelectReadPoolMsg.getRequiredAttributes());
+    }
 
     protected final PnfsHandler _pnfs;
     protected final long _startedAt;
@@ -296,7 +302,7 @@ public class Transfer implements Comparable<Transfer>
     }
 
     /**
-     * Sets the FileAttributes of the file to transfer.
+     * Gets the FileAttributes of the file to transfer.
      */
     public synchronized FileAttributes getFileAttributes()
     {
@@ -701,9 +707,8 @@ public class Transfer implements Comparable<Transfer>
 
     private ListenableFuture<Void> readNameSpaceEntryAsync(boolean allowWrite, long timeout)
     {
-        Set<FileAttribute> attr = EnumSet.of(PNFSID, TYPE, STORAGEINFO, SIZE);
+        Set<FileAttribute> attr = REQUIRED_ATTRIBUTES.clone();
         attr.addAll(_additionalAttributes);
-        attr.addAll(PoolMgrSelectReadPoolMsg.getRequiredAttributes());
         Set<AccessMask> mask;
         if (allowWrite) {
             mask = EnumSet.of(AccessMask.READ_DATA, AccessMask.WRITE_DATA);
@@ -726,27 +731,40 @@ public class Transfer implements Comparable<Transfer>
         return CellStub.transform(reply,
                                   (PnfsGetFileAttributes msg) ->
                                   {
-                                      FileAttributes attributes = msg.getFileAttributes();
-                                     /* We can only transfer regular files.
-                                      */
-                                      FileType type = attributes.getFileType();
-                                      if (type == FileType.DIR || type == FileType.SPECIAL) {
-                                          throw new NotFileCacheException("Not a regular file");
-                                      }
-
-                                     /* I/O mode must match completeness of the file.
-                                      */
-                                      if (!attributes.getStorageInfo().isCreatedOnly()) {
-                                          setWrite(false);
-                                      } else if (allowWrite) {
-                                          setWrite(true);
-                                      } else {
-                                          throw new FileIsNewCacheException();
-                                      }
-
-                                      setFileAttributes(attributes);
+                                      acceptFileAttributes(msg.getFileAttributes(), allowWrite);
                                       return immediateFuture(null);
                                   });
+    }
+
+    /**
+     * Alternative starting point when file attributes are already known.
+     */
+    public void acceptFileAttributes(FileAttributes attributes, boolean allowWrite)
+            throws NotFileCacheException, FileIsNewCacheException
+    {
+        if (!attributes.isDefined(REQUIRED_ATTRIBUTES)) {
+            throw new IllegalArgumentException("missing attributes: " +
+                    REQUIRED_ATTRIBUTES.clone().removeAll(attributes.getDefinedAttributes()));
+        }
+
+        /* We can only transfer regular files.
+         */
+        FileType type = attributes.getFileType();
+        if (type == FileType.DIR || type == FileType.SPECIAL) {
+          throw new NotFileCacheException("Not a regular file");
+        }
+
+        /* I/O mode must match completeness of the file.
+         */
+        if (!attributes.getStorageInfo().isCreatedOnly()) {
+            setWrite(false);
+        } else if (allowWrite) {
+            setWrite(true);
+        } else {
+            throw new FileIsNewCacheException();
+        }
+
+        setFileAttributes(attributes);
     }
 
     /**
