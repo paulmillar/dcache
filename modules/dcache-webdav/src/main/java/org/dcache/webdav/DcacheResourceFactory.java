@@ -74,7 +74,6 @@ import diskCacheV111.vehicles.ProtocolInfo;
 
 import dmg.cells.nucleus.AbstractCellComponent;
 import dmg.cells.nucleus.CellCommandListener;
-import dmg.cells.nucleus.CellMessage;
 import dmg.cells.nucleus.CellMessageReceiver;
 import dmg.cells.nucleus.CellPath;
 import dmg.cells.services.login.LoginManagerChildrenInfo;
@@ -82,7 +81,6 @@ import dmg.cells.services.login.LoginManagerChildrenInfo;
 import org.dcache.auth.SubjectWrapper;
 import org.dcache.auth.Subjects;
 import org.dcache.auth.attributes.Restriction;
-import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.CellStub;
 import org.dcache.missingfiles.AlwaysFailMissingFileStrategy;
 import org.dcache.missingfiles.MissingFileStrategy;
@@ -586,7 +584,7 @@ public class DcacheResourceFactory
         try {
             while(true) {
                 try {
-                    PnfsHandler pnfs = new PnfsHandler(_pnfs, subject);
+                    PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, getRestriction());
                     Set<FileAttribute> requestedAttributes =
                             buildRequestedAttributes();
                     FileAttributes attributes =
@@ -922,7 +920,7 @@ public class DcacheResourceFactory
     public void deleteFile(FileAttributes attributes, FsPath path)
         throws CacheException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject());
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
         pnfs.deletePnfsEntry(attributes.getPnfsId(), path.toString(), EnumSet.of(REGULAR, LINK));
         sendRemoveInfoToBilling(attributes, path);
     }
@@ -946,7 +944,7 @@ public class DcacheResourceFactory
     public void deleteDirectory(PnfsId pnfsid, FsPath path)
         throws CacheException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject());
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
         pnfs.deletePnfsEntry(pnfsid, path.toString(),
                              EnumSet.of(DIR));
     }
@@ -958,7 +956,7 @@ public class DcacheResourceFactory
         makeDirectory(FileAttributes parent, FsPath path)
         throws CacheException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject());
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
         PnfsCreateEntryMessage reply =
             pnfs.createPnfsDirectory(path.toString());
         FileAttributes attributes =
@@ -970,7 +968,7 @@ public class DcacheResourceFactory
     public void move(FsPath sourcePath, PnfsId pnfsId, FsPath newPath)
         throws CacheException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject());
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
         pnfs.renameEntry(pnfsId, sourcePath.toString(), newPath.toString(), true);
     }
 

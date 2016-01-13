@@ -66,7 +66,6 @@ documents or software obtained from this server.
 
 package org.dcache.srm;
 
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.CheckedFuture;
 
 import javax.annotation.Nonnull;
@@ -76,7 +75,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
-import org.dcache.auth.attributes.Activity;
 import org.dcache.srm.v2_2.TMetaDataSpace;
 
 

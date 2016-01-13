@@ -17,7 +17,6 @@ import java.util.List;
 
 import diskCacheV111.srm.RequestFileStatus;
 
-import org.dcache.srm.AbstractStorageElement;
 import org.dcache.srm.FileMetaData;
 import org.dcache.srm.SRM;
 import org.dcache.srm.SRMAuthorizationException;
@@ -359,8 +358,6 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                 throws SRMException, URISyntaxException
         {
                 List<FileMetaData> directoryList;
-                AbstractStorageElement storage = getStorage();
-                SRMUser user = getUser();
                 //
                 // simplify things for the most common case when people perform
                 // ls on directory w/o specifying recursionDepth
@@ -414,8 +411,6 @@ public final class LsFileRequest extends FileRequest<LsRequest> {
                                                     boolean longFormat)
                 throws SRMException, URISyntaxException
         {
-            AbstractStorageElement storage = getStorage();
-            SRMUser user = getUser();
                 if (!fmd.isDirectory || depth >= recursionDepth) {
                     return;
                 }

@@ -50,9 +50,11 @@ import diskCacheV111.util.PnfsHandler;
 
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.FileType;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.webdav.SecurityFilter;
 import org.dcache.webdav.transfer.RemoteTransferHandler.TransferType;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -378,7 +380,7 @@ public class CopyFilter implements Filter
      */
     private void checkPath(FsPath path) throws ErrorResponseException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject());
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
 
         FileAttributes attributes;
         try {
@@ -407,5 +409,11 @@ public class CopyFilter implements Filter
     private Subject getSubject()
     {
         return Subject.getSubject(AccessController.getContext());
+    }
+
+    private Restriction getRestriction()
+    {
+        HttpServletRequest servletRequest = ServletRequest.getRequest();
+        return (Restriction) servletRequest.getAttribute(SecurityFilter.DCACHE_RESTRICTION_ATTRIBUTE);
     }
 }

@@ -98,10 +98,6 @@ public class PnfsHandler
         _poolName = poolName;
     }
 
-    public PnfsHandler(PnfsHandler handler, Subject subject)
-    {
-        this(handler, subject, null);//FIXME: REMOVE THIS CONSTRUCTOR.
-    }
     /**
      * Copy constructor. The primary purpose is to create session
      * specific PnfsHandlers with a session specific subject. Notice

@@ -130,9 +130,8 @@ public class SrmExtendFileLifeTime
         status.setSurl(surl);
         TReturnStatus returnStatus;
         try {
-            URI otherSurl = URI.create(surl.toString());
             long lifetimeLeftInMillis =
-                    storage.srmExtendSurlLifetime(user, otherSurl, newLifetimeInMillis);
+                    storage.srmExtendSurlLifetime(user, URI.create(surl.toString()), newLifetimeInMillis);
             status.setFileLifetime(toSeconds(lifetimeLeftInMillis));
             returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);
         } catch (SRMInternalErrorException e) {

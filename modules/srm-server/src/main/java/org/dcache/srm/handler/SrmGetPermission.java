@@ -77,7 +77,6 @@ public class SrmGetPermission
             TPermissionReturn p = new TPermissionReturn();
             TReturnStatus returnStatus;
             try {
-                URI surl = URI.create(surls[i].toString());
                 FileMetaData fmd = storage.getFileMetaData(user, URI.create(surls[i].toString()), false);
                 copyPermissions(fmd, p);
                 returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);

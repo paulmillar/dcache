@@ -14,6 +14,7 @@ import org.dcache.srm.SRMInternalErrorException;
 import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.SRMUser;
+import org.dcache.srm.request.RequestCredential;
 import org.dcache.srm.v2_2.ArrayOfTSURLPermissionReturn;
 import org.dcache.srm.v2_2.SrmCheckPermissionRequest;
 import org.dcache.srm.v2_2.SrmCheckPermissionResponse;
@@ -74,8 +75,7 @@ public class SrmCheckPermission
             TReturnStatus returnStatus;
             TPermissionMode pm = null;
             try {
-                URI surl = URI.create(surls[i].toString());
-                FileMetaData fmd = storage.getFileMetaData(user, surl, false);
+                FileMetaData fmd = storage.getFileMetaData(user, URI.create(surls[i].toString()), false);
                 int mode = fmd.permMode;
                 if (fmd.isOwner(user)) {
                     pm = PermissionMaskToTPermissionMode.maskToTPermissionMode(((mode >> 6) & 0x7));

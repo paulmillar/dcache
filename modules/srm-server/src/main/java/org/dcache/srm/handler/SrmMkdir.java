@@ -52,8 +52,7 @@ public class SrmMkdir
     {
         TReturnStatus returnStatus;
         try {
-            URI url = URI.create(request.getSURL().toString());
-            storage.createDirectory(user, url);
+            storage.createDirectory(user, URI.create(request.getSURL().toString()));
             returnStatus = new TReturnStatus(TStatusCode.SRM_SUCCESS, null);
         } catch (SRMInternalErrorException e) {
             LOGGER.error(e.getMessage());

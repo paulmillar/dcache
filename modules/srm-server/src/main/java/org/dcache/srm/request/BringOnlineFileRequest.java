@@ -329,8 +329,7 @@ public final class BringOnlineFileRequest extends FileRequest<BringOnlineRequest
     }
 
     @Override
-    public final void run() throws SRMFileBusyException, IllegalStateTransition,
-            SRMInvalidRequestException, SRMAuthorizationException, SRMInvalidPathException
+    public final void run() throws SRMFileBusyException, IllegalStateTransition, SRMInvalidRequestException
     {
         logger.trace("run");
         if (!getState().isFinal() && getPinId() == null) {

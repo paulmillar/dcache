@@ -170,7 +170,6 @@ import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Origin;
 import org.dcache.auth.Subjects;
-import org.dcache.auth.attributes.Activity;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.AbstractMessageCallback;
@@ -1212,11 +1211,12 @@ public final class Storage
     }
 
     @Override
-    public void setFileMetaData(SRMUser user, FileMetaData fmd)
+    public void setFileMetaData(SRMUser abstractUser, FileMetaData fmd)
         throws SRMException
     {
+        DcacheUser user = asDcacheUser(abstractUser);
         PnfsHandler handler =
-            new PnfsHandler(_pnfs, asDcacheUser(user).getSubject());
+            new PnfsHandler(_pnfs, user.getSubject(), user.getRestriction());
 
         try {
             if (!(fmd instanceof DcacheFileMetaData)) {
@@ -1259,7 +1259,7 @@ public final class Storage
     private FileMetaData getFileMetaData(DcacheUser user, boolean checkReadPermissions, FsPath path) throws SRMException
     {
         PnfsHandler handler =
-            new PnfsHandler(_pnfs, user.getSubject());
+            new PnfsHandler(_pnfs, user.getSubject(), user.getRestriction());
         try {
             /* Fetch file attributes.
              */
@@ -1502,7 +1502,7 @@ public final class Storage
 
     private void removeSubdirectories(Subject subject, Restriction restriction, FsPath path) throws SRMException
     {
-        PnfsHandler pnfs = new PnfsHandler(_pnfs, subject);
+        PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, restriction);
 
         FileAttributes parentAttributes;
         FileAttributes attributes;
@@ -1565,7 +1565,7 @@ public final class Storage
         }
 
         try {
-            PnfsHandler pnfs = new PnfsHandler(_pnfs, subject);
+            PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, restriction);
             pnfs.deletePnfsEntry(path.toString(), EnumSet.of(FileType.DIR));
         } catch (TimeoutCacheException e) {
             throw new SRMInternalErrorException("Name space timeout");
@@ -1590,13 +1590,13 @@ public final class Storage
     }
 
     @Override
-    public void createDirectory(SRMUser user, URI surl)
+    public void createDirectory(SRMUser abstractUser, URI surl)
         throws SRMException
     {
         _log.debug("Storage.createDirectory");
 
-        Subject subject = asDcacheUser(user).getSubject();
-        PnfsHandler handler = new PnfsHandler(_pnfs, subject);
+        DcacheUser user = asDcacheUser(abstractUser);
+        PnfsHandler handler = new PnfsHandler(_pnfs, user.getSubject(), user.getRestriction());
 
         try {
             handler.createPnfsDirectory(config.getPath(surl).toString());
@@ -1619,11 +1619,11 @@ public final class Storage
     }
 
     @Override
-    public void moveEntry(SRMUser user, URI from, URI to)
+    public void moveEntry(SRMUser abstractUser, URI from, URI to)
         throws SRMException
     {
-        Subject subject = asDcacheUser(user).getSubject();
-        PnfsHandler handler = new PnfsHandler(_pnfs, subject);
+        DcacheUser user = asDcacheUser(abstractUser);
+        PnfsHandler handler = new PnfsHandler(_pnfs, user.getSubject(), user.getRestriction());
         FsPath fromPath = config.getPath(from);
         FsPath toPath = config.getPath(to);
 
@@ -2331,7 +2331,7 @@ public final class Storage
      * includes checking lookup privileges. The file must exist for
      * the call to succeed.
      *
-     * @param user The user ID
+     * @param abstractUser The user ID
      * @param surl The path to the file
      * @throws SRMAuthorizationException if the user lacks write privileges
      *         for this path.
@@ -2339,13 +2339,14 @@ public final class Storage
      * @throws SRMInternalErrorException for transient errors
      * @throws SRMException for other errors
      */
-    private void checkWritePrivileges(SRMUser user, URI surl)
+    private void checkWritePrivileges(SRMUser abstractUser, URI surl)
         throws SRMException
     {
         try {
-            Subject subject = asDcacheUser(user).getSubject();
+            DcacheUser user = asDcacheUser(abstractUser);
             FsPath path = config.getPath(surl);
-            PnfsHandler handler = new PnfsHandler(_pnfs, subject);
+            PnfsHandler handler = new PnfsHandler(_pnfs, user.getSubject(),
+                                                  user.getRestriction());
             handler.getFileAttributes(path.toString(),
                                       EnumSet.noneOf(FileAttribute.class),
                                       EnumSet.of(AccessMask.WRITE_DATA), false);

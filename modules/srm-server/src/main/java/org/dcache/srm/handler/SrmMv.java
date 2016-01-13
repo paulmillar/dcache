@@ -57,7 +57,6 @@ public class SrmMv
         try {
             URI to_surl = URI.create(request.getToSURL().toString());
             URI from_surl = URI.create(request.getFromSURL().toString());
-
             // [SRM 2.2, 4.6.3]     SRM_INVALID_PATH: status of fromSURL is SRM_FILE_BUSY.
             // [SRM 2.2, 4.6.2, c)] srmMv must fail on SURL that its status is SRM_FILE_BUSY,
             //                      and SRM_FILE_BUSY must be returned.

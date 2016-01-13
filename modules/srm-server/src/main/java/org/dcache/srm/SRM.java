@@ -464,19 +464,13 @@ public class SRM {
         }
     }
 
-    public void advisoryDelete(final SRMUser user, String[] SURLS)
-            throws SRMAuthorizationException, SRMInvalidPathException
-    {
+    public void advisoryDelete(final SRMUser user, String[] SURLS) {
         logger.debug("SRM.advisoryDelete");
         if (user == null) {
             String error = "advisoryDelete: user is unknown," +
                     " user needs authorization to delete ";
             logger.error(error);
             throw new IllegalArgumentException(error);
-        }
-
-        for (String surlArg : SURLS) {
-            URI surl = URI.create(surlArg);
         }
 
         TheAdvisoryDeleteCallbacks callabacks_array[] =
@@ -591,7 +585,6 @@ public class SRM {
                     }
                 }
             }
-
             long lifetime = configuration.getCopyLifetime();
             if (cred_lifetime < lifetime) {
                 logger.debug("credential lifetime is less than default lifetime, using credential lifetime =" + cred_lifetime);
@@ -714,9 +707,7 @@ public class SRM {
      *         the array of SURLs of files of interest
      * @return FileMetaData array assosiated with these SURLs
      */
-    public FileMetaData[] getFileMetaData(SRMUser user, String[] SURLS)
-            throws SRMAuthorizationException, SRMInvalidPathException
-    {
+    public FileMetaData[] getFileMetaData(SRMUser user, String[] SURLS) {
         StringBuilder sb = new StringBuilder();
         sb.append("getFileMetaData(");
         if (SURLS == null) {
@@ -731,10 +722,6 @@ public class SRM {
         }
         sb.append(")");
         logger.debug(sb.toString());
-
-        for (String surlParam : SURLS) {
-            URI surl = URI.create(surlParam);
-        }
 
         FileMetaData[] fmds = new FileMetaData[len];
         // call getFileMetaData(String path) for each SURL in array
@@ -884,7 +871,6 @@ public class SRM {
                 errorsb.append(']');
                 return createFailedRequestStatus(errorsb.toString());
             }
-
             // create a new put request
             PutRequest r = new PutRequest(user, dests_urls, sizes,
                     wantPerm, protocols, configuration.getPutLifetime(),
