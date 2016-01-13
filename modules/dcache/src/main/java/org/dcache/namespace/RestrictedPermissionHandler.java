@@ -105,7 +105,7 @@ public class RestrictedPermissionHandler
                                     FsPath path,
                                     FileAttributes attr)
     {
-        if (restriction.isRestricted(Activity.UPLOAD, path.getParent())) {
+        if (restriction.isRestricted(Activity.UPLOAD, path)) {
             return AccessType.ACCESS_DENIED;
         }
 
@@ -159,7 +159,7 @@ public class RestrictedPermissionHandler
                                      FsPath path,
                                      FileAttributes parentAttr)
     {
-        if (restriction.isRestricted(Activity.UPLOAD, path.getParent())) {
+        if (restriction.isRestricted(Activity.UPLOAD, path)) {
             return AccessType.ACCESS_DENIED;
         }
 

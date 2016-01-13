@@ -19,6 +19,7 @@ package org.dcache.auth.attributes;
 
 
 import java.util.EnumSet;
+import java.util.Iterator;
 
 import diskCacheV111.util.FsPath;
 
@@ -76,6 +77,16 @@ public class OnlyAllowedActivity implements Restriction
         if (denied.size() == Activity.values().length) {
             return "FullyRestricted";
         }
-        return "Restrict" + denied.toString();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Restrict[");
+        Iterator<Activity> i = denied.iterator();
+        for (;;) {
+            sb.append(i.next());
+            if (!i.hasNext()) {
+                return sb.append(']').toString();
+            }
+            sb.append(',');
+        }
     }
 }

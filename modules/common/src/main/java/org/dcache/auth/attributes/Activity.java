@@ -57,10 +57,9 @@ public enum Activity
 
     /**
      * Create a new file or symbolic link within dCache.  Note that creating
-     * new directory requires MANAGE.  The target is the parent directory of
-     * the new item.
+     * new directory requires MANAGE.  The target is the path of the new item.
      * <p>
-     * This Activity is undefined against a non-directory item.
+     * This Activity is undefined against a directory item.
      */
     UPLOAD,
 
