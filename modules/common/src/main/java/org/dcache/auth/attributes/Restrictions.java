@@ -18,7 +18,6 @@
 package org.dcache.auth.attributes;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -33,14 +32,9 @@ import static java.util.Arrays.asList;
  */
 public class Restrictions
 {
-    private static final Restriction UNRESTRICTED =
-            new OnlyAllowedActivity(EnumSet.allOf(Activity.class));
-
-    private static final Restriction DENY_ALL =
-            new OnlyAllowedActivity(EnumSet.noneOf(Activity.class));
-
-    private static final Restriction READ_ONLY =
-            new OnlyAllowedActivity(EnumSet.of(LIST, DOWNLOAD, READ_METADATA));
+    private static final Restriction UNRESTRICTED = OnlyAllowedActivity.restrictNone();
+    private static final Restriction DENY_ALL = OnlyAllowedActivity.restrictAll();
+    private static final Restriction READ_ONLY = OnlyAllowedActivity.restrict(DELETE, MANAGE, UPDATE_METADATA, UPLOAD);
 
     private Restrictions()
     {
@@ -82,7 +76,8 @@ public class Restrictions
             if (restrictions [1].isSubsumedBy(restrictions [0])) {
                 return restrictions [0];
             }
-            return concat(asList(restrictions));
+
+            // Fall through for default behaviour
 
         default:
             return concat(asList(restrictions));
@@ -216,10 +211,10 @@ public class Restrictions
             return true;
         }
 
-        private boolean subsumes(Restriction r)
+        private boolean subsumes(Restriction other)
         {
-            for (Restriction o : restrictions) {
-                if (r.isSubsumedBy(o)) {
+            for (Restriction r : restrictions) {
+                if (other.isSubsumedBy(r)) {
                     return true;
                 }
             }

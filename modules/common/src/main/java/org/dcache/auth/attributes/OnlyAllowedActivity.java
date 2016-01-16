@@ -33,9 +33,28 @@ public class OnlyAllowedActivity implements Restriction
 
     private final EnumSet<Activity> denied;
 
-    protected OnlyAllowedActivity(EnumSet<Activity> allowed)
+    public static OnlyAllowedActivity restrict(Activity... denied)
     {
-        denied = EnumSet.complementOf(allowed);
+        EnumSet<Activity> d = denied.length > 0 ?
+                EnumSet.of(denied[0], denied) :
+                EnumSet.noneOf(Activity.class);
+
+        return new OnlyAllowedActivity(d);
+    }
+
+    public static OnlyAllowedActivity restrictAll()
+    {
+        return new OnlyAllowedActivity(EnumSet.allOf(Activity.class));
+    }
+
+    public static OnlyAllowedActivity restrictNone()
+    {
+        return new OnlyAllowedActivity(EnumSet.noneOf(Activity.class));
+    }
+
+    private OnlyAllowedActivity(EnumSet<Activity> denied)
+    {
+        this.denied = denied;
     }
 
     @Override
