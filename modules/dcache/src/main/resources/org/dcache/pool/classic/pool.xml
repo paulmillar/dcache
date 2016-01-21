@@ -392,6 +392,7 @@
       <property name="namespaceMode" value="${pool.authn.namespace-mode}"/>
       <property name="crlCheckingMode" value="${pool.authn.crl-mode}"/>
       <property name="ocspCheckingMode" value="${pool.authn.ocsp-mode}"/>
+      <property name="httpProxy" value="${pool.mover.http-3rd-party.proxy}"/>
   </bean>
 
   <bean id="banned-ciphers" class="org.dcache.util.Crypto"

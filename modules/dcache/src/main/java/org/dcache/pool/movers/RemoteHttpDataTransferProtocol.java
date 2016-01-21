@@ -3,9 +3,15 @@ package org.dcache.pool.movers;
 import com.google.common.base.Optional;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.AuthenticationStrategy;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
@@ -13,13 +19,16 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.InputStreamEntity;
+import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.ProxyAuthenticationStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.channels.Channels;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
@@ -31,8 +40,6 @@ import diskCacheV111.util.ChecksumFactory;
 import diskCacheV111.util.ThirdPartyTransferFailedCacheException;
 import diskCacheV111.vehicles.ProtocolInfo;
 import diskCacheV111.vehicles.RemoteHttpDataTransferProtocolInfo;
-
-import dmg.cells.nucleus.CellEndpoint;
 
 import org.dcache.pool.movers.MoverChannel.AllocatorMode;
 import org.dcache.pool.repository.Allocator;
@@ -153,6 +160,10 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     protected static final String USER_AGENT = "dCache/" +
             Version.of(RemoteHttpDataTransferProtocol.class).getVersion();
 
+    private final HttpHost _proxy;
+
+    private final Credentials _proxyCredentials;
+
     // Pool-supplied factory for on-transfer checksums, null if disabled.
     private ChecksumFactory _onTransfer;
 
@@ -168,9 +179,50 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
 
     private CloseableHttpClient _client;
 
-    public RemoteHttpDataTransferProtocol(CellEndpoint cell)
+    public RemoteHttpDataTransferProtocol(String proxy) throws CacheException
     {
-        // constructor needed by Pool mover contract.
+        if (proxy != null) {
+            if (!proxy.contains("://")) {
+                int colon = proxy.indexOf(':');
+                if (colon == -1) {
+                    _proxy = new HttpHost(proxy, 80, "http");
+                } else {
+                    int port;
+                    try {
+                        port = Integer.parseInt(proxy.substring(colon+1));
+                    } catch (NumberFormatException e) {
+                        throw new CacheException("Invalid proxy port number: " +
+                                e.getMessage());
+                    }
+                    _proxy = new HttpHost(proxy.substring(0, colon), port, "http");
+                }
+                _proxyCredentials = null;
+            } else {
+                URI proxyUri;
+                try {
+                    proxyUri = new URI(proxy);
+                } catch (URISyntaxException e) {
+                    throw new CacheException("Invalid proxy setting: " + e.getMessage());
+                }
+
+                _proxy = new HttpHost(proxyUri.getHost(), proxyUri.getPort(), proxyUri.getScheme());
+
+                String userinfo = proxyUri.getUserInfo();
+                if (userinfo != null) {
+                    int colon = userinfo.indexOf(':');
+                    if (colon >= 0) {
+                        _proxyCredentials = new UsernamePasswordCredentials(userinfo.substring(0, colon), userinfo.substring(colon + 1));
+                    } else {
+                        _proxyCredentials = new UsernamePasswordCredentials(userinfo, null);
+                    }
+                } else {
+                    _proxyCredentials = null;
+                }
+            }
+        } else {
+            _proxy = null;
+            _proxyCredentials = null;
+        }
     }
 
     private static void checkThat(boolean isOk, String message) throws CacheException
@@ -212,7 +264,21 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
 
     protected CloseableHttpClient createHttpClient() throws CacheException
     {
-        return HttpClients.custom().setUserAgent(USER_AGENT).build();
+        CredentialsProvider provider = null;
+        AuthenticationStrategy strategy = null;
+
+        if (_proxy != null && _proxyCredentials != null) {
+            AuthScope scope = new AuthScope(_proxy.getHostName(), _proxy.getPort());
+            provider = new BasicCredentialsProvider();
+            provider.setCredentials(scope, _proxyCredentials);
+            strategy = new ProxyAuthenticationStrategy();
+        }
+
+        return HttpClients.custom()
+                .setProxy(_proxy)
+                .setProxyAuthenticationStrategy(strategy)
+                .setDefaultCredentialsProvider(provider)
+                .setUserAgent(USER_AGENT).build();
     }
 
     private void receiveFile(final RemoteHttpDataTransferProtocolInfo info)

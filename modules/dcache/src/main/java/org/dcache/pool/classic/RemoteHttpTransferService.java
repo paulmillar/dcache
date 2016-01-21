@@ -40,9 +40,13 @@ import org.dcache.pool.movers.MoverProtocol;
 import org.dcache.pool.movers.RemoteHttpDataTransferProtocol;
 import org.dcache.pool.movers.RemoteHttpsDataTransferProtocol;
 
+import static com.google.common.base.Strings.emptyToNull;
+import static com.google.common.base.Strings.nullToEmpty;
+
 public class RemoteHttpTransferService extends AbstractMoverProtocolTransferService
 {
     private String caPath;
+    private String httpProxy;
     private OCSPCheckingMode ocspCheckingMode;
     private CrlCheckingMode crlCheckingMode;
     private NamespaceCheckingMode namespaceMode;
@@ -72,6 +76,17 @@ public class RemoteHttpTransferService extends AbstractMoverProtocolTransferServ
     public void setOcspCheckingMode(OCSPCheckingMode ocspCheckingMode)
     {
         this.ocspCheckingMode = ocspCheckingMode;
+    }
+
+    public String getHttpProxy()
+    {
+        return nullToEmpty(httpProxy);
+    }
+
+    @Required
+    public void setHttpProxy(String proxy)
+    {
+        httpProxy = emptyToNull(proxy);
     }
 
     public CrlCheckingMode getCrlCheckingMode()
@@ -123,9 +138,9 @@ public class RemoteHttpTransferService extends AbstractMoverProtocolTransferServ
     {
         MoverProtocol moverProtocol;
         if (info instanceof RemoteHttpsDataTransferProtocolInfo) {
-            moverProtocol = new RemoteHttpsDataTransferProtocol(getCellEndpoint(), getValidator(), secureRandom);
+            moverProtocol = new RemoteHttpsDataTransferProtocol(httpProxy, getValidator(), secureRandom);
         } else if (info instanceof RemoteHttpDataTransferProtocolInfo) {
-            moverProtocol = new RemoteHttpDataTransferProtocol(getCellEndpoint());
+            moverProtocol = new RemoteHttpDataTransferProtocol(httpProxy);
         } else {
             throw new CacheException(27, "Could not create mover for " + info);
         }

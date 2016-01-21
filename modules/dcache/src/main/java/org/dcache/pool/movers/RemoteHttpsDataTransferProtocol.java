@@ -39,10 +39,10 @@ public class RemoteHttpsDataTransferProtocol extends RemoteHttpDataTransferProto
     private PrivateKey privateKey;
     private X509Certificate[] chain;
 
-    public RemoteHttpsDataTransferProtocol(CellEndpoint cell, X509CertChainValidator validator,
-                                           SecureRandom secureRandom)
+    public RemoteHttpsDataTransferProtocol(String proxy, X509CertChainValidator validator,
+                                           SecureRandom secureRandom) throws CacheException
     {
-        super(cell);
+        super(proxy);
         this.secureRandom = secureRandom;
         this.trustManager = new SSLTrustManager(validator);
     }
