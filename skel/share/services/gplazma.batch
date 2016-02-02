@@ -6,6 +6,8 @@ check -strong gplazma.cell.max-message-threads
 check gplazma.cell.max-messages-queued
 check -strong gplazma.configuration.file
 check -strong gplazma.service.pnfsmanager
+check -string gplazma.voms.save-bad-ac.enable
+check -string gplazma.voms.save-bad-ac.path-prefix
 
 create org.dcache.cells.UniversalSpringCell "${gplazma.cell.name}" \
    "classpath:org/dcache/services/login/gplazma.xml \
