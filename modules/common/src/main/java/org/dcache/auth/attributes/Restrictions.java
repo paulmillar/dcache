@@ -32,9 +32,9 @@ import static java.util.Arrays.asList;
  */
 public class Restrictions
 {
-    private static final Restriction UNRESTRICTED = OnlyAllowedActivity.restrictNone();
-    private static final Restriction DENY_ALL = OnlyAllowedActivity.restrictAll();
-    private static final Restriction READ_ONLY = OnlyAllowedActivity.restrict(DELETE, MANAGE, UPDATE_METADATA, UPLOAD);
+    private static final Restriction UNRESTRICTED = DenyActivityRestriction.restrictNone();
+    private static final Restriction DENY_ALL = DenyActivityRestriction.restrictAll();
+    private static final Restriction READ_ONLY = new DenyActivityRestriction(DELETE, MANAGE, UPDATE_METADATA, UPLOAD);
 
     private Restrictions()
     {

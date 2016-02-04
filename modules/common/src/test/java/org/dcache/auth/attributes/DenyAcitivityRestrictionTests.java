@@ -26,14 +26,14 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
-public class OnlyAllowedActivityTests
+public class DenyAcitivityRestrictionTests
 {
     @Test
     public void shouldRestrictAllActivity()
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = OnlyAllowedActivity.restrictAll();
+        Restriction r = DenyActivityRestriction.restrictAll();
 
         assertThat(r.isRestricted(DELETE, path), is(equalTo(true)));
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(true)));
@@ -49,7 +49,7 @@ public class OnlyAllowedActivityTests
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = OnlyAllowedActivity.restrictNone();
+        Restriction r = DenyActivityRestriction.restrictNone();
 
         assertThat(r.isRestricted(DELETE, path), is(equalTo(false)));
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(false)));
@@ -65,7 +65,7 @@ public class OnlyAllowedActivityTests
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = OnlyAllowedActivity.restrict(DELETE);
+        Restriction r = new DenyActivityRestriction(DELETE);
 
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(false)));
         assertThat(r.isRestricted(LIST, path), is(equalTo(false)));
@@ -82,7 +82,7 @@ public class OnlyAllowedActivityTests
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = OnlyAllowedActivity.restrict(DELETE,MANAGE);
+        Restriction r = new DenyActivityRestriction(DELETE, MANAGE);
 
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(false)));
         assertThat(r.isRestricted(LIST, path), is(equalTo(false)));
