@@ -21,7 +21,6 @@ import org.dcache.auth.UserAuthRecord;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.auth.UserPwdRecord;
 import org.dcache.auth.attributes.HomeDirectory;
-import org.dcache.auth.attributes.OnlyAllowedActivity;
 import org.dcache.auth.attributes.Restrictions;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.gplazma.AuthenticationException;

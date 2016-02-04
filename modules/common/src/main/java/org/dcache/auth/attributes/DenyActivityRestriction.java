@@ -18,8 +18,9 @@
 package org.dcache.auth.attributes;
 
 
+import com.google.common.base.Joiner;
+
 import java.util.EnumSet;
-import java.util.Iterator;
 
 import diskCacheV111.util.FsPath;
 
@@ -27,32 +28,32 @@ import diskCacheV111.util.FsPath;
  * A Restriction that allows a user to perform only activity from the
  * supplied set of activities.
  */
-public class OnlyAllowedActivity implements Restriction
+public class DenyActivityRestriction implements Restriction
 {
     private static final long serialVersionUID = 1L;
 
     private final EnumSet<Activity> denied;
 
-    public static OnlyAllowedActivity restrict(Activity... denied)
+    public static DenyActivityRestriction restrictAll()
+    {
+        return new DenyActivityRestriction(EnumSet.allOf(Activity.class));
+    }
+
+    public static DenyActivityRestriction restrictNone()
+    {
+        return new DenyActivityRestriction(EnumSet.noneOf(Activity.class));
+    }
+
+    public DenyActivityRestriction(Activity... denied)
     {
         EnumSet<Activity> d = denied.length > 0 ?
                 EnumSet.of(denied[0], denied) :
                 EnumSet.noneOf(Activity.class);
 
-        return new OnlyAllowedActivity(d);
+        this.denied = d;
     }
 
-    public static OnlyAllowedActivity restrictAll()
-    {
-        return new OnlyAllowedActivity(EnumSet.allOf(Activity.class));
-    }
-
-    public static OnlyAllowedActivity restrictNone()
-    {
-        return new OnlyAllowedActivity(EnumSet.noneOf(Activity.class));
-    }
-
-    private OnlyAllowedActivity(EnumSet<Activity> denied)
+    private DenyActivityRestriction(EnumSet<Activity> denied)
     {
         this.denied = denied;
     }
@@ -72,17 +73,17 @@ public class OnlyAllowedActivity implements Restriction
     @Override
     public boolean equals(Object other)
     {
-        return other instanceof OnlyAllowedActivity && denied.equals(((OnlyAllowedActivity) other).denied);
+        return other instanceof DenyActivityRestriction && denied.equals(((DenyActivityRestriction) other).denied);
     }
 
     @Override
     public boolean isSubsumedBy(Restriction other)
     {
-        if (!(other instanceof OnlyAllowedActivity)) {
+        if (!(other instanceof DenyActivityRestriction)) {
             return false;
         }
 
-        EnumSet<Activity> otherDenied = ((OnlyAllowedActivity) other).denied;
+        EnumSet<Activity> otherDenied = ((DenyActivityRestriction) other).denied;
 
         return otherDenied.containsAll(denied);
     }
@@ -99,13 +100,8 @@ public class OnlyAllowedActivity implements Restriction
 
         StringBuilder sb = new StringBuilder();
         sb.append("Restrict[");
-        Iterator<Activity> i = denied.iterator();
-        for (;;) {
-            sb.append(i.next());
-            if (!i.hasNext()) {
-                return sb.append(']').toString();
-            }
-            sb.append(',');
-        }
+        Joiner.on(',').appendTo(sb, denied);
+        sb.append(']');
+        return sb.toString();
     }
 }
