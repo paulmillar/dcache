@@ -106,7 +106,6 @@ public class PnfsHandler
      *
      * @param handler The PnfsHandler to copy
      * @param subject The Subject to apply to the copy
-     * @param restriction The Restriction applying to the current user
      */
     public PnfsHandler(PnfsHandler handler, Subject subject, Restriction restriction)
     {
@@ -244,9 +243,6 @@ public class PnfsHandler
         msg.setReplyRequired(true);
         if (_subject != null) {
             msg.setSubject(_subject);
-        }
-        if (_restriction != null) {
-            msg.setRestriction(_restriction);
         }
         return _cellStub.send(msg, timeout);
     }

@@ -61,7 +61,7 @@ import diskCacheV111.util.FsPath;
  *
  *     <dt>Write a new file</dt>
  *     <dd>
- *         Requires {@code Activity.UPLOAD} on the directory path.
+ *         Requires {@code Activity.UPLOAD} on the new file's path.
  *     </dd>
  *
  *     <dt>Delete a file or directory</dt>
@@ -72,7 +72,14 @@ import diskCacheV111.util.FsPath;
  *     <dt>Rename or move a file</dt>
  *     <dd>
  *         Requires {@code Activity.MANAGE} on source's and target's parent
- *         directories.
+ *         directories.  If the move would overwrite an existing file then
+ *         {@code Activity.DELETE} is also needed on the target path.
+ *     </dd>
+ *
+ *     <dt>Create a symbolic link</dt>
+ *     <dd>
+ *         Requires {@code Activity.MANAGE} on the symbolic link's parent
+ *         directory.
  *     </dd>
  *
  *     <dt>Creating an internal copy of a file</dt>
@@ -115,11 +122,14 @@ public interface Restriction extends LoginAttribute, Serializable
 
     /**
      * Check whether {@literal other} denies all operations that this
-     * restriction denies.  This is a transitive relationship. Note that
-     * {@literal A.isSubsumedBy(B)} and {@literal B.isSubsumedBy(A)} implies
-     * {@literal A.equals(B)}.
+     * restriction denies.  This is a transitive relationship.  Note that if
+     * {@literal A.isSubsumedBy(B)} and {@literal B.isSubsumedBy(A)} then
+     * A and B are equivalence.  Two restrictions that are equal are always
+     * equivalent; however, there may be pairs of equivalent restrictions that
+     * are not equal.  If a class cannot determine whether it is subsumed by
+     * some other class then it should return false.
      * @param other The Restriction to compare.
-     * @return true iff {@code other#isRestricted} returns true for all
+     * @return true if {@code other#isRestricted} returns true for all
      * (activity,path) pairs that {@code #isRestricted} returns true.
      */
     boolean isSubsumedBy(Restriction other);

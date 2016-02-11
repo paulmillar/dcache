@@ -185,7 +185,6 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
-import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.services.login.RemoteLoginStrategy;
 import org.dcache.util.Args;
 import org.dcache.util.AsynchronousRedirectedTransfer;
@@ -4152,12 +4151,11 @@ public abstract class AbstractFtpDoorV1
     {
         private final String _userName;
         private final PrintWriter _out;
-        private final RestrictedPermissionHandler _pdp =
-                new RestrictedPermissionHandler(
+        private final PermissionHandler _pdp =
                     new ChainedPermissionHandler (
                         new ACLPermissionHandler(),
                         new PosixPermissionHandler()
-                ));
+                );
 
         public LongListPrinter(PrintWriter writer)
         {
@@ -4183,13 +4181,17 @@ public abstract class AbstractFtpDoorV1
 
             if (attr.getFileType() == FileType.DIR) {
                 boolean canListDir =
-                    _pdp.canListDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canListDir(_subject, attr) == AccessType.ACCESS_ALLOWED
+                            && !_authz.isRestricted(Activity.LIST, dir);
                 boolean canLookup =
-                    _pdp.canLookup(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canLookup(_subject, attr) == AccessType.ACCESS_ALLOWED
+                            && !_authz.isRestricted(Activity.READ_METADATA, path);
                 boolean canCreateFile =
-                    _pdp.canCreateFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateFile(_subject, attr) == AccessType.ACCESS_ALLOWED
+                            && !_authz.isRestricted(Activity.UPLOAD, path);
                 boolean canCreateDir =
-                    _pdp.canCreateSubDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateSubDir(_subject, attr) == AccessType.ACCESS_ALLOWED
+                            && !_authz.isRestricted(Activity.MANAGE, path);
                 mode.append('d');
                 mode.append(canListDir ? 'r' : '-');
                 mode.append(canCreateFile || canCreateDir ? 'w' : '-');
@@ -4197,7 +4199,8 @@ public abstract class AbstractFtpDoorV1
                 mode.append("------");
             } else {
                 boolean canReadFile =
-                    _pdp.canReadFile(_subject, _authz, path, attr)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canReadFile(_subject, attr)== AccessType.ACCESS_ALLOWED
+                            && !_authz.isRestricted(Activity.DOWNLOAD, path);
                 mode.append('-');
                 mode.append(canReadFile ? 'r' : '-');
                 mode.append('-');
@@ -4234,12 +4237,11 @@ public abstract class AbstractFtpDoorV1
 
         protected final PrintWriter _out;
 
-        private final RestrictedPermissionHandler _pdp =
-                new RestrictedPermissionHandler(
+        private final PermissionHandler _pdp =
                     new ChainedPermissionHandler (
                         new ACLPermissionHandler(),
                         new PosixPermissionHandler()
-                ));
+                );
 
         public FactPrinter(PrintWriter writer)
         {
@@ -4316,8 +4318,8 @@ public abstract class AbstractFtpDoorV1
                     case SIZE:
                         if (attr.isDefined(SIZE) && attr.getFileType() != FileType.DIR) {
                             access =
-                                _pdp.canGetAttributes(_subject, _authz, path, attr,
-                                                      EnumSet.of(SIZE));
+                                _pdp.canGetAttributes(_subject, attr, EnumSet.of(SIZE));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printSizeFact(attr);
                             }
@@ -4326,8 +4328,8 @@ public abstract class AbstractFtpDoorV1
                     case CREATE:
                         if (attr.isDefined(CREATION_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
-                                                          EnumSet.of(CREATION_TIME));
+                                    _pdp.canGetAttributes(_subject, attr, EnumSet.of(CREATION_TIME));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printCreateFact(attr);
                             }
@@ -4336,8 +4338,9 @@ public abstract class AbstractFtpDoorV1
                     case MODIFY:
                         if (attr.isDefined(MODIFICATION_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(MODIFICATION_TIME));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printModifyFact(attr);
                             }
@@ -4346,8 +4349,9 @@ public abstract class AbstractFtpDoorV1
                     case CHANGE:
                         if (attr.isDefined(CHANGE_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(CHANGE_TIME));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printChangeFact(attr);
                             }
@@ -4356,8 +4360,9 @@ public abstract class AbstractFtpDoorV1
                     case ACCESS:
                         if (attr.isDefined(ACCESS_TIME)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(ACCESS_TIME));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printAccessFact(attr);
                             }
@@ -4366,8 +4371,9 @@ public abstract class AbstractFtpDoorV1
                     case TYPE:
                         if (attr.isDefined(TYPE)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(TYPE));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printTypeFact(attr);
                             }
@@ -4378,8 +4384,9 @@ public abstract class AbstractFtpDoorV1
                         break;
                     case PERM:
                         access =
-                            _pdp.canGetAttributes(_subject, _authz, path, attr,
+                            _pdp.canGetAttributes(_subject, attr,
                                                   EnumSet.of(MODE, ACL));
+                        access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                         if (access == AccessType.ACCESS_ALLOWED) {
                             printPermFact(path, dirAttr, attr);
                         }
@@ -4387,8 +4394,9 @@ public abstract class AbstractFtpDoorV1
                     case OWNER:
                         if (attr.isDefined(OWNER)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(OWNER));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printOwnerFact(attr);
                             }
@@ -4397,8 +4405,9 @@ public abstract class AbstractFtpDoorV1
                     case GROUP:
                         if (attr.isDefined(OWNER_GROUP)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
+                                    _pdp.canGetAttributes(_subject, attr,
                                                           EnumSet.of(OWNER_GROUP));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printGroupFact(attr);
                             }
@@ -4407,8 +4416,8 @@ public abstract class AbstractFtpDoorV1
                     case MODE:
                         if (attr.isDefined(MODE)) {
                             access =
-                                    _pdp.canGetAttributes(_subject, _authz, path, attr,
-                                                          EnumSet.of(MODE));
+                                    _pdp.canGetAttributes(_subject, attr, EnumSet.of(MODE));
+                            access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                             if (access == AccessType.ACCESS_ALLOWED) {
                                 printModeFact(attr);
                             }
@@ -4523,24 +4532,24 @@ public abstract class AbstractFtpDoorV1
         {
             StringBuilder s = new StringBuilder();
             if (attr.getFileType() == FileType.DIR) {
-                if (_pdp.canCreateFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canCreateFile(_subject, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('c');
                 }
-                if (_pdp.canDeleteDir(_subject, _authz, path, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canDeleteDir(_subject, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('d');
                 }
                 s.append('e');
-                if (_pdp.canListDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canListDir(_subject, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('l');
                 }
-                if (_pdp.canCreateSubDir(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canCreateSubDir(_subject, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('m');
                 }
             } else {
-                if (_pdp.canDeleteFile(_subject, _authz, path, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canDeleteFile(_subject, parentAttr, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('d');
                 }
-                if (_pdp.canReadFile(_subject, _authz, path, attr) == AccessType.ACCESS_ALLOWED) {
+                if (_pdp.canReadFile(_subject, attr) == AccessType.ACCESS_ALLOWED) {
                     s.append('r');
                 }
             }
@@ -4578,5 +4587,17 @@ public abstract class AbstractFtpDoorV1
             FsPath path = (dir == null) ? new FsPath(name) : new FsPath(dir, name);
             _out.print(_doorRootPath.relativize(path));
         }
+    }
+
+    private AccessType asAccessType(Subject subject, Restriction restriction,
+            Activity activity, FsPath path)
+    {
+        if (!Subjects.isRoot(subject) && path != null) {
+            return restriction.isRestricted(activity, path) ?
+                    AccessType.ACCESS_DENIED :
+                    AccessType.ACCESS_ALLOWED;
+        }
+
+        return AccessType.ACCESS_ALLOWED;
     }
 }

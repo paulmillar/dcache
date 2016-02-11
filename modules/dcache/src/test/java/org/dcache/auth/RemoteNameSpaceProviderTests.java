@@ -36,6 +36,7 @@ import diskCacheV111.vehicles.PnfsGetCacheLocationsMessage;
 import diskCacheV111.vehicles.PnfsGetParentMessage;
 import diskCacheV111.vehicles.PnfsMapPathMessage;
 import diskCacheV111.vehicles.PnfsMessage;
+import diskCacheV111.vehicles.PnfsRenameMessage;
 import diskCacheV111.vehicles.StorageInfo;
 
 import dmg.cells.nucleus.CellEndpoint;
@@ -44,7 +45,6 @@ import dmg.cells.nucleus.CellMessageAnswerable;
 import dmg.cells.nucleus.CellPath;
 import dmg.cells.nucleus.SerializationException;
 
-import org.dcache.auth.attributes.Restrictions;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -143,7 +143,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.addCacheLocation(ROOT, Restrictions.none(), A_PNFSID, "pool-1");
+        _namespace.addCacheLocation(ROOT, A_PNFSID, "pool-1");
 
         PnfsAddCacheLocationMessage sent =
                 getSingleSendAndWaitMessage(PnfsAddCacheLocationMessage.class);
@@ -160,7 +160,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.addCacheLocation(ROOT, Restrictions.none(), A_PNFSID, "pool-1");
+        _namespace.addCacheLocation(ROOT, A_PNFSID, "pool-1");
     }
 
 
@@ -169,7 +169,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.clearCacheLocation(ROOT, Restrictions.none(), A_PNFSID, "pool-1", true);
+        _namespace.clearCacheLocation(ROOT, A_PNFSID, "pool-1", true);
 
         PnfsClearCacheLocationMessage sent =
                 getSingleSendAndWaitMessage(PnfsClearCacheLocationMessage.class);
@@ -187,7 +187,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.clearCacheLocation(ROOT, Restrictions.none(), A_PNFSID, "pool-1", false);
+        _namespace.clearCacheLocation(ROOT, A_PNFSID, "pool-1", false);
 
         PnfsClearCacheLocationMessage sent =
                 getSingleSendAndWaitMessage(PnfsClearCacheLocationMessage.class);
@@ -204,7 +204,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.createFile(ROOT, Restrictions.none(), "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
 
         PnfsCreateEntryMessage sent =
                 getSingleSendAndWaitMessage(PnfsCreateEntryMessage.class);
@@ -222,7 +222,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_EXISTS);
 
-        _namespace.createFile(ROOT, Restrictions.none(), "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
     }
 
 
@@ -231,7 +231,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.createDirectory(ROOT, Restrictions.none(), "/path/to/dir", 100, 200, 0755);
+        _namespace.createDirectory(ROOT, "/path/to/dir", 100, 200, 0755);
 
         PnfsCreateDirectoryMessage sent =
                 getSingleSendAndWaitMessage(PnfsCreateDirectoryMessage.class);
@@ -249,7 +249,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.deleteEntry(ROOT, Restrictions.none(), EnumSet.allOf(FileType.class), A_PNFSID);
+        _namespace.deleteEntry(ROOT, EnumSet.allOf(FileType.class), A_PNFSID);
 
         PnfsDeleteEntryMessage sent =
                 getSingleSendAndWaitMessage(PnfsDeleteEntryMessage.class);
@@ -265,7 +265,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.deleteEntry(ROOT, Restrictions.none(), EnumSet.allOf(FileType.class), "/path/to/entry");
+        _namespace.deleteEntry(ROOT, EnumSet.allOf(FileType.class), "/path/to/entry");
 
         PnfsDeleteEntryMessage sent =
                 getSingleSendAndWaitMessage(PnfsDeleteEntryMessage.class);
@@ -282,7 +282,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.deleteEntry(ROOT, Restrictions.none(), EnumSet.allOf(FileType.class), A_PNFSID);
+        _namespace.deleteEntry(ROOT, EnumSet.allOf(FileType.class), A_PNFSID);
     }
 
 
@@ -291,7 +291,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.deleteEntry(ROOT, Restrictions.none(), EnumSet.allOf(FileType.class), "/path/to/file");
+        _namespace.deleteEntry(ROOT, EnumSet.allOf(FileType.class), "/path/to/file");
     }
 
 
@@ -301,7 +301,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        List<String> locations = _namespace.getCacheLocation(ROOT, Restrictions.none(), A_PNFSID);
+        List<String> locations = _namespace.getCacheLocation(ROOT, A_PNFSID);
 
         PnfsGetCacheLocationsMessage sent =
                 getSingleSendAndWaitMessage(PnfsGetCacheLocationsMessage.class);
@@ -320,7 +320,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.getCacheLocation(ROOT, Restrictions.none(), A_PNFSID);
+        _namespace.getCacheLocation(ROOT, A_PNFSID);
     }
 
 
@@ -331,7 +331,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(NOT_FILE);
 
-        _namespace.getCacheLocation(ROOT, Restrictions.none(), A_PNFSID);
+        _namespace.getCacheLocation(ROOT, A_PNFSID);
     }
 
 
@@ -348,7 +348,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        List<String> locations = _namespace.getCacheLocation(ROOT, Restrictions.none(), A_PNFSID);
+        List<String> locations = _namespace.getCacheLocation(ROOT, A_PNFSID);
 
         PnfsGetCacheLocationsMessage sent =
                 getSingleSendAndWaitMessage(PnfsGetCacheLocationsMessage.class);
@@ -374,7 +374,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        List<String> locations = _namespace.getCacheLocation(ROOT, Restrictions.none(), A_PNFSID);
+        List<String> locations = _namespace.getCacheLocation(ROOT, A_PNFSID);
 
         PnfsGetCacheLocationsMessage sent =
                 getSingleSendAndWaitMessage(PnfsGetCacheLocationsMessage.class);
@@ -402,7 +402,7 @@ public class RemoteNameSpaceProviderTests
 
 
         FileAttributes attributes =
-                _namespace.getFileAttributes(ROOT, Restrictions.none(), A_PNFSID, EnumSet.of(TYPE, SIZE));
+                _namespace.getFileAttributes(ROOT, A_PNFSID, EnumSet.of(TYPE, SIZE));
 
         PnfsGetFileAttributes sent =
                 getSingleSendAndWaitMessage(PnfsGetFileAttributes.class);
@@ -424,7 +424,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.getFileAttributes(ROOT, Restrictions.none(), A_PNFSID, EnumSet.of(TYPE, SIZE));
+        _namespace.getFileAttributes(ROOT, A_PNFSID, EnumSet.of(TYPE, SIZE));
     }
 
 
@@ -439,7 +439,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        PnfsId parent = _namespace.getParentOf(ROOT, Restrictions.none(), A_PNFSID);
+        PnfsId parent = _namespace.getParentOf(ROOT, A_PNFSID);
 
         PnfsGetParentMessage sent =
                 getSingleSendAndWaitMessage(PnfsGetParentMessage.class);
@@ -456,7 +456,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.getParentOf(ROOT, Restrictions.none(), A_PNFSID);
+        _namespace.getParentOf(ROOT, A_PNFSID);
     }
 
 
@@ -470,7 +470,7 @@ public class RemoteNameSpaceProviderTests
                 entry().name("file-2").id(ANOTHER_PNFSID).size(2000).build()));
 
         ListCapture capture = new ListCapture();
-        _namespace.list(ROOT, Restrictions.none(), "/path/to/dir", null, ALL_ENTRIES,
+        _namespace.list(ROOT, "/path/to/dir", null, ALL_ENTRIES,
                 EnumSet.of(SIZE), capture);
 
         Map<String,FileAttributes> results = capture.getNames();
@@ -497,7 +497,7 @@ public class RemoteNameSpaceProviderTests
                 entry().name("file-4").id(PNFSID_4).size(4000).build()));
 
         ListCapture capture = new ListCapture();
-        _namespace.list(ROOT, Restrictions.none(), "/path/to/dir", null, ALL_ENTRIES,
+        _namespace.list(ROOT, "/path/to/dir", null, ALL_ENTRIES,
                 EnumSet.of(SIZE), capture);
 
         Map<String,FileAttributes> results = capture.getNames();
@@ -533,7 +533,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        PnfsId id = _namespace.pathToPnfsid(ROOT, Restrictions.none(), "/path/to/entry", true);
+        PnfsId id = _namespace.pathToPnfsid(ROOT, "/path/to/entry", true);
 
         PnfsMapPathMessage sent =
                 getSingleSendAndWaitMessage(PnfsMapPathMessage.class);
@@ -559,7 +559,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        PnfsId id = _namespace.pathToPnfsid(ROOT, Restrictions.none(), "/path/to/entry", false);
+        PnfsId id = _namespace.pathToPnfsid(ROOT, "/path/to/entry", false);
 
         PnfsMapPathMessage sent =
                 getSingleSendAndWaitMessage(PnfsMapPathMessage.class);
@@ -579,7 +579,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.pathToPnfsid(ROOT, Restrictions.none(), "/path/to/entry", false);
+        _namespace.pathToPnfsid(ROOT, "/path/to/entry", false);
     }
 
 
@@ -595,7 +595,7 @@ public class RemoteNameSpaceProviderTests
             }
         });
 
-        String path = _namespace.pnfsidToPath(ROOT, Restrictions.none(), A_PNFSID);
+        String path = _namespace.pnfsidToPath(ROOT, A_PNFSID);
 
         PnfsMapPathMessage sent =
                 getSingleSendAndWaitMessage(PnfsMapPathMessage.class);
@@ -614,14 +614,14 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.pnfsidToPath(ROOT, Restrictions.none(), A_PNFSID);
+        _namespace.pnfsidToPath(ROOT, A_PNFSID);
     }
 
 
     @Test
     public void shouldSucceedForRemoveChecksum() throws Exception
     {
-        _namespace.removeChecksum(ROOT, Restrictions.none(), A_PNFSID, ChecksumType.ADLER32);
+        _namespace.removeChecksum(ROOT, A_PNFSID, ChecksumType.ADLER32);
 
         PnfsRemoveChecksumMessage sent =
                 getSingleSentMessage(PnfsRemoveChecksumMessage.class);
@@ -634,7 +634,7 @@ public class RemoteNameSpaceProviderTests
     @Test
     public void shouldSucceedForRemoveFileAttribute() throws Exception
     {
-        _namespace.removeFileAttribute(ROOT, Restrictions.none(), A_PNFSID, "flag-name");
+        _namespace.removeFileAttribute(ROOT, A_PNFSID, "flag-name");
 
         PnfsFlagMessage sent = getSingleSentMessage(PnfsFlagMessage.class);
         assertThat(sent.getSubject(), is(ROOT));
@@ -648,7 +648,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.setFileAttributes(ROOT, Restrictions.none(), A_PNFSID,
+        _namespace.setFileAttributes(ROOT, A_PNFSID,
                 attributes().size(1000).build(), EnumSet.noneOf(FileAttribute.class));
 
         PnfsSetFileAttributes sent =
@@ -667,7 +667,7 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_NOT_FOUND);
 
-        _namespace.setFileAttributes(ROOT, Restrictions.none(), A_PNFSID,
+        _namespace.setFileAttributes(ROOT, A_PNFSID,
                 attributes().size(1000).build(), EnumSet.noneOf(FileAttribute.class));
     }
 

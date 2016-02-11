@@ -17,10 +17,10 @@
  */
 package org.dcache.auth.attributes;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import diskCacheV111.util.FsPath;
 
@@ -32,8 +32,8 @@ import static java.util.Arrays.asList;
  */
 public class Restrictions
 {
-    private static final Restriction UNRESTRICTED = DenyActivityRestriction.restrictNone();
-    private static final Restriction DENY_ALL = DenyActivityRestriction.restrictAll();
+    private static final Restriction UNRESTRICTED = DenyActivityRestriction.restrictNoActivity();
+    private static final Restriction DENY_ALL = DenyActivityRestriction.restrictAllActivity();
     private static final Restriction READ_ONLY = new DenyActivityRestriction(DELETE, MANAGE, UPDATE_METADATA, UPLOAD);
 
     private Restrictions()
@@ -90,19 +90,19 @@ public class Restrictions
      */
     public static Restriction concat(Iterable<Restriction> restrictions)
     {
-        CompositeRestrictionBuilder composite = new CompositeRestrictionBuilder();
+        CompositeRestrictionBuilder composer = new CompositeRestrictionBuilder();
 
         for (Restriction r : restrictions) {
             if (r instanceof CompositeRestriction) {
                 for (Restriction inner : ((CompositeRestriction) r).restrictions) {
-                    composite.with(inner);
+                    composer.accept(inner);
                 }
             } else {
-                composite.with(r);
+                composer.accept(r);
             }
         }
 
-        return composite.build();
+        return composer.build();
     }
 
     /**
@@ -110,9 +110,9 @@ public class Restrictions
      */
     private static class CompositeRestrictionBuilder
     {
-        private final List<Restriction> restrictions = new ArrayList<>();
+        private final Set<Restriction> restrictions = new HashSet<>();
 
-        private void with(Restriction newRestriction)
+        private void accept(Restriction newRestriction)
         {
             Iterator<Restriction> i = restrictions.iterator();
             while (i.hasNext()) {
@@ -137,7 +137,7 @@ public class Restrictions
                 return UNRESTRICTED;
 
             case 1:
-                return restrictions.get(0);
+                return restrictions.iterator().next();
 
             default:
                 return new CompositeRestriction(restrictions);
@@ -151,9 +151,9 @@ public class Restrictions
      */
     private static class CompositeRestriction implements Restriction
     {
-        private final List<Restriction> restrictions;
+        private final Set<Restriction> restrictions;
 
-        public CompositeRestriction(List<Restriction> restrictions)
+        public CompositeRestriction(Set<Restriction> restrictions)
         {
             this.restrictions = restrictions;
         }
