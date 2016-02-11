@@ -64,6 +64,7 @@ import dmg.cells.services.login.LoginManagerChildrenInfo;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Origin;
 import org.dcache.auth.Subjects;
+import org.dcache.auth.attributes.Activity;
 import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.cells.MessageCallback;
@@ -73,7 +74,6 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
-import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.poolmanager.PoolMonitor;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
@@ -132,14 +132,9 @@ public class XrootdDoor
 
     private PoolMonitor _poolMonitor;
 
-    private final RestrictedPermissionHandler _pdp =
-            new RestrictedPermissionHandler(
-                new ChainedPermissionHandler
-                        (
+    private final PermissionHandler _pdp = new ChainedPermissionHandler (
                                 new ACLPermissionHandler(),
-                                new PosixPermissionHandler()
-                        )
-            );
+                                new PosixPermissionHandler());
 
     private int _moverTimeout = 180000;
     private TimeUnit _moverTimeoutUnit = TimeUnit.MILLISECONDS;
@@ -808,13 +803,17 @@ public class XrootdDoor
         switch (attributes.getFileType()) {
         case DIR:
             boolean canListDir =
-                    _pdp.canListDir(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canListDir(subject, attributes) == AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.LIST, path);
             boolean canLookup =
-                    _pdp.canLookup(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canLookup(subject, attributes) == AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.READ_METADATA, path);
             boolean canCreateFile =
-                    _pdp.canCreateFile(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateFile(subject, attributes) == AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.UPLOAD, path);
             boolean canCreateDir =
-                    _pdp.canCreateSubDir(subject, restriction, path, attributes) == AccessType.ACCESS_ALLOWED;
+                    _pdp.canCreateSubDir(subject, attributes) == AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.MANAGE, path);
             flags |= kXR_isDir;
             if (canLookup) {
                 flags |= kXR_xset;
@@ -828,9 +827,11 @@ public class XrootdDoor
             break;
         case REGULAR:
             boolean canReadFile =
-                    _pdp.canReadFile(subject, restriction, path, attributes)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canReadFile(subject, attributes)== AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.DOWNLOAD, path);
             boolean canWriteFile =
-                    _pdp.canWriteFile(subject, restriction, path, attributes)== AccessType.ACCESS_ALLOWED;
+                    _pdp.canWriteFile(subject, attributes)== AccessType.ACCESS_ALLOWED
+                        && !restriction.isRestricted(Activity.UPLOAD, path);
             if (canWriteFile) {
                 flags |= kXR_writable;
             }

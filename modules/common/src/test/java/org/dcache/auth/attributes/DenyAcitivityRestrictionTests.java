@@ -33,7 +33,7 @@ public class DenyAcitivityRestrictionTests
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = DenyActivityRestriction.restrictAll();
+        Restriction r = DenyActivityRestriction.restrictAllActivity();
 
         assertThat(r.isRestricted(DELETE, path), is(equalTo(true)));
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(true)));
@@ -49,7 +49,7 @@ public class DenyAcitivityRestrictionTests
     {
         FsPath path = new FsPath("/some/arbitrary/path");
 
-        Restriction r = DenyActivityRestriction.restrictNone();
+        Restriction r = DenyActivityRestriction.restrictNoActivity();
 
         assertThat(r.isRestricted(DELETE, path), is(equalTo(false)));
         assertThat(r.isRestricted(DOWNLOAD, path), is(equalTo(false)));

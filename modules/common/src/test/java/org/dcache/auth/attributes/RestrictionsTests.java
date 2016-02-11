@@ -214,8 +214,8 @@ public class RestrictionsTests
     @Test
     public void shouldConcatTwoNonSubsumptionAsComposite()
     {
-        Restriction denyDownload = DenyActivityRestriction.restrict(DOWNLOAD);
-        Restriction denyUpload = DenyActivityRestriction.restrict(UPLOAD);
+        Restriction denyDownload = new DenyActivityRestriction(DOWNLOAD);
+        Restriction denyUpload = new DenyActivityRestriction(UPLOAD);
 
         Restriction concat = Restrictions.concat(denyUpload, denyDownload);
 
@@ -238,9 +238,9 @@ public class RestrictionsTests
     @Test
     public void shouldConcatTwoNonSubsumptionAndSubsumptionAsComposite()
     {
-        Restriction denyDownload = DenyActivityRestriction.restrict(DOWNLOAD);
-        Restriction denyUpload = DenyActivityRestriction.restrict(UPLOAD);
-        Restriction denyDownloadAndDelete = DenyActivityRestriction.restrict(DOWNLOAD, DELETE);
+        Restriction denyDownload = new DenyActivityRestriction(DOWNLOAD);
+        Restriction denyUpload = new DenyActivityRestriction(UPLOAD);
+        Restriction denyDownloadAndDelete = new DenyActivityRestriction(DOWNLOAD, DELETE);
 
         Restriction concat = Restrictions.concat(denyUpload, denyDownload, denyDownloadAndDelete);
 

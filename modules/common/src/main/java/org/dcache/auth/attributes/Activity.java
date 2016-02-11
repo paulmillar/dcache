@@ -56,8 +56,8 @@ public enum Activity
     MANAGE,
 
     /**
-     * Create a new file or symbolic link within dCache.  Note that creating
-     * new directory requires MANAGE.  The target is the path of the new item.
+     * Create a new file within dCache.  Note that creating new directory or a
+     * new sym-link requires MANAGE.  The target is the path of the new item.
      * <p>
      * This Activity is undefined against a directory item.
      */

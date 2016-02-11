@@ -52,7 +52,6 @@ import org.dcache.chimera.posix.Stat;
 import org.dcache.namespace.CreateOption;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.PosixPermissionHandler;
-import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.vehicles.PnfsGetFileAttributes;
 import org.dcache.vehicles.PnfsSetFileAttributes;
@@ -114,7 +113,7 @@ public class PnfsManagerTest
                                                                 StorageInfo.DEFAULT_RETENTION_POLICY));
         chimera.setInheritFileOwnership(true);
         chimera.setVerifyAllLookups(true);
-        chimera.setPermissionHandler(new RestrictedPermissionHandler(new PosixPermissionHandler()));
+        chimera.setPermissionHandler(new PosixPermissionHandler());
         chimera.setAclEnabled(false);
         chimera.setFileSystem(_fs);
         chimera.setUploadDirectory("/upload/%d");

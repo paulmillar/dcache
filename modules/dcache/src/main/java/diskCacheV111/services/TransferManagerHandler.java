@@ -53,7 +53,6 @@ import org.dcache.namespace.ChainedPermissionHandler;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
-import org.dcache.namespace.RestrictedPermissionHandler;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.vehicles.PnfsGetFileAttributes;
 
@@ -108,7 +107,7 @@ public class TransferManagerHandler extends AbstractMessageCallback<Message>
     private transient Serializable _errorObject;
     private transient boolean _cancelTimer;
     private final transient DoorRequestInfoMessage info;
-    private final transient RestrictedPermissionHandler permissionHandler;
+    private final transient PermissionHandler permissionHandler;
     private transient PoolMgrSelectReadPoolMsg.Context _readPoolSelectionContext;
     private final transient Executor executor;
 
@@ -160,10 +159,10 @@ public class TransferManagerHandler extends AbstractMessageCallback<Message>
         }
         manager.addActiveTransfer(id, this);
         setState(INITIAL_STATE);
-        permissionHandler = new RestrictedPermissionHandler(
+        permissionHandler =
                 new ChainedPermissionHandler(
                 new ACLPermissionHandler(),
-                new PosixPermissionHandler()));
+                new PosixPermissionHandler());
     }
 
     public void handle()

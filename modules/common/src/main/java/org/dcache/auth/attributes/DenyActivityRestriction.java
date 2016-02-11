@@ -34,12 +34,12 @@ public class DenyActivityRestriction implements Restriction
 
     private final EnumSet<Activity> denied;
 
-    public static DenyActivityRestriction restrictAll()
+    public static DenyActivityRestriction restrictAllActivity()
     {
         return new DenyActivityRestriction(EnumSet.allOf(Activity.class));
     }
 
-    public static DenyActivityRestriction restrictNone()
+    public static DenyActivityRestriction restrictNoActivity()
     {
         return new DenyActivityRestriction(EnumSet.noneOf(Activity.class));
     }
