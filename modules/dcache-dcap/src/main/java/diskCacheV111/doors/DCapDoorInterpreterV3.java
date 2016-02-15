@@ -2088,6 +2088,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
                 new PnfsFlagMessage(pnfsId,"c", PnfsFlagMessage.FlagOperation.SET) ;
                 flag.setReplyRequired(false) ;
                 flag.setValue(checksumString);
+                flag.setPnfsPath(_path);
 
                 _pnfs.send(flag);
             }catch(RuntimeException eee ){

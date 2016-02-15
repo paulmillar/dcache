@@ -975,7 +975,9 @@ public class PnfsManagerV3
                   value+" for "+pnfsId);
 
         try{
-            // REVISIT: cannot enforce restriction.
+            // Note that dcap clients may bypass restrictions by not
+            // specifying a path when interacting via mounted namespace.
+            checkRestriction(pnfsMessage, UPDATE_METADATA);
             if( operation == PnfsFlagMessage.FlagOperation.GET ){
                 pnfsMessage.setValue( updateFlag(subject, pnfsId , operation , flagName , value ) );
             }else{
@@ -1710,7 +1712,7 @@ public class PnfsManagerV3
     public void processFlushMessage(CellMessage envelope, PoolFileFlushedMessage pnfsMessage)
     {
         try {
-            // REVISIT: cannot enforce Restriction as no path is provided.
+            // Note: no Restriction check as message sent autonomously by pool.
             FileAttributes attributesToUpdate = new FileAttributes();
             attributesToUpdate.setStorageInfo(pnfsMessage.getFileAttributes().getStorageInfo());
             _nameSpaceProvider.setFileAttributes(pnfsMessage.getSubject(),
@@ -2203,7 +2205,7 @@ public class PnfsManagerV3
     private static void checkRestriction(PnfsMessage message, Activity activity)
             throws PermissionDeniedCacheException
     {
-        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() == null) {
+        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
             checkRestriction(message.getRestriction(), message.getAccessMask(),
                     activity, message.getFsPath());
         }
@@ -2212,25 +2214,20 @@ public class PnfsManagerV3
     private static void checkRestriction(PnfsMessage message, Activity activity,
             FsPath path) throws PermissionDeniedCacheException
     {
-        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() == null) {
+        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
             checkRestriction(message.getRestriction(), message.getAccessMask(),
                     activity, path);
         }
     }
 
-    private static void checkRestriction(Restriction restriction, Set<AccessMask> mask, Activity activity, FsPath path)
-            throws PermissionDeniedCacheException
+    private static void checkRestriction(Restriction restriction, Set<AccessMask> mask,
+            Activity activity, FsPath path) throws PermissionDeniedCacheException
     {
-        if (mask.isEmpty()) {
-            if (restriction.isRestricted(activity, path)) {
-                throw new PermissionDeniedCacheException("Permission denied: " + path);
-            }
-        } else {
-            if (mask.stream()
+        if (mask.stream()
                     .map(PnfsManagerV3::toActivity)
-                    .anyMatch(a -> restriction.isRestricted(a, path))) {
-                throw new PermissionDeniedCacheException("Permission denied: " + path);
-            }
+                    .anyMatch(a -> restriction.isRestricted(a, path))
+                || restriction.isRestricted(activity, path)) {
+            throw new PermissionDeniedCacheException("Permission denied: " + path);
         }
     }
 }

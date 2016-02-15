@@ -41,8 +41,6 @@ import static diskCacheV111.vehicles.PnfsFlagMessage.FlagOperation.REMOVE;
  * The RemoteNameSpaceProvider uses the PnfsManager client stub to provide
  * an implementation of the NameSpaceProvider interface.  This implementation
  * is thread-safe.
- * <p>
- * Any user of this class is expected to enforce any Restriction.
  */
 public class RemoteNameSpaceProvider implements NameSpaceProvider
 {

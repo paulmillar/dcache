@@ -3461,11 +3461,11 @@ public abstract class AbstractFtpDoorV1
                     new PrintWriter(new OutputStreamWriter(new BufferedOutputStream(_dataSocket.getOutputStream()), "US-ASCII"));
                 DirectoryListPrinter printer = new ShortListPrinter(writer);
                 if ( pathIsPattern ) {
-                    total = _listSource.printDirectory(null, Restrictions.none(),
+                    total = _listSource.printDirectory(_subject, _authz,
                             printer, path.getParent(), new Glob(path.getName()),
                             Range.<Integer>all());
                 } else {
-                    total = _listSource.printDirectory(null, Restrictions.none(),
+                    total = _listSource.printDirectory(_subject, _authz,
                             printer, path, null, Range.<Integer>all());
                 }
                 writer.close();
@@ -3505,7 +3505,7 @@ public abstract class AbstractFtpDoorV1
             PrintWriter pw = new PrintWriter(sw);
             pw.print("250- Listing " + arg + "\r\n");
             pw.print(' ');
-            _listSource.printFile(null, Restrictions.none(), new MlstFactPrinter(pw), path);
+            _listSource.printFile(_subject, _authz, new MlstFactPrinter(pw), path);
             pw.print("250 End");
             reply(sw.toString());
         } catch (InterruptedException e) {
@@ -3558,7 +3558,7 @@ public abstract class AbstractFtpDoorV1
                 PrintWriter writer =
                     new PrintWriter(new OutputStreamWriter(new BufferedOutputStream(_dataSocket.getOutputStream()), "UTF-8"));
 
-                total = _listSource.printDirectory(null, Restrictions.none(),
+                total = _listSource.printDirectory(_subject, _authz,
                         new MlsdFactPrinter(writer), path, null,
                         Range.<Integer>all());
                 writer.close();
@@ -4393,7 +4393,7 @@ public abstract class AbstractFtpDoorV1
                                                   EnumSet.of(MODE, ACL));
                         access.and(asAccessType(_subject, _authz, Activity.READ_METADATA, path));
                         if (access == AccessType.ACCESS_ALLOWED) {
-                            printPermFact(path, dirAttr, attr);
+                            printPermFact(dirAttr, attr);
                         }
                         break;
                     case OWNER:
@@ -4534,7 +4534,7 @@ public abstract class AbstractFtpDoorV1
          * rather expensive as the permission information must be
          * retrieved.
          */
-        private void printPermFact(FsPath path, FileAttributes parentAttr, FileAttributes attr)
+        private void printPermFact(FileAttributes parentAttr, FileAttributes attr)
         {
             StringBuilder s = new StringBuilder();
             if (attr.getFileType() == FileType.DIR) {

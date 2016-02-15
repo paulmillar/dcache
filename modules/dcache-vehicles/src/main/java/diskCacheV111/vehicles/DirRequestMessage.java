@@ -27,6 +27,8 @@ import org.dcache.auth.attributes.Restriction;
  */
 public class DirRequestMessage extends PoolIoFileMessage
 {
+    private static final long serialVersionUID = 1L;
+
     private final Restriction _restriction;
 
     public DirRequestMessage(String pool, PnfsId pnfsId, ProtocolInfo info,

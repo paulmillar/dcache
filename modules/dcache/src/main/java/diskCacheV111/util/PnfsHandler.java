@@ -383,16 +383,6 @@ public class PnfsHandler
        _cellStub.setTimeoutUnit(TimeUnit.MILLISECONDS);
    }
 
-   public String getPnfsFlag(PnfsId pnfsId, String flag)
-   throws CacheException
-   {
-       PnfsFlagMessage flagMessage =
-                new PnfsFlagMessage( pnfsId ,flag , PnfsFlagMessage.FlagOperation.GET ) ;
-       flagMessage.setReplyRequired(true);
-
-       return request(flagMessage).getValue();
-   }
-
    public void putPnfsFlag(PnfsId pnfsId, String flag, String value)
    {
        PnfsFlagMessage flagMessage =
