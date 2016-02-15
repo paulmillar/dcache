@@ -62,11 +62,15 @@ public class ListDirectoryHandler
     /**
      * Sends a directory list request to PnfsManager. The result is
      * provided as a stream of directory entries.
-     *
+     * <p>
      * The method blocks until the first set of directory entries have
      * been received from the server.  Hence errors like
      * FILE_NOT_FOUND are thrown by the call to the list method rather
      * than while iterating over the stream.
+     * <p>
+     * Note that supplied subject and restriction values will be overwritten if
+     * {@link PnfsHandler#setSubject} or {@link PnfsHandler#setRestriction} have
+     * been called on the underlying PnfsHandler instance.
      */
     @Override
     public DirectoryStream
@@ -80,11 +84,15 @@ public class ListDirectoryHandler
     /**
      * Sends a directory list request to PnfsManager. The result is
      * provided as a stream of directory entries.
-     *
+     * <p>
      * The method blocks until the first set of directory entries have
      * been received from the server.  Hence errors like
      * FILE_NOT_FOUND are thrown by the call to the list method rather
      * than while iterating over the stream.
+     * <p>
+     * Note that supplied subject and restriction values will be overwritten if
+     * {@link PnfsHandler#setSubject} or {@link PnfsHandler#setRestriction} have
+     * been called on the underlying PnfsHandler instance.
      */
     @Override
     public DirectoryStream

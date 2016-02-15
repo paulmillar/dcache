@@ -2196,25 +2196,31 @@ public class PnfsManagerV3
     private static void checkRestrictionOnParent(PnfsMessage message, Activity activity)
             throws PermissionDeniedCacheException
     {
-        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
-            checkRestriction(message.getRestriction(), message.getAccessMask(),
-                    activity, message.getFsPath().getParent());
+        if (!Subjects.isRoot(message.getSubject())) {
+            FsPath path = message.getFsPath();
+            if (path != null) {
+                checkRestriction(message.getRestriction(),
+                        message.getAccessMask(), activity, path.getParent());
+            }
         }
     }
 
     private static void checkRestriction(PnfsMessage message, Activity activity)
             throws PermissionDeniedCacheException
     {
-        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
-            checkRestriction(message.getRestriction(), message.getAccessMask(),
-                    activity, message.getFsPath());
+        if (!Subjects.isRoot(message.getSubject())) {
+            FsPath path = message.getFsPath();
+            if (path != null) {
+                checkRestriction(message.getRestriction(), message.getAccessMask(),
+                        activity, path);
+            }
         }
     }
 
     private static void checkRestriction(PnfsMessage message, Activity activity,
             FsPath path) throws PermissionDeniedCacheException
     {
-        if (!Subjects.isRoot(message.getSubject()) && message.getPnfsPath() != null) {
+        if (!Subjects.isRoot(message.getSubject())) {
             checkRestriction(message.getRestriction(), message.getAccessMask(),
                     activity, path);
         }

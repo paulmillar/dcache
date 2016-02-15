@@ -91,14 +91,12 @@ public class LoginReply
         for (Restriction r : restrictions) {
             if (restriction == null) {
                 restriction = r;
+            } else if (restriction.isSubsumedBy(r)) {
+                restriction = r;
+            } else if (r.isSubsumedBy(restriction)) {
+                // skip r, restriction is already more restrictive.
             } else {
-                if (restriction.isSubsumedBy(r)) {
-                    restriction = r;
-                } else if (r.isSubsumedBy(restriction)) {
-                    // skip r, restriction is already more restrictive.
-                } else {
-                    return Restrictions.concat(restrictions);
-                }
+                return Restrictions.concat(restrictions);
             }
         }
 
