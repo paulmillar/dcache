@@ -828,7 +828,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
 
         protected Subject _subject;
         protected Origin _origin;
-        protected Restriction _authz;
+        protected Restriction _authz = Restrictions.denyAll();
 
         protected SessionHandler(int sessionId, int commandId, VspArgs args)
         {

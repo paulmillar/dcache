@@ -90,7 +90,7 @@ public class XrootdRedirectHandler extends ConcurrentXrootdRequestHandler
     private final FsPath _rootPath;
     private final FsPath _uploadPath;
 
-    private Restriction _authz = Restrictions.readOnly();
+    private Restriction _authz = Restrictions.denyAll();
     private FsPath _userRootPath = new FsPath();
 
     /**
