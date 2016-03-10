@@ -86,6 +86,8 @@ import diskCacheV111.util.FsPath;
 import org.dcache.srm.SRMInvalidPathException;
 import org.dcache.srm.client.Transport;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public class Configuration {
 
     private final static String SFN_STRING = "SFN=";
@@ -161,6 +163,8 @@ public class Configuration {
     protected long copyLifetime = 24*60*60*1000;
     protected long reserveSpaceLifetime = 24*60*60*1000;
     protected long defaultSpaceLifetime = 24*60*60*1000;
+
+    protected long minimumBandwidth = 0;
 
     protected boolean useUrlcopyScript=false;
     protected boolean useDcapForSrmCopy=false;
@@ -697,6 +701,33 @@ public class Configuration {
     public PlatformTransactionManager getTransactionManager()
     {
         return transactionManager;
+    }
+
+    /**
+     * Set the expected minimum bandwidth for transfers.  The number is some
+     * nominal value that the admin can configure, based on their experience.
+     * If set to a non-zero value then it is used to catch broken clients that
+     * specify an impossibly short request lifetime.  If set to zero then no
+     * checks are performed.
+     * @value the bandwidth in MiB/s
+     */
+    public void setMinimumBandwidth(long value)
+    {
+        checkArgument(value >= 0, "Bandwidth must be 0 or a positive value");
+        minimumBandwidth = value;
+    }
+
+    /**
+     * Get the expected minimum bandwidth for transfers.  The number is some
+     * nominal value that the admin can configure, based on their experience.
+     * If set to a non-zero value then it is used to catch broken clients that
+     * specify an impossibly short request lifetime.  If set to zero then no
+     * checks are performed.
+     * @return the bandwidth in MiB/s
+     */
+    public long getMinimumBandwidth()
+    {
+        return minimumBandwidth;
     }
 
     /**

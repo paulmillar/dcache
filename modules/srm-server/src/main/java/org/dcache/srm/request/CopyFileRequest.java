@@ -85,12 +85,15 @@ import diskCacheV111.srm.RequestFileStatus;
 
 import org.dcache.srm.CopyCallbacks;
 import org.dcache.srm.FileMetaData;
+import org.dcache.srm.SRM;
 import org.dcache.srm.SRMException;
 import org.dcache.srm.SRMInvalidRequestException;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.JobStorage;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Lifetimes;
 import org.dcache.srm.v2_2.TCopyRequestFileStatus;
 import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TStatusCode;
@@ -319,6 +322,20 @@ public final class CopyFileRequest extends FileRequest<CopyRequest> implements D
         } finally {
             runlock();
         }
+
+        reassessLifetime();
+    }
+
+    void reassessLifetime()
+    {
+        Configuration configuration = SRM.getSRM().getConfiguration();
+        long newLifetime = Lifetimes.updateLifetime(getLifetime(), getSize(),
+                configuration.getMinimumBandwidth(), configuration.getCopyLifetime());
+        try {
+            extendLifetime(newLifetime);
+        } catch (SRMException e) {
+            // Ignore: either the job is finished or is being aborted.
+        }
     }
 
     @Override
@@ -464,6 +481,7 @@ public final class CopyFileRequest extends FileRequest<CopyRequest> implements D
             return;
         }
         size = fmd.size;
+        reassessLifetime();
 
         if (getDestinationFileId() == null) {
             addHistoryEvent("Doing name space lookup.");

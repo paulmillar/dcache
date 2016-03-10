@@ -457,6 +457,7 @@
 	    <property name="prefix" value="srm.ping-extra-info"/>
 	</bean>
     </property>
+    <property name="minimumBandwidth" value="${srm.minimum-bandwidth}"/>
   </bean>
 
   <bean id="scheduling-strategy-provider" class="org.dcache.srm.scheduler.SchedulingStrategyFactoryBean">

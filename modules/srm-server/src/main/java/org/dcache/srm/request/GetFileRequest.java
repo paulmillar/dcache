@@ -93,6 +93,8 @@ import org.dcache.srm.SRMUser;
 import org.dcache.srm.scheduler.IllegalStateTransition;
 import org.dcache.srm.scheduler.Scheduler;
 import org.dcache.srm.scheduler.State;
+import org.dcache.srm.util.Configuration;
+import org.dcache.srm.util.Lifetimes;
 import org.dcache.srm.v2_2.TGetRequestFileStatus;
 import org.dcache.srm.v2_2.TReturnStatus;
 import org.dcache.srm.v2_2.TSURLReturnStatus;
@@ -240,7 +242,6 @@ public final class GetFileRequest extends FileRequest<GetRequest> {
             runlock();
         }
     }
-
 
     @Override
     public RequestFileStatus getRequestFileStatus(){
@@ -574,6 +575,25 @@ public final class GetFileRequest extends FileRequest<GetRequest> {
             this.fileMetaData = fileMetaData;
         } finally {
             wunlock();
+        }
+
+        reassessLifetime();
+    }
+
+    public void reassessLifetime() {
+        long existingLifetime = getLifetime();
+        long size = getFileMetaData().size;
+
+        Configuration configuration = SRM.getSRM().getConfiguration();
+        long newLifetime = Lifetimes.updateLifetime(existingLifetime, size,
+                configuration.getMinimumBandwidth(), configuration.getGetLifetime());
+
+        try {
+            if (newLifetime > existingLifetime) {
+                extendLifetime(newLifetime);
+            }
+        } catch (SRMException e) {
+            // ignored
         }
     }
 
