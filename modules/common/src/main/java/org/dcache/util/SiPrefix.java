@@ -32,7 +32,8 @@ public class SiPrefix
      * Prefixes may be grouped by whether they follow decimal ordering or
      * binary.
      */
-    public enum Type {
+    public enum Type
+    {
         /**
          * Prefixes that are base-10 (k, M, G, T, ...).  These are the
          * traditional prefix from scientific usage.
@@ -40,38 +41,79 @@ public class SiPrefix
         DECIMAL,
 
         /**
-         * Prefix that are base-2 (ki, Mi, Gi, Ti, ...).  These are the prefixes
-         * often used within computing.
+         * Prefix that are base-2 (ki, Mi, Gi, Ti, ...).  These are the
+         * prefixes often used within computing.
          */
         BINARY
     };
 
-    public enum Prefix {
-
-        NONE(null, 1L, "") {
+    public enum Prefix
+    {
+        NONE(null, "") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return d / 1_000;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return d >> 10;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return d / 1_000_000;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return d >> 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return d / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d >> 30;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return d / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d >> 40;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return d / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d >> 50;
             }
 
             @Override
@@ -81,30 +123,71 @@ public class SiPrefix
             }
         },
 
-        KILO(DECIMAL, 1_000L, "k") {
+        KILO(DECIMAL, "k") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d * 1_000L;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return d;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return (d * 1_000L) >> 10;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return d / 1_000L;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return (d * 1_000L) >> 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return d / 1_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return (d * 1_000L) >> 30;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return d / 1_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return (d * 1_000L) >> 40;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return d / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return (d * 1_000L) >> 50;
             }
 
             @Override
@@ -114,30 +197,71 @@ public class SiPrefix
             }
         },
 
-        KIBI(BINARY, 1L<<10, "ki") {
+        KIBI(BINARY, "ki") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d << 10;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return (d << 10) / 1_000;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return d;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return (d << 10) / 1_000_000L;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return d >> 10;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return (d << 10) / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d >> 20;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return (d << 10) / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d >> 30;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return (d << 10) / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d >> 40;
             }
 
             @Override
@@ -147,30 +271,71 @@ public class SiPrefix
             }
         },
 
-        MEGA(DECIMAL, 1_000_000L, "M") {
+        MEGA(DECIMAL, "M") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d * 1_000_000L;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return d * 1_000;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return (d * 1_000_000) >> 10;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return d;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return (d * 1_000_000L) >> 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return d / 1_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return (d * 1_000_000L) >> 30;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return d / 1_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return (d * 1_000_000L) >> 40;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return d / 1_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return (d * 1_000_000L) >> 50;
             }
 
             @Override
@@ -180,30 +345,71 @@ public class SiPrefix
             }
         },
 
-        MEBI(BINARY, 1L<<20, "Mi") {
+        MEBI(BINARY, "Mi") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d << 20;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return (d << 20) / 1_000L;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return d << 10;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return (d << 20) / 1_000_000L;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return d;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return (d << 20) / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d >> 10;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return (d << 20) / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d >> 20;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return (d << 20) / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d >> 30;
             }
 
             @Override
@@ -213,176 +419,456 @@ public class SiPrefix
             }
         },
 
-        GIGA(DECIMAL, 1_000_000_000L, "G") {
+        GIGA(DECIMAL, "G") {
             @Override
-            public long toNone(long d) {
+            public long toNone(long d)
+            {
                 return d * 1_000_000_000L;
             }
 
             @Override
-            public long toKilo(long d) {
+            public long toKilo(long d)
+            {
                 return d * 1_000_000;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKibi(long d)
+            {
                 return (d * 1_000_000_000L) >> 10;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toMega(long d)
+            {
                 return d / 1_000L;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return (d * 1_000_000_000L) >> 20;
             }
-        },
 
-        GIBI(BINARY, 1L<<30, "Gi") {
             @Override
-            public long toNone(long d) {
-                return d << 30;
+            public long toGiga(long d)
+            {
+                return d;
             }
 
             @Override
-            public long toKilo(long d) {
-                return (d << 30) / 1_000;
+            public long toGibi(long d)
+            {
+                return (d * 1_000_000_000L) >> 30;
             }
 
             @Override
-            public long toKibi(long d) {
-                return d << 20;
+            public long toTera(long d)
+            {
+                return d / 1_000L;
             }
 
             @Override
-            public long toMega(long d) {
-                return (d << 30) / 1_000_000L;
+            public long toTebi(long d)
+            {
+                return (d * 1_000_000_000L) >> 40;
             }
 
             @Override
-            public long toMebi(long d) {
-                return d << 10;
-            }
-        },
-
-        TERA(DECIMAL, 1_000_000_000_000L, "T") {
-            @Override
-            public long toNone(long d) {
-                return d * 1_000_000_000_000L;
-            }
-
-            @Override
-            public long toKilo(long d) {
-                return d * 1_000_000_000L;
-            }
-
-            @Override
-            public long toKibi(long d) {
-                return (d * 1_000_000_000_000L) >> 10;
-            }
-
-            @Override
-            public long toMega(long d) {
+            public long toPeta(long d)
+            {
                 return d / 1_000_000L;
             }
 
             @Override
-            public long toMebi(long d) {
-                return (d * 1_000_000_000_000L) >> 20;
+            public long toPebi(long d)
+            {
+                return (d * 1_000_000_000L) >> 50;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toGiga(value);
             }
         },
 
-        TEBI(BINARY, 1L<<40, "Ti") {
+        GIBI(BINARY, "Gi") {
             @Override
-            public long toNone(long d) {
-                return d << 40;
-            }
-
-            @Override
-            public long toKilo(long d) {
-                return (d << 40) / 1_000;
-            }
-
-            @Override
-            public long toKibi(long d) {
+            public long toNone(long d)
+            {
                 return d << 30;
             }
 
             @Override
-            public long toMega(long d) {
-                return (d << 40) / 1_000_000L;
+            public long toKilo(long d)
+            {
+                return (d << 30) / 1_000;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toKibi(long d)
+            {
                 return d << 20;
+            }
+
+            @Override
+            public long toMega(long d)
+            {
+                return (d << 30) / 1_000_000L;
+            }
+
+            @Override
+            public long toMebi(long d)
+            {
+                return d << 10;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return (d << 30) / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return (d << 30) / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d >> 10;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return (d << 30) / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d >> 20;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toGibi(value);
             }
         },
 
-        PETA(DECIMAL, 1_000_000_000_000_000L, "P") {
+        TERA(DECIMAL, "T") {
             @Override
-            public long toNone(long d) {
-                return d * 1_000_000_000_000_000L;
-            }
-
-            @Override
-            public long toKilo(long d) {
+            public long toNone(long d)
+            {
                 return d * 1_000_000_000_000L;
             }
 
             @Override
-            public long toKibi(long d) {
+            public long toKilo(long d)
+            {
+                return d * 1_000_000_000L;
+            }
+
+            @Override
+            public long toKibi(long d)
+            {
                 return (d * 1_000_000_000_000L) >> 10;
             }
 
             @Override
-            public long toMega(long d) {
-                return d / 1_000_000_000L;
+            public long toMega(long d)
+            {
+                return d * 1_000_000L;
             }
 
             @Override
-            public long toMebi(long d) {
-                return (d * 1_000_000_000_000_000L) >> 20;
+            public long toMebi(long d)
+            {
+                return (d * 1_000_000_000_000L) >> 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return d * 1_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return (d * 1_000_000_000_000L) >> 30;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return d;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return (d * 1_000_000_000_000L) >> 40;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return d * 1_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return (d * 1_000_000_000_000L) >> 50;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toTera(value);
             }
         },
 
-        PEBI(BINARY, 1L<<50, "Pi") {
+        TEBI(BINARY, "Ti") {
             @Override
-            public long toNone(long d) {
-                return d << 50;
-            }
-
-            @Override
-            public long toKilo(long d) {
-                return (d << 50) / 1_000L;
-            }
-
-            @Override
-            public long toKibi(long d) {
+            public long toNone(long d)
+            {
                 return d << 40;
             }
 
             @Override
-            public long toMega(long d) {
+            public long toKilo(long d)
+            {
+                return (d << 40) / 1_000;
+            }
+
+            @Override
+            public long toKibi(long d)
+            {
+                return d << 30;
+            }
+
+            @Override
+            public long toMega(long d)
+            {
+                return (d << 40) / 1_000_000L;
+            }
+
+            @Override
+            public long toMebi(long d)
+            {
+                return d << 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return (d << 40) / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d << 10;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return (d << 40) / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return (d << 40) / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d >> 10;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toTebi(value);
+            }
+        },
+
+        PETA(DECIMAL, "P") {
+            @Override
+            public long toNone(long d)
+            {
+                return d * 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toKilo(long d)
+            {
+                return d * 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toKibi(long d)
+            {
+                return (d * 1_000_000_000_000_000L) >> 10;
+            }
+
+            @Override
+            public long toMega(long d)
+            {
+                return d * 1_000_000_000L;
+            }
+
+            @Override
+            public long toMebi(long d)
+            {
+                return (d * 1_000_000_000_000_000L) >> 20;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return d * 1_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return (d * 1_000_000_000_000_000L) >> 30;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return d * 1_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return (d * 1_000_000_000_000_000L) >> 40;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return d;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return (d * 1_000_000_000_000_000L) >> 50;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toPeta(value);
+            }
+        },
+
+        PEBI(BINARY, "Pi") {
+            @Override
+            public long toNone(long d)
+            {
+                return d << 50;
+            }
+
+            @Override
+            public long toKilo(long d)
+            {
+                return (d << 50) / 1_000L;
+            }
+
+            @Override
+            public long toKibi(long d)
+            {
+                return d << 40;
+            }
+
+            @Override
+            public long toMega(long d)
+            {
                 return (d << 50) / 1_000_000L;
             }
 
             @Override
-            public long toMebi(long d) {
+            public long toMebi(long d)
+            {
                 return d << 30;
+            }
+
+            @Override
+            public long toGiga(long d)
+            {
+                return (d << 50) / 1_000_000_000L;
+            }
+
+            @Override
+            public long toGibi(long d)
+            {
+                return d << 20;
+            }
+
+            @Override
+            public long toTera(long d)
+            {
+                return (d << 50) / 1_000_000_000_000L;
+            }
+
+            @Override
+            public long toTebi(long d)
+            {
+                return d << 10;
+            }
+
+            @Override
+            public long toPeta(long d)
+            {
+                return (d << 50) / 1_000_000_000_000_000L;
+            }
+
+            @Override
+            public long toPebi(long d)
+            {
+                return d;
+            }
+
+            @Override
+            public long convert(long value, Prefix prefix)
+            {
+                return prefix.toPebi(value);
             }
         };
 
         private final Type type;
-        private final long value;
         private final String label;
 
-        Prefix(Type type, long value, String label)
+        Prefix(Type type, String label)
         {
             this.type = type;
-            this.value = value;
             this.label = label;
         }
 
@@ -400,26 +886,61 @@ public class SiPrefix
          */
         public long convert(long sourceValue, Prefix sourcePrefix)
         {
-            return (sourceValue * sourcePrefix.value) / value;
-        }
-
-        public long toNone(long d) {
             throw new UnsupportedOperationException();
         }
 
-        public long toKilo(long d) {
+        public long toNone(long d)
+        {
             throw new UnsupportedOperationException();
         }
 
-        public long toKibi(long d) {
+        public long toKilo(long d)
+        {
             throw new UnsupportedOperationException();
         }
 
-        public long toMega(long d) {
+        public long toKibi(long d)
+        {
             throw new UnsupportedOperationException();
         }
 
-        public long toMebi(long d) {
+        public long toMega(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toMebi(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toGiga(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toGibi(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toTera(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toTebi(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toPeta(long d)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public long toPebi(long d)
+        {
             throw new UnsupportedOperationException();
         }
     }
@@ -460,11 +981,11 @@ public class SiPrefix
         Prefix desiredPrefix = NONE;
         for (Prefix prefix : Prefix.values()) {
             if (prefix.type == type) {
-                // 2 is somewhat arbitrary value, chosen for ascetic reasons.
-                if (size < prefix.value * 2) {
+                if (prefix.convert(size, NONE) >= 2) {
+                    desiredPrefix = prefix;
+                } else {
                     break;
                 }
-                desiredPrefix = prefix;
             }
         }
 
