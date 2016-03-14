@@ -29,6 +29,13 @@ public class MessageReply<T extends Message>
     private CellEndpoint _endpoint;
     private CellMessage _envelope;
     private T _msg;
+    private ExceptionListener _listener;
+
+    @Override
+    public synchronized void commandException(ExceptionListener listener)
+    {
+        _listener = listener;
+    }
 
     @Override
     public synchronized void deliver(CellEndpoint endpoint, CellMessage envelope)
@@ -62,6 +69,9 @@ public class MessageReply<T extends Message>
 
     public void fail(T msg, int rc, Serializable e)
     {
+        if (_listener != null && e instanceof Exception) {
+            _listener.accept((Exception) e);
+        }
         msg.setFailed(rc, e);
         reply(msg);
     }

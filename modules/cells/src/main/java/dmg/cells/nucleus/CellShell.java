@@ -68,6 +68,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
+import dmg.cells.nucleus.Reply.ExceptionListener;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 /**
   *
   *
@@ -240,6 +246,14 @@ public class CellShell extends CommandInterpreter
          _errorMsg  = null ;
          if( o == null ) {
              return "";
+         }
+         if (o instanceof Reply) {
+            ((Reply) o).commandException(e -> {
+                    if (e instanceof CommandException) {
+                        CommandException ce = (CommandException) e;
+                        _errorCode = ce.getErrorCode();
+                        _errorMsg = ce.getErrorMessage();
+                    }});
          }
          return o ;
       }catch( CommandException ce ){
@@ -485,143 +499,134 @@ public class CellShell extends CommandInterpreter
             }
         }
     }
-   ////////////////////////////////////////////////////////////
-   //
-   //   waitfor cell/domain/context
-   //
-   public static final String hh_waitfor=
-       "context|cell|domain <objectName> [<domain>] [-i=<checkInterval>] [-wait=<maxTime>]" ;
-   public static final String fh_waitfor =
-       "waitfor [options]  context  <contextName> [<domainName]\n" +
-       "waitfor [options]  cell     <cellPath>\n" +
-       "waitfor [options]  domain   <domainName>\n"+
-       "    Options : -i=<probeInterval   -wait=<maxWaitSeconds>\n" ;
 
-   public String ac_waitfor_$_2_3( Args args ) throws CommandException{
-      int waitTime = 0 ;
-      int check    = 1 ;
-      for( int i = 0 ; i < args.optc() ; i ++ ){
-        if( args.optv(i).startsWith("-i=") ) {
-            check = Integer.parseInt(args.optv(i).substring(3));
-        } else if( args.optv(i).startsWith("-wait=") ) {
-            waitTime = Integer.parseInt(args.optv(i).substring(6));
+    private enum TargetType {
+        CONTEXT, CELL, DOMAIN;
+    };
+
+    @Command(name = "waitfor", hint = "block until some target exists",
+           description =
+                    "Wait for a named target of the given type to exist, where " +
+                    "the type is one of 'context', 'cell' or 'domain'.  The " +
+                    "command returns once the object exists or after a fixed " +
+                    "time has elapsed." +
+                    "\n\n" +
+                    "If the type is 'context' then the command checks for the "+
+                    "existence of the named context in <domain>.  If <domain> " +
+                    "is not specified then then the current domain is checked." +
+                    "\n\n" +
+                    "If the type is 'cell' then the command checks for the " +
+                    "existence of a cell by sending a ping message and waiting " +
+                    "for the response.  The name can be any valid cell name: " +
+                    "both simple names (without '@') and fully-qualified names " +
+                    "are supported." +
+                    "\n\n"+
+                    "If the type is 'domain' then the command checks for the " +
+                    "the appearance of the named domain.  This is equivalent to " +
+                    "checking the existence of the System cell in that domain." +
+                    "\n\n"+
+                    "The command is successful if the object exists.  It " +
+                    "has a return code of 1 if the command timed out before " +
+                    "the target appeared, and 2 if the command is interrupted " +
+                    "by dCache shutting down.")
+    public class WaitforCommand extends DelayedCommand<String>
+    {
+        @Option(name="i", usage="The time between successive attempts to "+
+                "discover if the target exists, in seconds.  This value also " +
+                "controls the timeout for messages", metaVar="duration")
+        private long check = 1;
+
+        @Option(name="wait", usage="The time to wait for the target to appear, " +
+                "in seconds.  Zero or negative values are not valid.",
+                metaVar="duration")
+        private long wait = MINUTES.toSeconds(5);
+
+        @Argument(index=0, usage="The kind of target to be checked.",
+                valueSpec="cell|domain|context",
+                metaVar="type")
+        private TargetType type;
+
+        @Argument(index=1, usage="The cell address if type is 'cell', domain " +
+                "name if type is 'domain', or context name if type is 'context'",
+                metaVar="name")
+        private String target;
+
+        @Argument(index=2, usage="The domain to check if type is 'context'. " +
+                "The value is ignored otherwise.",
+                required=false, metaVar="domain")
+        private String domain;
+
+        @Override
+        public Reply call() throws Exception
+        {
+            checkArgument(wait > 0, "Wait must be a positive integer.");
+            checkArgument(check > 0, "The check interval must be a positive integer.");
+
+            return super.call();
         }
-      }
-      if( waitTime < 0 ) {
-          waitTime = 0;
-      }
-      String what = args.argv(0) ;
-      String name = args.argv(1) ;
 
-       switch (what) {
-       case "cell":
-           return _waitForCell(name, waitTime, check, null);
-       case "domain":
-           return _waitForCell("System@" + name, waitTime, check, null);
-       case "context":
-           if (args.argc() > 2) {
-               return _waitForCell("System@" + args.argv(2),
-                       waitTime, check, "test context " + name);
-           } else {
-               return _waitForContext(name, waitTime, check);
-           }
-       }
+        @Override
+        public String execute() throws CommandException
+        {
+            // Deadline for the last probe, given calling isTargetExisting can
+            // block for up to check seconds.
+            long deadline = System.currentTimeMillis() + SECONDS.toMillis(wait)
+                    - SECONDS.toMillis(check);
 
-      throw new CommandException( "Unknown Observable : "+what ) ;
-   }
-   private String _waitForContext( String contextName , int waitTime , int check )
-           throws CommandException {
+            try {
+                boolean found;
 
+                do {
+                    found = isTargetExisting();
 
-      if( check <= 0 ) {
-          check = 1;
-      }
-      long finish = System.currentTimeMillis() + ( waitTime * 1000 ) ;
-      while( true ){
-         Object o = _nucleus.getDomainContext( contextName ) ;
-         if( o != null ) {
-             break;
-         }
-         if( ( waitTime == 0 ) || ( finish > System.currentTimeMillis()  ) ){
-            try{ Thread.sleep(((long)check)*1000) ; }
-            catch( InterruptedException ie ){
-               throw new
-               CommandException( 2 , "Command Was interrupted" ) ;
+                    long remaining = Math.max(0L, deadline - System.currentTimeMillis());
+
+                    if (!found && remaining > 0) {
+                        Thread.sleep(Math.min(SECONDS.toMillis(check), remaining));
+                    }
+                } while (!found && System.currentTimeMillis() < deadline);
+
+                if (!found) {
+                    throw new CommandException(1, "Command timed Out");
+                }
+
+                return "";
+            } catch (InterruptedException e) {
+                throw new CommandException(2, "Command was interrupted");
             }
-            continue ;
-         }
-         throw new
-         CommandException( 1 , "Command Timed Out" ) ;
-      }
-      return "" ;
-   }
-   private String _waitForCell( String cellName ,
-                               int waitTime , int check ,
-                               String command  )
-           throws CommandException {
+        }
 
-      if( check <= 4 ) {
-          check = 5;
-      }
-      CellPath destination = new CellPath( cellName ) ;
-      long finish = System.currentTimeMillis() + ( waitTime * 1000 ) ;
-      CellMessage answer = null ;
-      //
-      // creating the message now and send it forever does not
-      // allow time messurements.
-      //
-      CellMessage request  =
-          new CellMessage( destination ,
-                           (command == null ?
-                                   new PingMessage() : command) ) ;
-
-      Object o;
-      boolean noRoute;
-      while( true ){
-          noRoute = false ;
-          answer = null ;
-          try{
-            _log.warn( "waitForCell : Sending request" ) ;
-            answer = _nucleus.sendAndWait( request , ((long) check) * 1000);
-            _log.warn( "waitForCell : got "+answer ) ;
-         } catch (NoRouteToCellException e) {
-            noRoute = true ;
-         } catch (ExecutionException ignored) {
-         } catch (InterruptedException e) {
-            throw new CommandException(66, "sendAndWait problem : " + e.toString(), e);
-         }
-         if( ( answer != null ) &&
-             ( ( o = answer.getMessageObject() ) != null ) &&
-             ( ( o instanceof PingMessage ) || (o instanceof String) )
-           ) {
-             break;
-         }
-
-         if( ( waitTime == 0 ) ||
-             ( finish > System.currentTimeMillis() )  ){
-
-            //
-            // not to waste cpu time, we should distinquish between
-            // between timeout and NoRouteToCellException
-            //
-            if( ( ! noRoute ) && ( answer == null ) ) {
-                continue;
+        private boolean isTargetExisting() throws InterruptedException
+        {
+            switch (type) {
+            case CELL:
+               return sendCommand(target, new PingMessage()) instanceof PingMessage;
+            case DOMAIN:
+               return sendCommand("System@" + target, new PingMessage()) instanceof PingMessage;
+            case CONTEXT:
+                if (domain == null) {
+                    return _nucleus.getDomainContext(target) != null;
+                } else {
+                    return sendCommand("System@" + domain, "test context " + target) instanceof String;
+                }
+            default:
+                throw new RuntimeException("Unknown type: " + type);
             }
-            //
-            // this answer was to fast to try it again, so we wait
-            //
-            try{ Thread.sleep(((long)check)*1000) ; }
-            catch( InterruptedException ie ){
-               throw new
-               CommandException( 2 , "Command Was interrupted" ) ;
+        }
+
+        private Serializable sendCommand(String destination, Serializable payload)
+                throws InterruptedException
+        {
+            CellMessage request  = new CellMessage(new CellPath(destination), payload);
+            try {
+                CellMessage answer = _nucleus.sendAndWait(request, SECONDS.toMillis(check));
+                return answer == null ? null : answer.getMessageObject();
+            } catch (NoRouteToCellException | ExecutionException ignored) {
+                return null;
             }
-            continue ;
-         }
-         throw new
-         CommandException( 1 , "Command Timed Out" ) ;
-      }
-      return "" ;
-   }
+        }
+    }
+
    ////////////////////////////////////////////////////////////
    //
    //   route

@@ -11,6 +11,7 @@ public class DelayedReply implements Reply
     private CellEndpoint _endpoint;
     private CellMessage _envelope;
     private Serializable _msg;
+    private ExceptionListener _listener;
 
     @Override
     public synchronized void deliver(CellEndpoint endpoint, CellMessage envelope)
@@ -24,6 +25,9 @@ public class DelayedReply implements Reply
 
     public synchronized void reply(Serializable msg)
     {
+        if (_listener != null && msg instanceof Exception) {
+            _listener.accept((Exception) msg);
+        }
         _msg = msg;
         if (_envelope != null) {
             send();
@@ -37,5 +41,11 @@ public class DelayedReply implements Reply
         _endpoint.sendMessage(_envelope);
         _envelope = null;
         _endpoint = null;
+    }
+
+    @Override
+    public synchronized void commandException(ExceptionListener listener)
+    {
+        _listener = listener;
     }
 }
