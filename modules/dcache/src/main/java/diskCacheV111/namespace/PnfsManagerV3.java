@@ -35,6 +35,10 @@ import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.stream.Collectors;
+
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.ChecksumFactory;
 import diskCacheV111.util.FileNotFoundCacheException;
@@ -44,6 +48,7 @@ import diskCacheV111.util.MissingResourceCacheException;
 import diskCacheV111.util.NotDirCacheException;
 import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsId;
+import diskCacheV111.vehicles.DoorCancelledUploadNotificationMessage;
 import diskCacheV111.vehicles.Message;
 import diskCacheV111.vehicles.PnfsAddCacheLocationMessage;
 import diskCacheV111.vehicles.PnfsCancelUpload;
@@ -192,6 +197,7 @@ public class PnfsManagerV3
     private CellStub _stub;
 
     private List<String> _flushNotificationTargets;
+    private List<CellPath> _cancelUploadNotificationTargets = Collections.emptyList();
 
     private void populateRequestMap()
     {
@@ -304,6 +310,18 @@ public class PnfsManagerV3
     {
         _flushNotificationTargets = Splitter.on(",").omitEmptyStrings().splitToList(target);
     }
+
+    @Required
+    public void setCancelUploadNotificationTarget(String target)
+    {
+        _cancelUploadNotificationTargets = Arrays.stream(target.split(","))
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .map(CellPath::new)
+                .collect(Collectors.toList());
+    }
+
+
 
     public void init()
     {
@@ -1305,11 +1323,29 @@ public class PnfsManagerV3
 
     void cancelUpload(PnfsCancelUpload message)
     {
+        Subject subject = message.getSubject();
+        String explanation = message.getExplanation();
+
         try {
             checkRestriction(message, UPLOAD);
-            _nameSpaceProvider.cancelUpload(message.getSubject(),
-                    message.getUploadPath(), message.getPath(),
-                    message.getExplanation());
+
+            Set<FileAttribute> requested = message.getRequestedAttributes();
+            requested.addAll(EnumSet.of(PNFSID, NLINK, SIZE));
+            Collection<FileAttributes> deletedFiles =
+                    _nameSpaceProvider.cancelUpload(subject,
+                    message.getUploadPath(), message.getPath(), requested,
+                    explanation);
+
+            deletedFiles.stream()
+                    .filter(f -> f.isUndefined(SIZE)) // currently uploading
+                    .filter(f -> f.getNlink() == 1) // with no hard links
+                    .map(FileAttributes::getPnfsId)
+                    .forEach(id ->
+                            _cancelUploadNotificationTargets.forEach(p ->
+                                    _stub.notify(p, new DoorCancelledUploadNotificationMessage(subject,
+                                            id, explanation))));
+
+            message.setDeletedFiles(deletedFiles);
             message.setSucceeded();
         } catch (CacheException e) {
             message.setFailed(e.getRc(), e.getMessage());
@@ -1338,6 +1374,10 @@ public class PnfsManagerV3
 
             FileAttributes attributes;
 
+            if (allowed.contains(REGULAR)) {
+                requested.addAll(EnumSet.of(SIZE, TYPE, NLINK));
+            }
+
             if (path != null) {
                 _log.info("delete PNFS entry for {}", path);
                 if (pnfsId != null) {
@@ -1347,7 +1387,8 @@ public class PnfsManagerV3
                     requested.add(PNFSID);
                     attributes = _nameSpaceProvider.deleteEntry(subject, allowed,
                             path, requested);
-                    pnfsMessage.setPnfsId(attributes.getPnfsId());
+                    pnfsId = attributes.getPnfsId();
+                    pnfsMessage.setPnfsId(pnfsId);
                 }
             } else {
                 _log.info("delete PNFS entry for {}", pnfsId);

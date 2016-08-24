@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -1481,7 +1482,8 @@ public class ChimeraNameSpaceProvider
 
             /* Delete temporary upload directory and any files in it.
              */
-            removeRecursively(uploadDirInode, temporaryDir.name(), temporaryDirInode);
+            removeRecursively(null, uploadDirInode, temporaryDir.name(),
+                    temporaryDirInode, EnumSet.noneOf(FileAttribute.class));
 
             return attributes;
         } catch (ChimeraFsException e) {
@@ -1493,9 +1495,11 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void cancelUpload(Subject subject, FsPath temporaryPath,
-            FsPath finalPath, String explanation) throws CacheException
+    public Collection<FileAttributes> cancelUpload(Subject subject, FsPath temporaryPath,
+            FsPath finalPath, Set<FileAttribute> requested, String explanation)
+            throws CacheException
     {
+        List<FileAttributes> deleted = new ArrayList();
         try {
             FsPath temporaryDir = getParentOfFile(temporaryPath);
 
@@ -1513,13 +1517,17 @@ public class ChimeraNameSpaceProvider
             /* Delete temporary upload directory and any files in it.
              */
             String name = temporaryPath.parent().name();
-            removeRecursively(uploadDirInode, name, uploadDirInode.inodeOf(name, STAT));
+            removeRecursively(deleted, uploadDirInode, name,
+                    uploadDirInode.inodeOf(name, STAT), requested);
         } catch (ChimeraFsException e) {
             throw new CacheException(CacheException.UNEXPECTED_SYSTEM_EXCEPTION, e.getMessage());
         }
+        return deleted;
     }
 
-    private void removeRecursively(ExtendedInode parent, String name, ExtendedInode inode) throws ChimeraFsException
+    private void removeRecursively(@Nullable List<FileAttributes> deleted,
+            ExtendedInode parent, String name, ExtendedInode inode,
+            Set<FileAttribute> requested) throws ChimeraFsException, CacheException
     {
         try {
             if (inode.isDirectory() && inode.stat().getNlink() > 2) {
@@ -1527,7 +1535,12 @@ public class ChimeraNameSpaceProvider
                     for (HimeraDirectoryEntry entry : list) {
                         String child = entry.getName();
                         if (!child.equals(".") && !child.equals("..")) {
-                            removeRecursively(inode, child, new ExtendedInode(_fs, entry.getInode()));
+                            ExtendedInode childInode = new ExtendedInode(_fs, entry.getInode());
+                            if (deleted != null && childInode.getFileType() == FileType.REGULAR) {
+                                deleted.add(getFileAttributes(childInode, requested));
+                            }
+                            removeRecursively(deleted, inode, child, childInode,
+                                    requested);
                         }
                     }
                 }

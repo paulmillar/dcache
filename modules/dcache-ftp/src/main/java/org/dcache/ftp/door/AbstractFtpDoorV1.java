@@ -88,7 +88,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.Writer;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -123,6 +122,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -141,6 +141,7 @@ import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.TimeoutCacheException;
+import diskCacheV111.vehicles.DoorCancelledUploadNotificationMessage;
 import diskCacheV111.vehicles.DoorRequestInfoMessage;
 import diskCacheV111.vehicles.DoorTransferFinishedMessage;
 import diskCacheV111.vehicles.GFtpProtocolInfo;
@@ -192,7 +193,6 @@ import org.dcache.namespace.FileType;
 import org.dcache.namespace.PermissionHandler;
 import org.dcache.namespace.PosixPermissionHandler;
 import org.dcache.poolmanager.PoolManagerHandler;
-import org.dcache.poolmanager.PoolManagerHandlerSubscriber;
 import org.dcache.poolmanager.PoolManagerStub;
 import org.dcache.services.login.RemoteLoginStrategy;
 import org.dcache.util.Args;
@@ -232,6 +232,11 @@ import static org.dcache.util.NetLoggerBuilder.Level.INFO;
 enum AnonymousPermission
 {
     ALLOW_ANONYMOUS_USER, FORBID_ANONYMOUS_USER
+}
+
+/** Cancelling a transfer by notification. */
+class CancelledUploadException extends Exception
+{
 }
 
 /**
@@ -556,6 +561,7 @@ public abstract class AbstractFtpDoorV1
     protected CellStub _gPlazmaStub;
     protected TransferRetryPolicy _readRetryPolicy;
     protected TransferRetryPolicy _writeRetryPolicy;
+    private final Map<PnfsId,FtpTransfer> _uploads = new ConcurrentHashMap<>();
 
     /** Tape Protection */
     protected CheckStagePermission _checkStagePermission;
@@ -938,6 +944,10 @@ public abstract class AbstractFtpDoorV1
         @Override
         protected void onFinish() throws FTPCommandException
         {
+            if (getFileAttributes().isDefined(PNFSID)) {
+                _uploads.remove(getFileAttributes().getPnfsId());
+            }
+
             try {
                 ProxyAdapter adapter;
                 synchronized (this) {
@@ -994,6 +1004,10 @@ public abstract class AbstractFtpDoorV1
         @Override
         protected synchronized void onFailure(Throwable t)
         {
+            if (getFileAttributes().isDefined(PNFSID)) {
+                _uploads.remove(getFileAttributes().getPnfsId());
+            }
+
             if (_perfMarkerTask != null) {
                 _perfMarkerTask.stop();
             }
@@ -1008,7 +1022,7 @@ public abstract class AbstractFtpDoorV1
                 }
             }
 
-            if (isWrite()) {
+            if (isWrite() && !(t.getCause() instanceof CancelledUploadException)) {
                 if (_settings.isRemoveFileOnIncompleteTransfer()) {
                     LOGGER.warn("Removing incomplete file {}: {}", getPnfsId(), _path);
                     deleteNameSpaceEntry();
@@ -1045,6 +1059,16 @@ public abstract class AbstractFtpDoorV1
             }
             setTransfer(null);
             reply(_commandLine, msg);
+        }
+
+        @Override
+        protected String explain(Throwable t)
+        {
+            if (t instanceof FTPCommandException) {
+                return ((FTPCommandException)t).getReply();
+            }
+
+            return super.explain(t);
         }
 
         public void getInfo(PrintWriter pw)
@@ -1445,6 +1469,15 @@ public abstract class AbstractFtpDoorV1
         ListDirectoryHandler listSource = _listSource;
         if (listSource != null) {
             listSource.messageArrived(message);
+        }
+    }
+
+    public void messageArrived(DoorCancelledUploadNotificationMessage message)
+    {
+        FtpTransfer transfer = _uploads.get(message.getPnfsId());
+        if (transfer != null) {
+            transfer.abort(555, message.getExplanation(),
+                    new CancelledUploadException());
         }
     }
 
@@ -3197,6 +3230,7 @@ public abstract class AbstractFtpDoorV1
                             delayedPassive,
                             protocolFamily,
                             version);
+        PnfsId pnfsid = null;
         try {
             LOGGER.info("store receiving with mode {}", xferMode);
 
@@ -3204,6 +3238,8 @@ public abstract class AbstractFtpDoorV1
                 transfer.redirect(null);
             }
             transfer.createNameSpaceEntry();
+            pnfsid = transfer.getFileAttributes().getPnfsId();
+            _uploads.put(pnfsid, transfer);
             transfer.createTransactionLog();
             if (_checkSum != null) {
                 transfer.setChecksum(_checkSum);
@@ -3211,6 +3247,7 @@ public abstract class AbstractFtpDoorV1
 
             transfer.createAdapter();
             transfer.selectPoolAndStartMoverAsync(_writeRetryPolicy);
+            pnfsid = null;
         } catch (IOException e) {
             transfer.abort(451, "Operation failed: " + e.getMessage());
         } catch (PermissionDeniedCacheException e) {
@@ -3249,6 +3286,9 @@ public abstract class AbstractFtpDoorV1
             LOGGER.error("Store failed", e);
             transfer.abort(451, "Transient internal failure");
         } finally {
+            if (pnfsid != null) {
+                _uploads.remove(pnfsid);
+            }
             _checkSumFactory = null;
             _checkSum = null;
             _allo = 0;
