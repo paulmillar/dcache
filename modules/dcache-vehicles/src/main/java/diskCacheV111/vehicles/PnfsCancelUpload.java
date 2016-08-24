@@ -17,11 +17,14 @@
  */
 package diskCacheV111.vehicles;
 
+import javax.annotation.Nonnull;
 import javax.security.auth.Subject;
 
 import diskCacheV111.util.FsPath;
 
 import org.dcache.auth.attributes.Restriction;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Revoke a temporary upload path.
@@ -35,6 +38,7 @@ public class PnfsCancelUpload extends PnfsMessage
     private static final long serialVersionUID = 1198546600602532976L;
 
     private final String uploadPath;
+    private String explanation = "SRM cancelled upload";
 
     public PnfsCancelUpload(Subject subject, Restriction restriction, FsPath uploadPath, FsPath path)
     {
@@ -53,5 +57,16 @@ public class PnfsCancelUpload extends PnfsMessage
     public FsPath getUploadPath()
     {
         return FsPath.create(uploadPath);
+    }
+
+    public void setExplanation(@Nonnull String explanation)
+    {
+        this.explanation = requireNonNull(explanation);
+    }
+
+    @Nonnull
+    public String getExplanation()
+    {
+        return explanation;
     }
 }

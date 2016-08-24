@@ -275,7 +275,7 @@ public class PerformanceTest extends Thread
                                                       CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME, CHANGE_TIME));
                 break;
             case DELETE_ENTRY:
-                provider.deleteEntry(Subjects.ROOT, EnumSet.allOf(FileType.class), path);
+                provider.deleteEntry(Subjects.ROOT, EnumSet.allOf(FileType.class), path, null);
                 break;
             case PNFS_ID_TO_PATH:
                 provider.pnfsidToPath(Subjects.ROOT, getPnfsid(path));
@@ -329,7 +329,7 @@ public class PerformanceTest extends Thread
                 provider.createDirectory(Subjects.ROOT, path, UID, GID, 0755);
                 break;
             case RMDIR:
-                provider.deleteEntry(Subjects.ROOT, EnumSet.of(FileType.DIR), path);
+                provider.deleteEntry(Subjects.ROOT, EnumSet.of(FileType.DIR), path, null);
                 break;
             default:
                 break;

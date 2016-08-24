@@ -397,8 +397,8 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId)
-        throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId,
+            Set<FileAttribute> attr) throws CacheException
     {
         try {
             ExtendedInode inode = new ExtendedInode(_fs, pnfsId, STAT);
@@ -410,6 +410,8 @@ public class ChimeraNameSpaceProvider
             }
 
             _fs.remove(inode);
+
+            return attr == null ? null : getFileAttributes(inode, attr);
         }catch(FileNotFoundHimeraFsException fnf) {
             throw new FileNotFoundCacheException("No such file or directory: " + pnfsId);
         }catch(DirNotEmptyHimeraFsException e) {
@@ -421,8 +423,8 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path)
-        throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed,
+            String path, Set<FileAttribute> attr) throws CacheException
     {
         try {
             File filePath = new File(path);
@@ -444,7 +446,7 @@ public class ChimeraNameSpaceProvider
 
             _fs.remove(parent, name, inode);
 
-            return inode.getPnfsId();
+            return attr == null ? null : getFileAttributes(inode, attr);
         }catch(FileNotFoundHimeraFsException fnf) {
             throw new FileNotFoundCacheException("No such file or directory: " + path);
         }catch(DirNotEmptyHimeraFsException e) {
@@ -456,8 +458,8 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path)
-            throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed,
+            PnfsId pnfsId, String path, Set<FileAttribute> attr) throws CacheException
     {
         try {
             File filePath = new File(path);
@@ -482,6 +484,8 @@ public class ChimeraNameSpaceProvider
             }
 
             _fs.remove(parent, name, inode);
+
+            return attr == null ? null : getFileAttributes(inode, attr);
         } catch (FileNotFoundHimeraFsException fnf) {
             throw new FileNotFoundCacheException("No such file or directory: " + path);
         } catch (DirNotEmptyHimeraFsException e) {
@@ -872,6 +876,10 @@ public class ChimeraNameSpaceProvider
                     attributes.setCacheClass(storageInfo.getCacheClass());
                     attributes.setHsm(storageInfo.getHsm());
                 }
+                break;
+            case NLINK:
+                stat = inode.statCache();
+                attributes.setNlink(stat.getNlink());
                 break;
             default:
                 throw new UnsupportedOperationException("Attribute " + attribute + " not supported yet.");
@@ -1415,7 +1423,7 @@ public class ChimeraNameSpaceProvider
 
             /* Delete temporary upload directory and any files in it.
              */
-            removeRecursively(uploadDirInode, temporaryDir.name(), temporaryDirInode);
+            removeRecursively(uploadDirInode, temporaryDir.name(), null, temporaryDirInode);
 
             return attributes;
         } catch (ChimeraFsException e) {
@@ -1427,7 +1435,7 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public void cancelUpload(Subject subject, FsPath temporaryPath, FsPath finalPath) throws CacheException
+    public PnfsId cancelUpload(Subject subject, FsPath temporaryPath, FsPath finalPath) throws CacheException
     {
         try {
             FsPath temporaryDir = getParentOfFile(temporaryPath);
@@ -1446,26 +1454,32 @@ public class ChimeraNameSpaceProvider
             /* Delete temporary upload directory and any files in it.
              */
             String name = temporaryPath.parent().name();
-            removeRecursively(uploadDirInode, name, uploadDirInode.inodeOf(name, STAT));
+            return removeRecursively(uploadDirInode, name, temporaryPath.name(), uploadDirInode.inodeOf(name, STAT));
         } catch (ChimeraFsException e) {
             throw new CacheException(CacheException.UNEXPECTED_SYSTEM_EXCEPTION, e.getMessage());
         }
     }
 
-    private void removeRecursively(ExtendedInode parent, String name, ExtendedInode inode) throws ChimeraFsException
+    private PnfsId removeRecursively(ExtendedInode parent, String name, String target, ExtendedInode inode) throws ChimeraFsException
     {
         try {
+            PnfsId id = null;
             if (inode.isDirectory() && inode.stat().getNlink() > 2) {
                 try (DirectoryStreamB<HimeraDirectoryEntry> list = _fs.newDirectoryStream(inode)) {
                     for (HimeraDirectoryEntry entry : list) {
                         String child = entry.getName();
                         if (!child.equals(".") && !child.equals("..")) {
-                            removeRecursively(inode, child, new ExtendedInode(_fs, entry.getInode()));
+                            ExtendedInode childInode = new ExtendedInode(_fs, entry.getInode());
+                            if (child.equals(target)) {
+                                id = childInode.getPnfsId();
+                            }
+                            removeRecursively(inode, child, null, childInode);
                         }
                     }
                 }
             }
             _fs.remove(parent, name, inode);
+            return id;
         } catch (ChimeraFsException e) {
             throw e;
         } catch (IOException e) {

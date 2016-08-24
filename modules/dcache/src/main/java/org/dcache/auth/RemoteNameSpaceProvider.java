@@ -92,24 +92,27 @@ public class RemoteNameSpaceProvider implements NameSpaceProvider
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId id) throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed,
+            PnfsId id, Set<FileAttribute> attr) throws CacheException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, Restrictions.none());
-        pnfs.deletePnfsEntry(id, null, allowed);
+        return pnfs.deletePnfsEntry(id, null, allowed, attr);
     }
 
     @Override
-    public PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path) throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed,
+            String path, Set<FileAttribute> attr) throws CacheException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, Restrictions.none());
-        return pnfs.deletePnfsEntry(path, allowed);
+        return pnfs.deletePnfsEntry(null, path, allowed, attr);
     }
 
     @Override
-    public void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path) throws CacheException
+    public FileAttributes deleteEntry(Subject subject, Set<FileType> allowed,
+            PnfsId pnfsId, String path, Set<FileAttribute> attr) throws CacheException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, Restrictions.none());
-        pnfs.deletePnfsEntry(pnfsId, path, allowed);
+        return pnfs.deletePnfsEntry(pnfsId, path, allowed, attr);
     }
 
     @Override
@@ -238,8 +241,8 @@ public class RemoteNameSpaceProvider implements NameSpaceProvider
     }
 
     @Override
-    public void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException
+    public PnfsId cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException
     {
-        _pnfs.request(new PnfsCancelUpload(subject, Restrictions.none(), uploadPath, path));
+        return _pnfs.request(new PnfsCancelUpload(subject, Restrictions.none(), uploadPath, path)).getPnfsId();
     }
 }

@@ -122,6 +122,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -140,6 +141,7 @@ import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.TimeoutCacheException;
+import diskCacheV111.vehicles.CancelUploadNotificationMessage;
 import diskCacheV111.vehicles.DoorRequestInfoMessage;
 import diskCacheV111.vehicles.DoorTransferFinishedMessage;
 import diskCacheV111.vehicles.GFtpProtocolInfo;
@@ -551,6 +553,7 @@ public abstract class AbstractFtpDoorV1
     protected CellStub _gPlazmaStub;
     protected TransferRetryPolicy _readRetryPolicy;
     protected TransferRetryPolicy _writeRetryPolicy;
+    private final Map<PnfsId,FtpTransfer> _uploads = new ConcurrentHashMap<>();
 
     /** Tape Protection */
     protected CheckStagePermission _checkStagePermission;
@@ -932,6 +935,10 @@ public abstract class AbstractFtpDoorV1
         @Override
         protected void onFinish() throws FTPCommandException
         {
+            if (getFileAttributes().isDefined(PNFSID)) {
+                _uploads.remove(getFileAttributes().getPnfsId());
+            }
+
             try {
                 ProxyAdapter adapter;
                 synchronized (this) {
@@ -988,6 +995,10 @@ public abstract class AbstractFtpDoorV1
         @Override
         protected synchronized void onFailure(Throwable t)
         {
+            if (getFileAttributes().isDefined(PNFSID)) {
+                _uploads.remove(getFileAttributes().getPnfsId());
+            }
+
             if (_perfMarkerTask != null) {
                 _perfMarkerTask.stop();
             }
@@ -1039,6 +1050,18 @@ public abstract class AbstractFtpDoorV1
             }
             setTransfer(null);
             reply(_commandLine, msg);
+        }
+
+        @Override
+        protected String explain(Throwable t)
+        {
+            if (t instanceof FTPCommandException) {
+                return ((FTPCommandException)t).getReply();
+            } else if (t instanceof RuntimeException) {
+                return "bug " + t.toString();
+            } else {
+                return t.getMessage();
+            }
         }
 
         public void getInfo(PrintWriter pw)
@@ -1438,6 +1461,14 @@ public abstract class AbstractFtpDoorV1
         ListDirectoryHandler listSource = _listSource;
         if (listSource != null) {
             listSource.messageArrived(message);
+        }
+    }
+
+    public void messageArrived(CancelUploadNotificationMessage message)
+    {
+        FtpTransfer transfer = _uploads.get(message.getPnfsId());
+        if (transfer != null) {
+            transfer.abort(555, "transfer aborted: " + message.getExplanation());
         }
     }
 
@@ -3190,6 +3221,7 @@ public abstract class AbstractFtpDoorV1
                             delayedPassive,
                             protocolFamily,
                             version);
+        PnfsId pnfsid = null;
         try {
             LOGGER.info("store receiving with mode {}", xferMode);
 
@@ -3197,6 +3229,8 @@ public abstract class AbstractFtpDoorV1
                 transfer.redirect(null);
             }
             transfer.createNameSpaceEntry();
+            pnfsid = transfer.getFileAttributes().getPnfsId();
+            _uploads.put(pnfsid, transfer);
             transfer.createTransactionLog();
             if (_checkSum != null) {
                 transfer.setChecksum(_checkSum);
@@ -3204,6 +3238,7 @@ public abstract class AbstractFtpDoorV1
 
             transfer.createAdapter();
             transfer.selectPoolAndStartMoverAsync(_settings.getIoQueueName(), _writeRetryPolicy);
+            pnfsid = null;
         } catch (IOException e) {
             transfer.abort(451, "Operation failed: " + e.getMessage());
         } catch (PermissionDeniedCacheException e) {
@@ -3242,6 +3277,9 @@ public abstract class AbstractFtpDoorV1
             LOGGER.error("Store failed", e);
             transfer.abort(451, "Transient internal failure");
         } finally {
+            if (pnfsid != null) {
+                _uploads.remove(pnfsid);
+            }
             _checkSumFactory = null;
             _checkSum = null;
             _allo = 0;

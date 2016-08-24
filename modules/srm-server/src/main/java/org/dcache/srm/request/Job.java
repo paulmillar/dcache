@@ -385,6 +385,14 @@ public abstract class Job  {
        return errorsb.toString();
     }
 
+    public String getSimpleErrorMessage() {
+        if (!jobHistory.isEmpty()) {
+            return jobHistory.get(jobHistory.size() -1).getDescription();
+        } else {
+            return "unknown reason";
+        }
+    }
+
     public void addHistoryEvent(String description){
         wlock();
         try {

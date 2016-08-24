@@ -958,7 +958,8 @@ public class DcacheResourceFactory
         throws CacheException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
-        pnfs.deletePnfsEntry(attributes.getPnfsId(), path.toString(), EnumSet.of(REGULAR, LINK));
+        pnfs.deletePnfsEntry(attributes.getPnfsId(), path.toString(),
+                EnumSet.of(REGULAR, LINK), null);
         sendRemoveInfoToBilling(attributes, path);
     }
 
@@ -983,7 +984,7 @@ public class DcacheResourceFactory
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, getSubject(), getRestriction());
         pnfs.deletePnfsEntry(pnfsid, path.toString(),
-                             EnumSet.of(DIR));
+                             EnumSet.of(DIR), null);
     }
 
     /**

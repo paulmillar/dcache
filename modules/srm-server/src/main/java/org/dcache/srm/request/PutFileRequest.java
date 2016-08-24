@@ -582,11 +582,11 @@ public final class PutFileRequest extends FileRequest<PutRequest> {
                         break;
                     case CANCELED:
                     case FAILED:
-                        fr.getStorage().abortPut(fr.getUser(), fileId, fr.getSurl(), fr.getErrorMessage());
+                        fr.getStorage().abortPut(fr.getUser(), fileId, fr.getSurl(), fr.getSimpleErrorMessage());
                         break;
                     default:
                         logger.error("Put request is in an unexpected state in callback: {}", state);
-                        fr.getStorage().abortPut(fr.getUser(), fileId, fr.getSurl(), fr.getErrorMessage());
+                        fr.getStorage().abortPut(fr.getUser(), fileId, fr.getSurl(), fr.getSimpleErrorMessage());
                         break;
                     }
                 } catch (SRMException e) {

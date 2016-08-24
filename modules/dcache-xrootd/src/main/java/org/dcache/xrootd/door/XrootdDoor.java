@@ -48,6 +48,7 @@ import diskCacheV111.util.FsPath;
 import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
+import diskCacheV111.vehicles.CancelUploadNotificationMessage;
 import diskCacheV111.vehicles.DoorRequestInfoMessage;
 import diskCacheV111.vehicles.DoorTransferFinishedMessage;
 import diskCacheV111.vehicles.IoDoorEntry;
@@ -155,6 +156,12 @@ public class XrootdDoor
      */
     private final Map<Integer,XrootdTransfer> _transfers =
         new ConcurrentHashMap<>();
+
+    /**
+     * Current xrootd uploads.
+     */
+    private final Map<PnfsId, XrootdTransfer> _uploads =
+            new ConcurrentHashMap<>();
 
     @Required
     public void setPoolStub(CellStub stub)
@@ -323,6 +330,9 @@ public class XrootdDoor
                 {
                     super.finished(error);
 
+                    if (getPnfsId() != null) {
+                        _uploads.remove(getPnfsId());
+                    }
                     _transfers.remove(getFileHandle());
 
                     if (error == null) {
@@ -363,6 +373,7 @@ public class XrootdDoor
 
         InetSocketAddress address = null;
         _transfers.put(handle, transfer);
+        String explanation = "Problem within door";
         try {
             transfer.readNameSpaceEntry(false);
             transfer.selectPoolAndStartMover(ioQueue == null ? _ioQueue : ioQueue, RETRY_POLICY);
@@ -374,13 +385,16 @@ public class XrootdDoor
             transfer.setStatus("Mover " + transfer.getPool() + "/" +
                                transfer.getMoverId() + ": Sending");
         } catch (CacheException e) {
+            explanation = e.getMessage();
             transfer.notifyBilling(e.getRc(), e.getMessage());
             throw e;
         } catch (InterruptedException e) {
+            explanation = "Transfer interrupted";
             transfer.notifyBilling(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                    "Transfer interrupted");
             throw e;
         } catch (RuntimeException e) {
+            explanation = "Bug found in door: " + e.toString();
             transfer.notifyBilling(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                    e.toString());
             throw e;
@@ -409,12 +423,14 @@ public class XrootdDoor
         int handle = transfer.getFileHandle();
         InetSocketAddress address = null;
         _transfers.put(handle, transfer);
+        String explanation = "Problem within door";
         try {
             if (createDir) {
                 transfer.createNameSpaceEntryWithParents();
             } else {
                 transfer.createNameSpaceEntry();
             }
+            _uploads.put(transfer.getPnfsId(), transfer);
             if (size != null) {
                 transfer.setLength(size);
             }
@@ -434,19 +450,25 @@ public class XrootdDoor
                 }
             }
         } catch (CacheException e) {
+            explanation = e.getMessage();
             transfer.notifyBilling(e.getRc(), e.getMessage());
             throw e;
         } catch (InterruptedException e) {
+            explanation = "Transfer interrupted";
             transfer.notifyBilling(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                    "Transfer interrupted");
             throw e;
         } catch (RuntimeException e) {
+            explanation = "Bug found in door: " + e.toString();
             transfer.notifyBilling(CacheException.UNEXPECTED_SYSTEM_EXCEPTION,
                                    e.toString());
             throw e;
         } finally {
             if (address == null) {
-                transfer.killMover(0);
+                if (transfer.getPnfsId() != null) {
+                    _uploads.remove(transfer.getPnfsId());
+                }
+                transfer.killMover(0, explanation);
                 _transfers.remove(handle);
             }
         }
@@ -796,6 +818,14 @@ public class XrootdDoor
             request.continueListing(msg);
         } else {
             request.failure(msg);
+        }
+    }
+
+    public void messageArrived(CancelUploadNotificationMessage msg)
+    {
+        XrootdTransfer transfer = _uploads.remove(msg.getPnfsId());
+        if (transfer != null) {
+            transfer.killMover(0, msg.getExplanation());
         }
     }
 

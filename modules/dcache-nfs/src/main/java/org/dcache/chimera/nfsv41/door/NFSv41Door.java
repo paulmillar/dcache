@@ -483,6 +483,8 @@ public class NFSv41Door extends AbstractCellComponent implements
                         nfsState.addDisposeListener((NFS4State state) -> {
                             Transfer t = _ioMessages.remove(stateid);
                             if (t != null) {
+                                // NB. we use the lack of an explanation to
+                                // indicate an orderly kill of the mover.
                                 t.killMover(0);
                             }
                         });
@@ -588,6 +590,8 @@ public class NFSv41Door extends AbstractCellComponent implements
         }
 
         _log.debug("Sending KILL to {}@{}", transfer.getMoverId(), transfer.getPool());
+        // NB. we use the lack of an explanation to indicate an orderly
+        // kill of the mover.
         transfer.killMover(0);
 
         try {

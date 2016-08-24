@@ -99,6 +99,8 @@ public abstract class AsynchronousRedirectedTransfer<T> extends Transfer
 
     protected abstract void onFailure(Throwable t);
 
+    protected abstract String explain(Throwable t);
+
     /**
      * To avoid locking the monitor of the Transfer object during callbacks,
      * we have an explicit monitor guarding our state machine and ensuring
@@ -139,7 +141,7 @@ public abstract class AsynchronousRedirectedTransfer<T> extends Transfer
             try {
                 isQueued = true;
                 if (isDone) {
-                    doKill();
+                    doKill("transfer aborted");
                 } else {
                     onQueued();
                     doRedirect();
@@ -176,18 +178,18 @@ public abstract class AsynchronousRedirectedTransfer<T> extends Transfer
         private synchronized void doAbort(Throwable t)
         {
             if (!isDone) {
-                doKill();
+                doKill(explain(t));
                 onFailure(t);
                 isDone = true;
             }
         }
 
-        private synchronized void doKill()
+        private synchronized void doKill(String explanation)
         {
             if (queueFuture != null) {
                 queueFuture.cancel(true);
             }
-            killMover(0);
+            killMover(0, explanation);
         }
 
         /**

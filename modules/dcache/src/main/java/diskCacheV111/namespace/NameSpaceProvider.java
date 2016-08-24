@@ -109,18 +109,24 @@ public interface NameSpaceProvider
      * @param subject Subject of user who invoked this method.
      * @param allowed Only delete if one of these file types.
      * @param pnfsId
+     * @param attr Attributes of deleted file or directory, may be null
+     * @returns Requested attributes or null if attr is null.
      * @throws CacheException
      */
-    void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId) throws CacheException;
+    FileAttributes deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId,
+            Set<FileAttribute> attr) throws CacheException;
 
     /**
      * remove file or directory
      * @param subject Subject of user who invoked this method.
      * @param allowed Only delete if one of these file types.
      * @param path
+     * @param attr Attributes of deleted file or directory, may be null
+     * @returns Requested attributes or null if attr is null.
      * @throws CacheException
      */
-    PnfsId deleteEntry(Subject subject, Set<FileType> allowed, String path) throws CacheException;
+    FileAttributes deleteEntry(Subject subject, Set<FileType> allowed, String path,
+            Set<FileAttribute> attr) throws CacheException;
 
     /**
      * Remove file or directory. Path and PnfsID must describe the same object.
@@ -129,9 +135,12 @@ public interface NameSpaceProvider
      * @param allowed Only delete if one of these file types.
      * @param pnfsId PnfsID of file to delete
      * @param path Path of file to delete
+     * @param attr Attributes of deleted file or directory, may be null
+     * @returns Requested attributes or null if attr is null.
      * @throws CacheException
      */
-    void deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId, String path) throws CacheException;
+    FileAttributes deleteEntry(Subject subject, Set<FileType> allowed, PnfsId pnfsId,
+            String path, Set<FileAttribute> attr) throws CacheException;
 
     void rename(Subject subject, @Nullable PnfsId pnfsId, String sourcePath, String destinationPath, boolean overwrite)
             throws CacheException;
@@ -282,6 +291,7 @@ public interface NameSpaceProvider
      * @param subject the subject of user who invoked this method
      * @param uploadPath the temporary path as returned by createUploadPath
      * @param path the path of file that is uploaded
+     * @return PnfsId the PnfsId of the file or null if no such file is present
      */
-    void cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException;
+    PnfsId cancelUpload(Subject subject, FsPath uploadPath, FsPath path) throws CacheException;
 }

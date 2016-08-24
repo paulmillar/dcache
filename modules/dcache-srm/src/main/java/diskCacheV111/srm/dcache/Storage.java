@@ -607,8 +607,10 @@ public final class Storage
     {
         // Catches replies for which the callback timed out
         if (msg.isReply() && msg.getReturnCode() == 0) {
-            _pnfsStub.notify(
-                    new PnfsCancelUpload(msg.getSubject(), msg.getRestriction(), msg.getUploadPath(), msg.getPath()));
+            PnfsCancelUpload message = new PnfsCancelUpload(msg.getSubject(),
+                    msg.getRestriction(), msg.getUploadPath(), msg.getPath());
+            message.setExplanation("timeout creating upload path");
+            _pnfsStub.notify(message);
         }
     }
 
@@ -1236,6 +1238,7 @@ public final class Storage
                 FsPath actualPnfsPath = config.getPath(surl);
                 PnfsCancelUpload msg =
                         new PnfsCancelUpload(subject, restriction, FsPath.create(localTransferPath), actualPnfsPath);
+                msg.setExplanation("SRM upload aborted: " + reason);
                 _pnfsStub.sendAndWait(msg);
 
                 DoorRequestInfoMessage infoMsg =

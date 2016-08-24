@@ -453,7 +453,7 @@ public class CopyFilter implements Filter
                     // deleting existing entry.
                     try {
                         pnfs.deletePnfsEntry(attributes.getPnfsId(), path.toString(),
-                                EnumSet.of(FileType.REGULAR));
+                                EnumSet.of(FileType.REGULAR), null);
                     } catch (FileNotFoundCacheException ignored) {
                         // Ignore this: someone else deleted the file, which
                         // suggests we might be unlucky pulling the data.

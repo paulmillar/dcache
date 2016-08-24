@@ -36,6 +36,7 @@ import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.RetentionPolicy;
 import diskCacheV111.util.SpreadAndWait;
+import diskCacheV111.vehicles.CancelUploadNotificationMessage;
 import diskCacheV111.vehicles.DCapProtocolInfo;
 import diskCacheV111.vehicles.DirRequestMessage;
 import diskCacheV111.vehicles.DoorRequestInfoMessage;
@@ -56,6 +57,7 @@ import diskCacheV111.vehicles.PoolMgrSelectWritePoolMsg;
 import diskCacheV111.vehicles.PoolMoverKillMessage;
 import diskCacheV111.vehicles.PoolPassiveIoFileMessage;
 import diskCacheV111.vehicles.StorageInfo;
+
 import dmg.cells.nucleus.CellAddressCore;
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellMessage;
@@ -63,6 +65,7 @@ import dmg.cells.nucleus.CellPath;
 import dmg.util.CommandException;
 import dmg.util.CommandExitException;
 import dmg.util.KeepAliveListener;
+
 import org.dcache.acl.ACL;
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.RsType;
@@ -152,6 +155,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
     private final CellAddressCore _cellAddress;
     private String      _ourName     = "server" ;
     private final ConcurrentMap<Integer,SessionHandler> _sessions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PnfsId,IoHandler> _uploads = new ConcurrentHashMap<>();
 
     private final CellStub _pinManagerStub;
     private final PoolManagerStub _poolMgrStub;
@@ -1580,6 +1584,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
         private String            _retentionPolicy;
         private PoolMgrSelectReadPoolMsg.Context _readPoolSelectionContext;
         private InetSocketAddress _clientSocketAddress;
+        private String _explanation;
 
         private IoHandler(int sessionId, int commandId, VspArgs args)
             throws CacheException
@@ -1818,6 +1823,7 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
                     }catch(IllegalArgumentException e) { /* bad RetentionPolicy ignored*/}
                 }
 
+                _uploads.put(_fileAttributes.getPnfsId(), this);
 
                 //
                 // try to get some space to store the file.
@@ -2057,6 +2063,12 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
             setStatus( "WaitingForDoorTransferOk" ) ;
         }
 
+        public void abortTransfer(String explanation) {
+            sendReply("abortTransfer", 1, "transfer aborted: " + explanation);
+            _explanation = explanation;
+            removeUs();
+        }
+
         public void poolPassiveIoFileMessage( PoolPassiveIoFileMessage<byte[]> reply) {
 
             InetSocketAddress poolSocketAddress = reply.socketAddress();
@@ -2121,9 +2133,14 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
 
         @Override
         public void removeUs() {
+            FileAttributes attributes = _fileAttributes;
+            if (attributes != null && attributes.isDefined(PNFSID)) {
+                _uploads.remove(attributes.getPnfsId());
+            }
             Integer moverId = _moverId;
             if (moverId != null) {
                 PoolMoverKillMessage message = new PoolMoverKillMessage(_pool, moverId);
+                message.setExplanation(_explanation);
                 message.setReplyRequired(false);
 
                 _cell.sendMessage(new CellMessage(new CellPath(_pool), message));
@@ -2355,6 +2372,11 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
             return;
         }
 
+        if (object instanceof CancelUploadNotificationMessage) {
+            messageArrived((CancelUploadNotificationMessage) object);
+            return;
+        }
+
         Message reply = (Message) object;
         SessionHandler handler = _sessions.get((int) reply.getId());
         if (handler == null) {
@@ -2387,6 +2409,15 @@ public class DCapDoorInterpreterV3 implements KeepAliveListener,
                       object.getClass(), msg.getSourcePath());
         }
     }
+
+    private void messageArrived(CancelUploadNotificationMessage message)
+    {
+        IoHandler handler = _uploads.get(message.getPnfsId());
+        if (handler != null) {
+            handler.abortTransfer(message.getExplanation());
+        }
+    }
+
 
     private void postToBilling(DoorRequestInfoMessage info) {
         _cell.sendMessage(new CellMessage(_settings.getBilling(), info));

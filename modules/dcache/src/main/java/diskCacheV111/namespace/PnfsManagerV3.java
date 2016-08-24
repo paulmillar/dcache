@@ -33,7 +33,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+
 import javax.security.auth.Subject;
+
+import java.util.Arrays;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.ChecksumFactory;
@@ -44,6 +47,7 @@ import diskCacheV111.util.MissingResourceCacheException;
 import diskCacheV111.util.NotDirCacheException;
 import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsId;
+import diskCacheV111.vehicles.CancelUploadNotificationMessage;
 import diskCacheV111.vehicles.Message;
 import diskCacheV111.vehicles.PnfsAddCacheLocationMessage;
 import diskCacheV111.vehicles.PnfsCancelUpload;
@@ -63,6 +67,7 @@ import diskCacheV111.vehicles.PnfsSetChecksumMessage;
 import diskCacheV111.vehicles.PoolFileFlushedMessage;
 import diskCacheV111.vehicles.StorageInfo;
 import diskCacheV111.vehicles.StorageInfos;
+
 import dmg.cells.nucleus.AbstractCellComponent;
 import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellCommandListener;
@@ -76,6 +81,7 @@ import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.CommandLine;
 import dmg.util.command.Option;
+
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.acl.enums.AccessType;
 import org.dcache.auth.Subjects;
@@ -106,6 +112,7 @@ import static org.dcache.acl.enums.AccessType.*;
 import static org.dcache.auth.Subjects.ROOT;
 import static org.dcache.auth.attributes.Activity.*;
 import static org.dcache.namespace.FileAttribute.*;
+import static org.dcache.namespace.FileType.REGULAR;
 
 public class PnfsManagerV3
     extends AbstractCellComponent
@@ -189,6 +196,7 @@ public class PnfsManagerV3
     private CellStub _stub;
 
     private List<String> _flushNotificationTargets;
+    private List<String> _cancelUploadNotificationTargets;
 
     private void populateRequestMap()
     {
@@ -302,6 +310,14 @@ public class PnfsManagerV3
     {
         _flushNotificationTargets = Splitter.on(",").omitEmptyStrings().splitToList(target);
     }
+
+    @Required
+    public void setCancelUploadNotificationTarget(String target)
+    {
+        _cancelUploadNotificationTargets = Splitter.on(",").omitEmptyStrings().splitToList(target);
+    }
+
+
 
     public void init()
     {
@@ -1341,7 +1357,10 @@ public class PnfsManagerV3
     {
         try {
             checkRestriction(message, UPLOAD);
-            _nameSpaceProvider.cancelUpload(message.getSubject(), message.getUploadPath(), message.getPath());
+            PnfsId id = _nameSpaceProvider.cancelUpload(message.getSubject(), message.getUploadPath(), message.getPath());
+            if (id != null) {
+                notifyCancelledUpload(message.getSubject(), id, message.getExplanation());
+            }
             message.setSucceeded();
         } catch (CacheException e) {
             message.setFailed(e.getRc(), e.getMessage());
@@ -1357,26 +1376,59 @@ public class PnfsManagerV3
         PnfsId pnfsId = pnfsMessage.getPnfsId();
         Subject subject = pnfsMessage.getSubject();
         Set<FileType> allowed = pnfsMessage.getAllowedFileTypes();
+        Set<FileAttribute> requested = pnfsMessage.getRequestedAttributes();
 
         try {
             if (path == null && pnfsId == null) {
                 throw new InvalidMessageCacheException("pnfsid or path have to be defined for PnfsDeleteEntryMessage");
             }
 
+
             checkMask(pnfsMessage);
             checkRestriction(pnfsMessage, DELETE);
+
+            FileAttributes attributes;
+
+            if (allowed.contains(REGULAR)) {
+                if (requested == null) {
+                    requested = EnumSet.of(SIZE, TYPE, NLINK);
+                } else {
+                    requested.add(SIZE);
+                    requested.add(TYPE);
+                    requested.add(NLINK);
+                }
+            }
+
             if (path != null) {
                 _log.info("delete PNFS entry for {}", path);
                 if (pnfsId != null) {
-                    _nameSpaceProvider.deleteEntry(subject, allowed, pnfsId, path);
+                    attributes = _nameSpaceProvider.deleteEntry(subject, allowed,
+                            pnfsId, path, requested);
                 } else {
-                    pnfsMessage.setPnfsId(_nameSpaceProvider.deleteEntry(subject, allowed, path));
+                    if (requested == null) {
+                        requested = EnumSet.of(PNFSID);
+                    } else {
+                        requested.add(PNFSID);
+                    }
+                    attributes = _nameSpaceProvider.deleteEntry(subject, allowed,
+                            path, requested);
+                    pnfsId = attributes.getPnfsId();
+                    pnfsMessage.setPnfsId(pnfsId);
                 }
             } else {
                 _log.info("delete PNFS entry for {}", pnfsId);
-                _nameSpaceProvider.deleteEntry(subject, allowed, pnfsId);
+                attributes = _nameSpaceProvider.deleteEntry(subject, allowed,
+                        pnfsId, requested);
             }
 
+            // FIXME using whether size is defined as test whether file is currently being uploaded
+            if (attributes != null && attributes.isDefined(EnumSet.of(TYPE, NLINK))
+                    && attributes.getFileType() == REGULAR && attributes.getNlink() == 1
+                    && !attributes.isDefined(SIZE)) {
+                notifyCancelledUpload(subject, pnfsId, "file deleted");
+            }
+
+            pnfsMessage.setFileAttributes(attributes);
             pnfsMessage.setSucceeded();
         } catch (FileNotFoundCacheException e) {
             pnfsMessage.setFailed(CacheException.FILE_NOT_FOUND, e.getMessage());
@@ -2359,5 +2411,13 @@ public class PnfsManagerV3
                 || restriction.isRestricted(activity, path)) {
             throw new PermissionDeniedCacheException("Permission denied: " + path);
         }
+    }
+
+    private void notifyCancelledUpload(Subject subject, PnfsId pnfsid, String explanation)
+    {
+        Message message = new CancelUploadNotificationMessage(subject, pnfsid, explanation);
+        _cancelUploadNotificationTargets.stream()
+                .map(CellPath::new)
+                .forEach(p -> _stub.notify(p, message));
     }
 }
