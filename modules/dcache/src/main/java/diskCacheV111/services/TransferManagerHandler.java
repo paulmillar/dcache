@@ -7,6 +7,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.security.auth.Subject;
 
 import java.io.IOException;
@@ -638,17 +639,17 @@ public class TransferManagerHandler extends AbstractMessageCallback<Message>
     {
         log.error(" transfer timed out");
         if (moverId != null) {
-            killMover(moverId);
+            killMover(moverId, "timed out");
         }
         sendErrorReply(24, new IOException("timed out while waiting for mover reply"), false);
     }
 
-    public void cancel(String explanation)
+    public void cancel(@Nonnull String explanation)
     {
         log.debug("transfer cancelled: {}", explanation);
 
         if (moverId != null) {
-            killMover(moverId);
+            killMover(moverId, explanation);
         }
 
         // FIXME: sending the reply here removes the TransferManagerHandler
@@ -754,10 +755,11 @@ public class TransferManagerHandler extends AbstractMessageCallback<Message>
         this.poolAddress = poolAddress;
     }
 
-    public void killMover(int moverId)
+    public void killMover(int moverId, String explanation)
     {
         log.debug("sending mover kill to pool {} for moverId={}", pool, moverId);
-        PoolMoverKillMessage killMessage = new PoolMoverKillMessage(pool, moverId);
+        PoolMoverKillMessage killMessage = new PoolMoverKillMessage(pool, moverId,
+                "killed by TransferManagerHandler: " + explanation);
         killMessage.setReplyRequired(false);
         manager.getPoolStub().notify(new CellPath(poolAddress), killMessage);
     }

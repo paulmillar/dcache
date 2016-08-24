@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.security.auth.Subject;
 
 import java.io.IOException;
@@ -979,9 +981,17 @@ public class Transfer implements Comparable<Transfer>
     }
 
 
-    public final void killMover(long timeout, TimeUnit unit)
+    /**
+     * Kills the mover of the transfer.  Blocks until the mover has died or
+     * until a timeout is reached.  An error is logged if the mover failed to
+     * die or if the timeout was reached.
+     * @param timeout the duration of the timeout
+     * @param unit the time units of the duration
+     * @param explanation short information why the transfer is killed
+     */
+    public final void killMover(long timeout, TimeUnit unit, @Nonnull String explanation)
     {
-        killMover(unit.toMillis(timeout));
+        killMover(unit.toMillis(timeout), explanation);
     }
 
 
@@ -991,8 +1001,9 @@ public class Transfer implements Comparable<Transfer>
      * the mover failed to die or if the timeout was reached.
      *
      * @param millis Timeout in milliseconds
+     * @param explanation short information why the transfer is killed
      */
-    public void killMover(long millis)
+    public void killMover(long millis, @Nonnull String explanation)
     {
         if (!hasMover()) {
             return;
@@ -1006,7 +1017,7 @@ public class Transfer implements Comparable<Transfer>
             /* Kill the mover.
              */
             PoolMoverKillMessage message =
-                    new PoolMoverKillMessage(pool, moverId);
+                    new PoolMoverKillMessage(pool, moverId, explanation);
             message.setReplyRequired(false);
             _pool.notify(new CellPath(poolAddress), message);
 

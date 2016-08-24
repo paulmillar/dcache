@@ -5,6 +5,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import javax.annotation.Nonnull;
 import javax.security.auth.Subject;
 
 import java.util.concurrent.ExecutionException;
@@ -139,7 +140,7 @@ public abstract class AsynchronousRedirectedTransfer<T> extends Transfer
             try {
                 isQueued = true;
                 if (isDone) {
-                    doKill();
+                    doKill("transfer aborted");
                 } else {
                     onQueued();
                     doRedirect();
@@ -176,18 +177,23 @@ public abstract class AsynchronousRedirectedTransfer<T> extends Transfer
         private synchronized void doAbort(Throwable t)
         {
             if (!isDone) {
-                doKill();
+                doKill(explain(t));
                 onFailure(t);
                 isDone = true;
             }
         }
 
-        private synchronized void doKill()
+        protected String explain(Throwable t)
+        {
+            return String.valueOf(t);
+        }
+
+        private synchronized void doKill(@Nonnull String explanation)
         {
             if (queueFuture != null) {
                 queueFuture.cancel(true);
             }
-            killMover(0);
+            killMover(0, "killed by door: " + explanation);
         }
 
         /**
