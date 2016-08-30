@@ -50,6 +50,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -63,6 +64,7 @@ import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.util.PnfsHandler;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.TimeoutCacheException;
+import diskCacheV111.vehicles.CancelUploadNotificationMessage;
 import diskCacheV111.vehicles.DoorRequestInfoMessage;
 import diskCacheV111.vehicles.DoorTransferFinishedMessage;
 import diskCacheV111.vehicles.HttpDoorUrlInfoMessage;
@@ -158,6 +160,8 @@ public class DcacheResourceFactory
      */
     private final Map<Integer,HttpTransfer> _transfers =
         Maps.newConcurrentMap();
+
+    private final Map<PnfsId,HttpTransfer> _uploads = new ConcurrentHashMap<>();
 
     private ListDirectoryHandler _list;
 
@@ -665,6 +669,7 @@ public class DcacheResourceFactory
             boolean success = false;
             transfer.setProxyTransfer(true);
             transfer.createNameSpaceEntry();
+            _uploads.put(transfer.getPnfsId(), transfer);
             try {
                 transfer.setLength(length);
                 try {
@@ -696,6 +701,9 @@ public class DcacheResourceFactory
             throw e;
         } finally {
             _transfers.remove((int) transfer.getId());
+            if (transfer.getPnfsId() != null) {
+                _uploads.remove(transfer.getPnfsId());
+            }
         }
 
         return getResource(path);
@@ -713,6 +721,7 @@ public class DcacheResourceFactory
         _transfers.put((int) transfer.getId(), transfer);
         try {
             transfer.createNameSpaceEntry();
+            _uploads.put(transfer.getPnfsId(), transfer);
             try {
                 transfer.setLength(length);
                 transfer.selectPoolAndStartMover(_ioQueue, _retryPolicy);
@@ -743,6 +752,9 @@ public class DcacheResourceFactory
         } finally {
             if (uri == null) {
                 _transfers.remove((int) transfer.getId());
+                if (transfer.getPnfsId() != null) {
+                    _uploads.remove(transfer.getPnfsId());
+                }
             }
         }
         return uri;
@@ -1099,6 +1111,7 @@ public class DcacheResourceFactory
         Transfer transfer = _transfers.get((int) message.getId());
         if (transfer != null) {
             transfer.finished(message);
+            _uploads.remove(transfer.getPnfsId());
         }
     }
 
@@ -1112,6 +1125,14 @@ public class DcacheResourceFactory
         if (message.getReturnCode() == 0) {
             String pool = message.getPoolName();
             _poolStub.notify(new CellPath(pool), new PoolMoverKillMessage(pool, message.getMoverId()));
+        }
+    }
+
+    public void messageArrived(CancelUploadNotificationMessage message)
+    {
+        HttpTransfer transfer = _uploads.get(message.getPnfsId());
+        if (transfer != null) {
+            transfer.killMover(0, message.getExplanation());
         }
     }
 
