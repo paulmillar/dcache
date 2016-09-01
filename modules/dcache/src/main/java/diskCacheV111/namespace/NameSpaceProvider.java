@@ -71,12 +71,13 @@ public interface NameSpaceProvider
      * @param uid uid of new entry or -1 for default
      * @param gid gid of new entry or -1 for default
      * @param mode mode of new entry or -1 for default
+     * @param mtime the mtime in EPOC milliseconds or -1 for default
      * @param requestedAttributes Attributes of the new file to return
      * @return FileAttributes of newly created file
      * @throws CacheException
      */
     FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
-                              Set<FileAttribute> requestedAttributes) throws CacheException;
+            long mtime, Set<FileAttribute> requestedAttributes) throws CacheException;
 
     /**
      * Create a directory for a given path and type.

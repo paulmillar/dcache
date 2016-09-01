@@ -98,6 +98,7 @@ public class Transfer implements Comparable<Transfer>
     protected final long _id;
     protected final Object _session;
 
+    protected long _mtime = -1;
     protected PoolManagerStub _poolManager;
     protected CellStub _pool;
     protected CellStub _billing;
@@ -670,7 +671,7 @@ public class Transfer implements Comparable<Transfer>
         try {
             PnfsCreateEntryMessage msg;
             try {
-                msg = _pnfs.createPnfsEntry(_path.toString());
+                msg = _pnfs.createPnfsEntry(_path.toString(), _mtime);
             } catch (FileExistsCacheException e) {
                 /* REVISIT: This should be moved to PnfsManager with a
                  * flag in the PnfsCreateEntryMessage.
@@ -679,7 +680,7 @@ public class Transfer implements Comparable<Transfer>
                     throw e;
                 }
                 _pnfs.deletePnfsEntry(_path.toString(), EnumSet.of(FileType.REGULAR));
-                msg = _pnfs.createPnfsEntry(_path.toString());
+                msg = _pnfs.createPnfsEntry(_path.toString(), _mtime);
             }
 
             FileAttributes attrs = msg.getFileAttributes();

@@ -16,6 +16,7 @@ import io.milton.http.Request;
 import io.milton.http.ResourceFactory;
 import io.milton.resource.Resource;
 import io.milton.servlet.ServletRequest;
+import io.milton.servlet.ServletResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
@@ -43,12 +44,14 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.AccessController;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -101,6 +104,7 @@ import org.dcache.util.list.DirectoryEntry;
 import org.dcache.util.list.DirectoryListPrinter;
 import org.dcache.util.list.ListDirectoryHandler;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.webdav.owncloud.OwncloudClients;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.cycle;
@@ -1411,6 +1415,16 @@ public class DcacheResourceFactory
                 Restriction restriction, FsPath path) throws URISyntaxException
         {
             super(pnfs, subject, restriction, path);
+
+            Optional<Instant> mtime = OwncloudClients.parseMTime(ServletRequest.getRequest());
+            _mtime = mtime.map(i -> i.toEpochMilli()).orElse(-1L);
+        }
+
+        @Override
+        public void createNameSpaceEntry() throws CacheException
+        {
+            super.createNameSpaceEntry();
+            OwncloudClients.addMTimeAccepted(ServletResponse.getResponse());
         }
 
         public void relayData(InputStream inputStream)

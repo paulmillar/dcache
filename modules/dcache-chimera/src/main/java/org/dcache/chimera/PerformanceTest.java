@@ -264,7 +264,8 @@ public class PerformanceTest extends Thread
             FileAttributes fileAttributes;
             switch (aOp) {
             case CREATE_ENTRY:
-                provider.createFile(Subjects.ROOT, path, UID, GID, 0664, EnumSet.noneOf(FileAttribute.class));
+                provider.createFile(Subjects.ROOT, path, UID, GID, 0664, -1,
+                        EnumSet.noneOf(FileAttribute.class));
                 break;
             case PATH_TO_PNFS_ID:
                 getPnfsid(path);

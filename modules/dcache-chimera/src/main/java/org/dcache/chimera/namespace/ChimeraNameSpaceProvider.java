@@ -227,7 +227,7 @@ public class ChimeraNameSpaceProvider
 
     @Override
     public FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
-                                     Set<FileAttribute> requestedAttributes)
+            long mtime, Set<FileAttribute> requestedAttributes)
             throws CacheException
     {
         try {
@@ -267,6 +267,11 @@ public class ChimeraNameSpaceProvider
             }
 
             ExtendedInode inode = parent.create(newEntryFile.getName(), uid, gid, mode);
+            if (mtime != DEFAULT) {
+                Stat stat = new Stat();
+                stat.setMTime(mtime);
+                inode.setStat(stat);
+            }
             FileAttributes fileAttributes = getFileAttributes(inode, requestedAttributes);
             if (parent.getTags().containsKey(TAG_EXPECTED_SIZE)) {
                 ImmutableList<String> size = parent.getTag(TAG_EXPECTED_SIZE);

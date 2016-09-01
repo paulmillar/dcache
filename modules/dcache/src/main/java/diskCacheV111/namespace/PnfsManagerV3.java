@@ -1279,6 +1279,7 @@ public class PnfsManagerV3
                                                   pnfsMessage.getUid(),
                                                   pnfsMessage.getGid(),
                                                   pnfsMessage.getMode(),
+                                                  pnfsMessage.getMtime(),
                                                   requested);
 
             StorageInfo info = attrs.getStorageInfo();

@@ -203,7 +203,8 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, -1,
+                EnumSet.noneOf(FileAttribute.class));
 
         PnfsCreateEntryMessage sent =
                 getSingleSendAndWaitMessage(PnfsCreateEntryMessage.class);
@@ -221,7 +222,8 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_EXISTS);
 
-        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, -1,
+                EnumSet.noneOf(FileAttribute.class));
     }
 
 

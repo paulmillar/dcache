@@ -302,6 +302,12 @@ public class PnfsHandler
 
    }
 
+    public PnfsCreateEntryMessage createPnfsEntry(String path, long mtime)
+            throws CacheException {
+       return request(new PnfsCreateEntryMessage(path, -1, -1, -1, mtime,
+               EnumSet.noneOf(FileAttribute.class)));
+    }
+
     public PnfsCreateEntryMessage createSymLink(String path, String dest, int uid, int gid)
             throws CacheException {
 

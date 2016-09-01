@@ -19,6 +19,6 @@ public class PnfsCreateDirectoryMessage extends PnfsCreateEntryMessage {
             int gid,
             int mode,
             Set<FileAttribute> attr){
-        super(path,uid,gid,mode,attr);
+        super(path,uid,gid,mode,-1,attr);
     }
 }

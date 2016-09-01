@@ -61,12 +61,12 @@ public class RemoteNameSpaceProvider implements NameSpaceProvider
 
     @Override
     public FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
-                                     Set<FileAttribute> requestedAttributes)
+            long mtime, Set<FileAttribute> requestedAttributes)
             throws CacheException
     {
         PnfsHandler pnfs = new PnfsHandler(_pnfs, subject, Restrictions.none());
-        PnfsCreateEntryMessage returnMsg =
-                pnfs.request(new PnfsCreateEntryMessage(path, uid, gid, mode, requestedAttributes));
+        PnfsCreateEntryMessage returnMsg = pnfs.request(new PnfsCreateEntryMessage(path,
+                uid, gid, mode, mtime, requestedAttributes));
         return returnMsg.getFileAttributes();
     }
 
