@@ -1183,8 +1183,7 @@ public class PnfsManagerV3
             pnfsId = _nameSpaceProvider.createSymLink(pnfsMessage.getSubject(),
                                                       pnfsMessage.getPath(),
                                                       pnfsMessage.getDestination(),
-                                                      pnfsMessage.getUid(),
-                                                      pnfsMessage.getGid());
+                                                      pnfsMessage.getAssignAttributes());
 
             pnfsMessage.setPnfsId(pnfsId);
             pnfsMessage.setSucceeded();
@@ -1209,8 +1208,7 @@ public class PnfsManagerV3
             checkRestrictionOnParent(pnfsMessage, MANAGE);
             pnfsId = _nameSpaceProvider.createDirectory(pnfsMessage.getSubject(),
                                                         pnfsMessage.getPath(),
-                                                        pnfsMessage.getUid(), pnfsMessage.getGid(),
-                                                        pnfsMessage.getMode());
+                                                        pnfsMessage.getAssignAttributes());
 
             pnfsMessage.setPnfsId(pnfsId);
             pnfsMessage.setSucceeded();
@@ -1263,20 +1261,19 @@ public class PnfsManagerV3
             requested.add(FileAttribute.STORAGEINFO);
             requested.add(FileAttribute.PNFSID);
 
+            FileAttributes assign = pnfsMessage.getAssignAttributes();
             FileAttributes attrs =
                     _nameSpaceProvider.createFile(pnfsMessage.getSubject(),
                                                   pnfsMessage.getPath(),
-                                                  pnfsMessage.getUid(),
-                                                  pnfsMessage.getGid(),
-                                                  pnfsMessage.getMode(),
+                                                  assign,
                                                   requested);
 
             StorageInfo info = attrs.getStorageInfo();
             if (info.getKey("path") == null) {
                 info.setKey("path", pnfsMessage.getPnfsPath());
             }
-            info.setKey("uid", Integer.toString(pnfsMessage.getUid()));
-            info.setKey("gid", Integer.toString(pnfsMessage.getGid()));
+            info.setKey("uid", Integer.toString(assign.getOwnerIfPresent().or(-1)));
+            info.setKey("gid", Integer.toString(assign.getGroupIfPresent().or(-1)));
 
             pnfsMessage.setFileAttributes(attrs);
             pnfsMessage.setPnfsId(attrs.getPnfsId());

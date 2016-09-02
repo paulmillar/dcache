@@ -7,50 +7,50 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import org.dcache.namespace.FileAttribute;
+import org.dcache.vehicles.FileAttributes;
 import org.dcache.vehicles.PnfsGetFileAttributes;
 
+import static java.util.Objects.requireNonNull;
 import static org.dcache.namespace.FileAttribute.*;
 
 public class PnfsCreateEntryMessage extends PnfsGetFileAttributes
 {
     private final String _path;
-    private final int _uid;
-    private final int _gid;
-    private final int _mode;
+    private final FileAttributes _assignAttributes;
 
     private static final long serialVersionUID = -8197311585737333341L;
 
     public PnfsCreateEntryMessage(String path) {
-        this(path, -1, -1, -1);
+        this(path, new FileAttributes());
     }
 
-    public PnfsCreateEntryMessage(String path, int uid, int gid, int mode) {
-        this(path, uid, gid, mode, Collections.emptySet());
+    public PnfsCreateEntryMessage(String path, FileAttributes assignAttributes) {
+        this(path, assignAttributes, Collections.emptySet());
     }
 
-    public PnfsCreateEntryMessage(String path,
-            int uid,
-            int gid,
-            int mode,
-            Set<FileAttribute> attr) {
-        super(path, EnumSet.copyOf(Sets.union(attr,
+    public PnfsCreateEntryMessage(String path, FileAttributes assignAttributes,
+            Set<FileAttribute> queryAttributes) {
+        super(path, EnumSet.copyOf(Sets.union(queryAttributes,
                 EnumSet.of(OWNER, OWNER_GROUP, MODE, TYPE, SIZE,
                         CREATION_TIME, ACCESS_TIME, MODIFICATION_TIME,
                         PNFSID, STORAGEINFO, STORAGECLASS, CACHECLASS, HSM,
                         ACCESS_LATENCY, RETENTION_POLICY))));
         _path = path;
-        _uid  = uid ;
-        _gid  = gid ;
-        _mode = mode ;
+        _assignAttributes = requireNonNull(assignAttributes);
     }
 
 
     public String getPath(){
 	return _path;
     }
-    public int getUid(){ return _uid ; }
-    public int getGid(){ return _gid ; }
-    public int getMode(){return _mode ; }
+
+    /**
+     * Attributes for the newly created entry.
+     */
+    public FileAttributes getAssignAttributes()
+    {
+        return _assignAttributes;
+    }
 
     @Override
     public boolean invalidates(Message message)

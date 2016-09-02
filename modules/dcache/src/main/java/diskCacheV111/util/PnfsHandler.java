@@ -250,10 +250,10 @@ public class PnfsHandler
         return request(new PnfsCreateDirectoryMessage(path));
     }
 
-    public PnfsCreateEntryMessage createPnfsDirectory(String path, int uid, int gid, int mode)
-        throws CacheException
+    public PnfsCreateEntryMessage createPnfsDirectory(String path,
+            FileAttributes assignAttributes) throws CacheException
     {
-        return request(new PnfsCreateDirectoryMessage(path, uid, gid, mode));
+        return request(new PnfsCreateDirectoryMessage(path, assignAttributes));
     }
 
     /**
@@ -302,11 +302,10 @@ public class PnfsHandler
 
    }
 
-    public PnfsCreateEntryMessage createSymLink(String path, String dest, int uid, int gid)
-            throws CacheException {
-
-        return request(new PnfsCreateSymLinkMessage(path, dest, uid, gid));
-
+    public PnfsCreateEntryMessage createSymLink(String path, String dest,
+            FileAttributes assignAttributes) throws CacheException
+    {
+        return request(new PnfsCreateSymLinkMessage(path, dest, assignAttributes));
     }
 
     public void renameEntry(PnfsId pnfsId, String path, String newName, boolean overwrite)
@@ -321,12 +320,11 @@ public class PnfsHandler
         request(new PnfsRenameMessage(path, newName, overwrite));
     }
 
-   public PnfsCreateEntryMessage createPnfsEntry( String path , int uid , int gid , int mode )
-          throws CacheException                {
-
-       return request(new PnfsCreateEntryMessage(path, uid, gid, mode)) ;
-
-   }
+    public PnfsCreateEntryMessage createPnfsEntry(String path,
+            FileAttributes attributes) throws CacheException
+    {
+       return request(new PnfsCreateEntryMessage(path, attributes));
+    }
 
     public PnfsId getParentOf(PnfsId pnfsId)
         throws CacheException

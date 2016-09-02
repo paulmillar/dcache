@@ -217,7 +217,8 @@ public class PnfsManagerTest
     @Test
     public void testMkdirPermTest() throws Exception {
 
-        PnfsCreateDirectoryMessage pnfsCreateDirectoryMessage = new PnfsCreateDirectoryMessage("/pnfs/testRoot/testMkdirPermTest", 3750, 1000, 0750);
+        PnfsCreateDirectoryMessage pnfsCreateDirectoryMessage = new PnfsCreateDirectoryMessage("/pnfs/testRoot/testMkdirPermTest",
+                FileAttributes.of().uid(3750).gid(1000).mode(0750).build());
 
         _pnfsManager.createDirectory(pnfsCreateDirectoryMessage);
 
@@ -291,7 +292,8 @@ public class PnfsManagerTest
     @Test
     public void testCreateDupDir() {
 
-        PnfsCreateDirectoryMessage pnfsCreateDirectoryMessage = new PnfsCreateDirectoryMessage("/pnfs/testRoot/testCreateDupDir", 3750, 1000, 0750);
+        PnfsCreateDirectoryMessage pnfsCreateDirectoryMessage = new PnfsCreateDirectoryMessage("/pnfs/testRoot/testCreateDupDir",
+                FileAttributes.of().uid(3750).gid(1000).mode(0750).build());
 
         _pnfsManager.createDirectory(pnfsCreateDirectoryMessage);
 

@@ -71,6 +71,9 @@ import org.dcache.commons.stats.MonitoringProxy;
 import org.dcache.commons.stats.RequestCounters;
 import org.dcache.commons.stats.RequestExecutionTimeGauges;
 import org.dcache.namespace.CreateOption;
+
+import static org.dcache.namespace.FileAttribute.*;
+
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.namespace.ListHandler;
@@ -80,6 +83,7 @@ import org.dcache.util.ChecksumType;
 import org.dcache.util.Glob;
 import org.dcache.vehicles.FileAttributes;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static org.dcache.acl.enums.AccessType.ACCESS_ALLOWED;
@@ -90,6 +94,8 @@ public class ChimeraNameSpaceProvider
     implements NameSpaceProvider, CellInfoProvider
 {
     private static final int SYMLINK_MODE = 0777;
+
+    private static final int INHERIT_MODE = -1;
 
     public static final String TAG_EXPECTED_SIZE = "ExpectedSize";
     public static final String TAG_PATH = "Path";
@@ -225,11 +231,42 @@ public class ChimeraNameSpaceProvider
         return new ExtendedInode(_fs, inodes.get(inodes.size() - 1));
     }
 
+    private int defaultUid(Subject subject, ExtendedInode parent)
+    {
+        checkState(parent.hasStatCache());
+        try {
+            if (Subjects.isNobody(subject) || _inheritFileOwnership) {
+                return parent.statCache().getUid();
+            } else {
+                return (int) Subjects.getUid(subject);
+            }
+        } catch (ChimeraFsException e) {
+            throw new RuntimeException("Bug detected: " + e, e);
+        }
+    }
+
+    private int defaultGid(Subject subject, ExtendedInode parent)
+    {
+        checkState(parent.hasStatCache());
+        try {
+            if (Subjects.isNobody(subject) || _inheritFileOwnership) {
+                return parent.statCache().getGid();
+            } else {
+                return (int) Subjects.getPrimaryGid(subject);
+            }
+        } catch (ChimeraFsException e) {
+            throw new RuntimeException("Bug detected: " + e, e);
+        }
+    }
+
     @Override
-    public FileAttributes createFile(Subject subject, String path, int uid, int gid, int mode,
-                                     Set<FileAttribute> requestedAttributes)
+    public FileAttributes createFile(Subject subject, String path,
+            FileAttributes assignAttributes, Set<FileAttribute> requestedAttributes)
             throws CacheException
     {
+        checkArgument(assignAttributes.isUndefined(EnumSet.of(CACHECLASS,
+                CREATION_TIME, NLINK, PNFSID, STORAGECLASS, STORAGEINFO,
+                SIMPLE_TYPE, TYPE)), "Illegal assign attributes");
         try {
             File newEntryFile = new File(path);
             String parentPath = newEntryFile.getParent();
@@ -246,28 +283,21 @@ public class ChimeraNameSpaceProvider
                 }
             }
 
-            if (uid == DEFAULT) {
-                if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                    uid = parent.statCache().getUid();
-                } else {
-                    uid = (int) Subjects.getUid(subject);
-                }
-            }
-
-            if (gid == DEFAULT) {
-                if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                    gid = parent.statCache().getGid();
-                } else {
-                    gid = (int) Subjects.getPrimaryGid(subject);
-                }
-            }
-
-            if (mode == DEFAULT) {
-                mode = parent.statCache().getMode() & UMASK_FILE;
-            }
+            int uid = assignAttributes.getOwnerIfPresent().or(() -> defaultUid(subject, parent));
+            int gid = assignAttributes.getGroupIfPresent().or(() -> defaultGid(subject, parent));
+            int mode = assignAttributes.getModeIfPresent().or(parent.statCache().getMode() & UMASK_FILE);
+            assignAttributes.undefine(OWNER, OWNER_GROUP, MODE);
 
             ExtendedInode inode = parent.create(newEntryFile.getName(), uid, gid, mode);
-            FileAttributes fileAttributes = getFileAttributes(inode, requestedAttributes);
+
+            FileAttributes fileAttributes;
+            if (assignAttributes.getDefinedAttributes().isEmpty()) {
+                fileAttributes = getFileAttributes(inode, requestedAttributes);
+            } else {
+                fileAttributes = setFileAttributes(subject, inode.getPnfsId(),
+                        assignAttributes, requestedAttributes);
+            }
+
             if (parent.getTags().containsKey(TAG_EXPECTED_SIZE)) {
                 ImmutableList<String> size = parent.getTag(TAG_EXPECTED_SIZE);
                 if (!size.isEmpty()) {
@@ -288,8 +318,13 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId createDirectory(Subject subject, String path, int uid, int gid, int mode)
-            throws CacheException {
+    public PnfsId createDirectory(Subject subject, String path, FileAttributes attributes)
+            throws CacheException
+    {
+        checkArgument(attributes.isUndefined(EnumSet.of(CACHECLASS, CHECKSUM,
+                CREATION_TIME, FLAGS, HSM, LOCATIONS, NLINK, PNFSID,
+                RETENTION_POLICY, SIZE, STORAGECLASS, STORAGEINFO, SIMPLE_TYPE,
+                TYPE)), "Illegal assign attributes");
         try {
             File newEntryFile = new File(path);
             String parentPath = newEntryFile.getParent();
@@ -297,7 +332,19 @@ public class ChimeraNameSpaceProvider
                 throw new FileExistsCacheException("File exists: " + path);
             }
             ExtendedInode parent = pathToInode(subject, parentPath);
-            ExtendedInode inode = mkdir(subject, parent, newEntryFile.getName(), uid, gid, mode);
+
+            int uid = attributes.getOwnerIfPresent().or(() -> defaultUid(subject, parent));
+            int gid = attributes.getGroupIfPresent().or(() -> defaultGid(subject, parent));
+            int mode = attributes.getModeIfPresent().or(parent.statCache().getMode() & UMASK_FILE);
+            attributes.undefine(OWNER, OWNER_GROUP, MODE);
+
+            ExtendedInode inode = mkdir(subject, parent, newEntryFile.getName(),
+                    uid, gid, mode);
+
+            if (!attributes.getDefinedAttributes().isEmpty()) {
+                setFileAttributes(subject, inode.getPnfsId(), attributes,
+                        EnumSet.noneOf(FileAttribute.class));
+            }
             return inode.getPnfsId();
         } catch (NotDirChimeraException e) {
             throw new NotDirCacheException("Not a directory: " + path);
@@ -312,9 +359,13 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public PnfsId createSymLink(Subject subject, String path, String dest, int uid, int gid)
+    public PnfsId createSymLink(Subject subject, String path, String dest, FileAttributes assignAttributes)
         throws CacheException
     {
+        checkArgument(assignAttributes.isUndefined(EnumSet.of(ACCESS_LATENCY,
+                CACHECLASS, CHECKSUM, CREATION_TIME, FLAGS, HSM, LOCATIONS,
+                NLINK, PNFSID, RETENTION_POLICY, SIZE, STORAGECLASS, STORAGEINFO,
+                 SIMPLE_TYPE, TYPE)), "Illegal assign attributes");
         try {
             File newEntryFile = new File(path);
             String parentPath = newEntryFile.getParent();
@@ -331,25 +382,19 @@ public class ChimeraNameSpaceProvider
                 }
             }
 
-            if (uid == DEFAULT) {
-                if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                    uid = parent.statCache().getUid();
-                } else {
-                    uid = (int) Subjects.getUid(subject);
-                }
-            }
-
-            if (gid == DEFAULT) {
-                if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                    gid = parent.statCache().getGid();
-                } else {
-                    gid = (int) Subjects.getPrimaryGid(subject);
-                }
-            }
+            int uid = assignAttributes.getOwnerIfPresent().or(() -> defaultUid(subject, parent));
+            int gid = assignAttributes.getGroupIfPresent().or(() -> defaultGid(subject, parent));
+            assignAttributes.undefine(OWNER, OWNER_GROUP);
 
             FsInode inode = _fs.createLink(parent, newEntryFile.getName(), uid, gid,
                                            SYMLINK_MODE, dest.getBytes(Charsets.UTF_8));
-            return new PnfsId(inode.getId());
+            PnfsId pnfsid = new PnfsId(inode.getId());
+
+            if (!assignAttributes.getDefinedAttributes().isEmpty()) {
+                setFileAttributes(subject, pnfsid, assignAttributes,
+                        EnumSet.noneOf(FileAttribute.class));
+            }
+            return pnfsid;
         } catch (NotDirChimeraException e) {
             throw new NotDirCacheException("Not a directory: " + path);
         } catch (FileNotFoundHimeraFsException e) {
@@ -1112,23 +1157,6 @@ public class ChimeraNameSpaceProvider
                 throw new PermissionDeniedCacheException("Access denied: " + parent.getPath().child(name));
             }
         }
-        if (uid == DEFAULT) {
-            if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                uid = parent.statCache().getUid();
-            } else {
-                uid = (int) Subjects.getUid(subject);
-            }
-        }
-        if (gid == DEFAULT) {
-            if (Subjects.isNobody(subject) || _inheritFileOwnership) {
-                gid = parent.statCache().getGid();
-            } else {
-                gid = (int) Subjects.getPrimaryGid(subject);
-            }
-        }
-        if (mode == DEFAULT) {
-            mode = parent.statCache().getMode() & UMASK_DIR;
-        }
         return parent.mkdir(name, uid, gid, mode);
     }
 
@@ -1159,7 +1187,10 @@ public class ChimeraNameSpaceProvider
         } catch (FileNotFoundCacheException e) {
             ExtendedInode parentOfPath = installDirectory(subject, path.parent(), mode);
             try {
-                inode = mkdir(subject, parentOfPath, path.name(), DEFAULT, DEFAULT, mode);
+                int uid = defaultUid(subject, parentOfPath);
+                int gid = defaultGid(subject, parentOfPath);
+                inode = mkdir(subject, parentOfPath, path.name(), uid, gid,
+                        mode == INHERIT_MODE ? (parentOfPath.statCache().getMode() & UMASK_FILE) : mode);
             } catch (FileExistsChimeraFsException e1) {
                 /* Concurrent directory creation. Current transaction is invalid.
                  */
@@ -1195,7 +1226,7 @@ public class ChimeraNameSpaceProvider
              */
             ExtendedInode parentOfPath =
                     options.contains(CreateOption.CREATE_PARENTS)
-                            ? installDirectory(subject, path.parent(), DEFAULT)
+                            ? installDirectory(subject, path.parent(), INHERIT_MODE)
                             : lookupDirectory(subject, path.parent());
 
             FileAttributes attributesOfParent =

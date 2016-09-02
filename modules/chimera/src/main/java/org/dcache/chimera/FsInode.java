@@ -198,6 +198,13 @@ public class FsInode {
     }
 
     /**
+     * Available to allow assertions.
+     */
+    public boolean hasStatCache() {
+        return _stat != null;
+    }
+
+    /**
      *
      * gets the cached value of  stat information of the inode
      * See also stat()

@@ -2748,7 +2748,7 @@ public abstract class AbstractFtpDoorV1
 
         try {
             _pnfs.createSymLink(absolutePath(_symlinkPath).toString(), target,
-                    (int)Subjects.getUid(_subject), (int)Subjects.getPrimaryGid(_subject));
+                    FileAttributes.of().uid(_subject).gid(_subject).build());
             reply ("257 symlink '" + _symlinkPath + "' created.");
         } catch (PermissionDeniedCacheException e) {
             throw new FTPCommandException(550, "Permission denied.", e);

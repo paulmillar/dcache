@@ -203,16 +203,18 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file",
+                FileAttributes.of().uid(100).gid(200).mode(0644).build(),
+                EnumSet.noneOf(FileAttribute.class));
 
         PnfsCreateEntryMessage sent =
                 getSingleSendAndWaitMessage(PnfsCreateEntryMessage.class);
         assertThat(sent.getReplyRequired(), is(true));
         assertThat(sent.getSubject(), is(ROOT));
         assertThat(sent.getPath(), is("/path/to/file"));
-        assertThat(sent.getUid(), is(100));
-        assertThat(sent.getGid(), is(200));
-        assertThat(sent.getMode(), is(0644));
+        assertThat(sent.getAssignAttributes().getOwner(), is(100));
+        assertThat(sent.getAssignAttributes().getGroup(), is(200));
+        assertThat(sent.getAssignAttributes().getMode(), is(0644));
     }
 
 
@@ -221,7 +223,9 @@ public class RemoteNameSpaceProviderTests
     {
         givenFailureResponse(FILE_EXISTS);
 
-        _namespace.createFile(ROOT, "/path/to/file", 100, 200, 0644, EnumSet.noneOf(FileAttribute.class));
+        _namespace.createFile(ROOT, "/path/to/file",
+                FileAttributes.of().uid(100).gid(200).mode(0644).build(),
+                EnumSet.noneOf(FileAttribute.class));
     }
 
 
@@ -230,16 +234,17 @@ public class RemoteNameSpaceProviderTests
     {
         givenSuccessfulResponse();
 
-        _namespace.createDirectory(ROOT, "/path/to/dir", 100, 200, 0755);
+        _namespace.createDirectory(ROOT, "/path/to/dir",
+                FileAttributes.of().uid(100).gid(200).mode(0755).build());
 
         PnfsCreateDirectoryMessage sent =
                 getSingleSendAndWaitMessage(PnfsCreateDirectoryMessage.class);
         assertThat(sent.getReplyRequired(), is(true));
         assertThat(sent.getSubject(), is(ROOT));
         assertThat(sent.getPath(), is("/path/to/dir"));
-        assertThat(sent.getUid(), is(100));
-        assertThat(sent.getGid(), is(200));
-        assertThat(sent.getMode(), is(0755));
+        assertThat(sent.getAssignAttributes().getOwner(), is(100));
+        assertThat(sent.getAssignAttributes().getGroup(), is(200));
+        assertThat(sent.getAssignAttributes().getMode(), is(0755));
     }
 
 
