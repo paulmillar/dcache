@@ -11,11 +11,11 @@
  * point to the copy.
  */
 
-page(static,subject,path,files,base,config,root) ::= <<
+page(static,subject,isBasic,logoutId,path,files,base,config,root) ::= <<
   $render(list(files))$
 >>
 
-errorpage(static,subject,path,errorcode,errormessage,base,config,root) ::= <<
+errorpage(static,subject,isBasic,logoutId,path,errorcode,errormessage,base,config,root) ::= <<
   $render(error(errorcode,errormessage))$
 >>
 
@@ -149,6 +149,12 @@ render(body) ::= <<
                   </a>
                   <ul class="dropdown-menu dropdown-menu-right">
                     $subject.principals:{p|<li><a href="#">$p$</a></li>}$
+	            <li role="separator" class="divider"></li>
+                    $if(isBasic)$
+                    <li><a href="?logout=$logoutId$"><span class="glyphicon glyphicon-log-out" aria-hidden="true"></span> Logout</a></li>
+                    $else$
+                    <li class="disabled"><a href="#" title="Not logged in with BASIC authentication"><span class="glyphicon glyphicon-log-out" aria-hidden="true"></span> Logout</a></li>
+                    $endif$
                   </ul>
               </div>
             </div>

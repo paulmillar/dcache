@@ -1,8 +1,11 @@
 package org.dcache.webdav;
 
 import com.google.common.net.InetAddresses;
+
 import dmg.cells.nucleus.CDC;
+
 import org.dcache.util.NetLoggerBuilder;
+
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Response;
@@ -14,22 +17,19 @@ import javax.security.auth.Subject;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.cert.X509Certificate;
 
-import static org.dcache.webdav.DcacheResourceFactory.TRANSACTION_ATTRIBUTE;
-import static org.dcache.webdav.AuthenticationHandler.DCACHE_SUBJECT_ATTRIBUTE;
-
+import static org.dcache.webdav.Attributes.getSubject;
+import static org.dcache.webdav.Attributes.getTransaction;
 
 public class LoggingHandler extends HandlerWrapper {
 
     private final Logger ACCESS_LOGGER =
             LoggerFactory.getLogger("org.dcache.access.webdav");
-
-    private static final String X509_CERTIFICATE_ATTRIBUTE =
-            "javax.servlet.request.X509Certificate";
 
     @Override
     public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
@@ -77,30 +77,9 @@ public class LoggingHandler extends HandlerWrapper {
         }
     }
 
-    private static String getCertificateName(HttpServletRequest request) {
-
-        Object object = request.getAttribute(X509_CERTIFICATE_ATTRIBUTE);
-
-        if (object instanceof X509Certificate[]) {
-            X509Certificate[] chain = (X509Certificate[]) object;
-
-            if (chain.length >= 1) {
-                return chain[0].getSubjectX500Principal().getName();
-            }
-        }
-
-        return null;
-    }
-
-    private static String getTransaction(HttpServletRequest request) {
-        Object object = request.getAttribute(TRANSACTION_ATTRIBUTE);
-
-        return object == null ? null : String.valueOf(object);
-    }
-
-    private static Subject getSubject(HttpServletRequest request) {
-        Object object = request.getAttribute(DCACHE_SUBJECT_ATTRIBUTE);
-
-        return (object instanceof Subject) ? (Subject) object : null;
+    private static String getCertificateName(HttpServletRequest request)
+    {
+        X509Certificate[] chain = Attributes.getX509Certificate(request);
+        return (chain == null || chain.length == 0) ? null : chain [0].getSubjectX500Principal().getName();
     }
 }

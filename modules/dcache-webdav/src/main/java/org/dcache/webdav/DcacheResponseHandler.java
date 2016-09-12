@@ -1,5 +1,6 @@
 package org.dcache.webdav;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -26,12 +27,14 @@ import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
 
 import javax.security.auth.Subject;
+import javax.servlet.http.HttpServletRequest;
 import javax.xml.namespace.QName;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.security.AccessController;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -39,14 +42,18 @@ import java.util.Set;
 
 import diskCacheV111.util.FsPath;
 
+import org.dcache.auth.SubjectWrapper;
 import org.dcache.auth.attributes.HomeDirectory;
 import org.dcache.auth.attributes.LoginAttribute;
 import org.dcache.auth.attributes.RootDirectory;
 import org.dcache.util.Slf4jSTErrorListener;
+import org.dcache.webdav.AuthenticationHandler.AuthenticationType;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.Iterables.cycle;
+import static com.google.common.collect.Iterables.limit;
 import static io.milton.http.Response.Status.*;
-import static org.dcache.webdav.AuthenticationHandler.DCACHE_LOGIN_ATTRIBUTES;
+import static java.util.Arrays.asList;
 
 /**
  * This class controls how Milton responds under different circumstances by
@@ -149,7 +156,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
         // If GET on the root results in an authorization failure, we redirect to the users
         // home directory for convenience.
         if (request.getAbsolutePath().equals("/") && request.getMethod() == Request.Method.GET) {
-            Set<LoginAttribute> login = (Set<LoginAttribute>) ServletRequest.getRequest().getAttribute(DCACHE_LOGIN_ATTRIBUTES);
+            Set<LoginAttribute> login = Attributes.getLoginAttributes();
             FsPath userRoot = FsPath.ROOT;
             String userHome = "/";
             for (LoginAttribute attribute : login) {
@@ -235,17 +242,22 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
             return templateNotFoundErrorPage(_templateGroup, HTML_TEMPLATE_NAME);
         }
 
-        template.add("path", UrlPathWrapper.forPaths(base));
-        template.add("base", UrlPathWrapper.forEmptyPath());
+        String relPathOfRoot = Joiner.on("/").join(limit(cycle(".."), base.length));
+
+        boolean isBasic = Attributes.getSuppliedAuthenticationTypes().contains(AuthenticationType.BASIC);
+        Subject subject = Subject.getSubject(AccessController.getContext());
+
+        // FIXME: duplication with DcacheResourceFactory#addTemplateAttributes
+        template.add("path", asList(UrlPathWrapper.forPaths(base)));
         template.add("static", _staticContentPath);
+        template.add("subject", new SubjectWrapper(subject));
+        template.add("isBasic", isBasic);
+        template.add("logoutId", Attributes.getLogoutId());
+        template.add("base", UrlPathWrapper.forEmptyPath());
+        template.add("root", relPathOfRoot);
+        template.add("config", _templateConfig);
         template.add("errorcode", status.toString());
         template.add("errormessage", ERRORS.get(status));
-        template.add("config", _templateConfig);
-
-        Subject subject = Subject.getSubject(AccessController.getContext());
-        if (subject != null) {
-            template.add("subject", subject.getPrincipals().toString());
-        }
 
         return template.render();
     }

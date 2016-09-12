@@ -27,7 +27,6 @@ import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
 
 import javax.security.auth.Subject;
-import javax.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,6 +100,7 @@ import org.dcache.util.list.DirectoryEntry;
 import org.dcache.util.list.DirectoryListPrinter;
 import org.dcache.util.list.ListDirectoryHandler;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.webdav.AuthenticationHandler.AuthenticationType;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.cycle;
@@ -109,6 +109,8 @@ import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.dcache.namespace.FileAttribute.*;
 import static org.dcache.namespace.FileType.*;
+import static org.dcache.webdav.Attributes.getRestriction;
+import static org.dcache.webdav.Attributes.setTransaction;
 
 /**
  * This ResourceFactory exposes the dCache name space through the
@@ -120,8 +122,6 @@ public class DcacheResourceFactory
 {
     private static final Logger _log =
         LoggerFactory.getLogger(DcacheResourceFactory.class);
-
-    public static final String TRANSACTION_ATTRIBUTE = "org.dcache.transaction";
 
     private static final Set<FileAttribute> REQUIRED_ATTRIBUTES =
         EnumSet.of(TYPE, PNFSID, CREATION_TIME, MODIFICATION_TIME, SIZE,
@@ -870,15 +870,20 @@ public class DcacheResourceFactory
         String requestPath = getRequestPath();
         String[] base =
             Iterables.toArray(PATH_SPLITTER.split(requestPath), String.class);
-
         String relPathOfRoot = Joiner.on("/").join(limit(cycle(".."), base.length));
 
+        boolean isBasic = Attributes.getSuppliedAuthenticationTypes().contains(AuthenticationType.BASIC);
+        Subject subject = Subject.getSubject(AccessController.getContext());
+
+        // FIXME: duplication with DcacheResponseHandler#generateErrorPage
         template.add("path", asList(UrlPathWrapper.forPaths(base)));
         template.add("static", _staticContentPath);
-        template.add("subject", new SubjectWrapper(getSubject()));
+        template.add("subject", new SubjectWrapper(subject));
+        template.add("isBasic", isBasic);
+        template.add("logoutId", Attributes.getLogoutId());
         template.add("base", UrlPathWrapper.forEmptyPath());
-        template.add("config", _templateConfig);
         template.add("root", relPathOfRoot);
+        template.add("config", _templateConfig);
     }
 
     /**
@@ -1148,12 +1153,6 @@ public class DcacheResourceFactory
         return Subject.getSubject(AccessController.getContext());
     }
 
-    private Restriction getRestriction()
-    {
-        HttpServletRequest servletRequest = ServletRequest.getRequest();
-        return (Restriction) servletRequest.getAttribute(AuthenticationHandler.DCACHE_RESTRICTION_ATTRIBUTE);
-    }
-
     /**
      * Returns the location URI of the current request. This is the
      * full request URI excluding user information, query and fragments.
@@ -1275,9 +1274,7 @@ public class DcacheResourceFactory
             super(pnfs, subject, restriction, path);
             initializeTransfer(this, subject);
             _clientAddressForPool = getClientAddress();
-
-            ServletRequest.getRequest().setAttribute(TRANSACTION_ATTRIBUTE,
-                    getTransaction());
+            setTransaction(getTransaction());
         }
 
         protected ProtocolInfo createProtocolInfo(InetSocketAddress address)

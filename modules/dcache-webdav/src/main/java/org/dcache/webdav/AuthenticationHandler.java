@@ -29,8 +29,10 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PermissionDeniedCacheException;
@@ -52,17 +54,19 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.reverse;
 import static java.util.Arrays.asList;
 
-public class AuthenticationHandler extends HandlerWrapper {
+public class AuthenticationHandler extends HandlerWrapper
+{
+    /** Indicates the user should be logged out. */
+    private class LogOutException extends Exception
+    {
+    }
 
     private final static Logger LOG = LoggerFactory.getLogger(AuthenticationHandler.class);
-    public static final String X509_CERTIFICATE_ATTRIBUTE =
-            "javax.servlet.request.X509Certificate";
-    public static final String DCACHE_SUBJECT_ATTRIBUTE =
-            "org.dcache.subject";
-    public static final String DCACHE_RESTRICTION_ATTRIBUTE =
-            "org.dcache.restriction";
-    public static final String DCACHE_LOGIN_ATTRIBUTES =
-            "org.dcache.login";
+
+    public static final String QUERY_KEY_LOGOUT = "logout";
+
+    /** Different kinds of authentication material the user can present. */
+    public enum AuthenticationType {X509, KERBEROS, BASIC, BEARER}
 
     private static final InetAddress UNKNOWN_ADDRESS = InetAddresses.forString("0.0.0.0");
 
@@ -71,6 +75,7 @@ public class AuthenticationHandler extends HandlerWrapper {
     private boolean _isBasicAuthenticationEnabled;
     private boolean _isSpnegoAuthenticationEnabled;
     private LoginStrategy _loginStrategy;
+    private final AtomicInteger _logoutId = new AtomicInteger();
 
     private CertificateFactory _cf = CertificateFactories.newX509CertificateFactory();
 
@@ -80,19 +85,23 @@ public class AuthenticationHandler extends HandlerWrapper {
         if (isStarted() && !baseRequest.isHandled()) {
             Subject subject = new Subject();
             AuthHandlerResponse response = new AuthHandlerResponse(servletResponse);
+            EnumSet<AuthenticationType> suppliedAuthn = EnumSet.noneOf(AuthenticationType.class);
             try {
-                addX509ChainToSubject(request, subject);
+                addX509ChainToSubject(request, subject, suppliedAuthn);
                 addOriginToSubject(request, subject);
-                addAuthCredentialsToSubject(request, subject);
-                addSpnegoCredentialsToSubject(baseRequest, request, subject);
+                addAuthCredentialsToSubject(request, subject, suppliedAuthn);
+                addSpnegoCredentialsToSubject(baseRequest, request, subject, suppliedAuthn);
 
                 LoginReply login = _loginStrategy.login(subject);
                 subject = login.getSubject();
+                checkLogOut(baseRequest, suppliedAuthn);
                 Restriction restriction = Restrictions.concat(_doorRestriction, login.getRestriction());
 
-                request.setAttribute(DCACHE_SUBJECT_ATTRIBUTE, subject);
-                request.setAttribute(DCACHE_RESTRICTION_ATTRIBUTE, restriction);
-                request.setAttribute(DCACHE_LOGIN_ATTRIBUTES, login.getLoginAttributes());
+                Attributes.setSubject(request, subject);
+                Attributes.setRestriction(request, restriction);
+                Attributes.setLoginAttributes(request, login.getLoginAttributes());
+                Attributes.setAuthenticationTypes(request, suppliedAuthn);
+                Attributes.setLogoutId(request, Integer.toString(_logoutId.get()));
 
                 /* Process the request as the authenticated user.*/
                 Exception problem = Subject.doAs(subject, (PrivilegedAction<Exception>) () -> {
@@ -108,6 +117,10 @@ public class AuthenticationHandler extends HandlerWrapper {
                     Throwables.propagateIfInstanceOf(problem, ServletException.class);
                     throw Throwables.propagate(problem);
                 }
+            } catch (LogOutException e) {
+                // FIXME: error reponses should be customisable; e.g., using StringTemplate.
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                baseRequest.setHandled(true);
             } catch (PermissionDeniedCacheException e) {
                 LOG.warn("{} for path {} and user {}", e.getMessage(), request.getPathInfo(),
                         NetLoggerBuilder.describeSubject(subject));
@@ -122,9 +135,46 @@ public class AuthenticationHandler extends HandlerWrapper {
         }
     }
 
+    /**
+     * The LogOut is achieved by sending a 401 UNAUTHORIZED response, even
+     * though the user successfully authenticated.  This is necessary to
+     * "poison" the browser's BASIC authentication cache.  To trigger this, the
+     * UI forwards the user to a page with {@literal ?logout=<id>} in the URL.
+     * If the supplied {@literal <id>} matches the AuthenticationHandler's
+     * internal id then the id increments and the user receives a 401 response.
+     * The id is needed since the user may simply refresh the page (i.e., make
+     * a request with the same URL), which should allow the user to authenticate
+     * normally.
+     */
+    private void checkLogOut(Request request, EnumSet<AuthenticationType> suppliedAuthn)
+            throws LogOutException
+    {
+        if (!suppliedAuthn.contains(AuthenticationType.BASIC)) {
+            return;
+        }
+
+        String logout = request.getParameter("logout");
+
+        if (logout == null) {
+            return;
+        }
+
+        try {
+            int id = Integer.parseInt(logout);
+
+            if (_logoutId.compareAndSet(id, id+1)) {
+                LOG.debug("Logging out user");
+                throw new LogOutException();
+            }
+        } catch (NumberFormatException e) {
+            LOG.debug("Ignoring badly formatted logout id: {}", e.getMessage());
+        }
+    }
+
     private void addSpnegoCredentialsToSubject(Request baseRequest,
                                                HttpServletRequest request,
-                                               Subject subject)
+                                               Subject subject,
+                                               EnumSet<AuthenticationType> authn)
     {
         if (_isSpnegoAuthenticationEnabled) {
             Authentication spnegoAuth = baseRequest.getAuthentication();
@@ -133,17 +183,19 @@ public class AuthenticationHandler extends HandlerWrapper {
                 if (spnegoUser instanceof UserAuthentication) {
                     UserIdentity identity = ((UserAuthentication) spnegoUser).getUserIdentity();
                     subject.getPrincipals().add(new KerberosPrincipal(identity.getUserPrincipal().getName()));
+                    authn.add(AuthenticationType.KERBEROS);
                 }
             }
         }
     }
 
-    private void addX509ChainToSubject(HttpServletRequest request, Subject subject)
+    private void addX509ChainToSubject(HttpServletRequest request, Subject subject, EnumSet<AuthenticationType> authn)
             throws CacheException {
-        Object object = request.getAttribute(X509_CERTIFICATE_ATTRIBUTE);
-        if (object instanceof X509Certificate[]) {
+        X509Certificate[] chain = Attributes.getX509Certificate(request);
+        if (chain != null) {
             try {
-                subject.getPublicCredentials().add(_cf.generateCertPath(asList((X509Certificate[]) object)));
+                subject.getPublicCredentials().add(_cf.generateCertPath(asList(chain)));
+                authn.add(AuthenticationType.X509);
             } catch (CertificateException e) {
                 throw new CacheException("Failed to generate X.509 certificate path: " + e.getMessage(), e);
             }
@@ -190,7 +242,9 @@ public class AuthenticationHandler extends HandlerWrapper {
 
 
 
-    private void addAuthCredentialsToSubject(HttpServletRequest request, Subject subject) {
+    private void addAuthCredentialsToSubject(HttpServletRequest request,
+            Subject subject, EnumSet<AuthenticationType> authn)
+    {
         if (!_isBasicAuthenticationEnabled) {
             return;
         }
@@ -211,6 +265,7 @@ public class AuthenticationHandler extends HandlerWrapper {
                         } else {
                             subject.getPrincipals().add(new LoginNamePrincipal(credential));
                         }
+                        authn.add(AuthenticationType.BASIC);
                     } catch (IllegalArgumentException e) {
                         LOG.warn("Authentication Data in the header received is not Base64 encoded {}",
                                 request.getHeader("Authorization"));
@@ -219,6 +274,7 @@ public class AuthenticationHandler extends HandlerWrapper {
                 case "BEARER":
                     try {
                         subject.getPrivateCredentials().add(new BearerTokenCredential(info.getData()));
+                        authn.add(AuthenticationType.BEARER);
                     } catch (IllegalArgumentException e) {
                         LOG.info("Bearer Token in invalid {}",
                                 request.getHeader("Authorization"));

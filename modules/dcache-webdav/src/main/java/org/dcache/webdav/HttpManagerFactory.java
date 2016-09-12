@@ -106,7 +106,7 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
                 response.setNonStandardHeader("Accept-Ranges", "bytes");
                 String etag = eTagGenerator.generateEtag(resource);
                 if (etag != null) {
-                        response.setEtag(etag);
+                    response.setEtag("\"" + etag.substring(1, etag.length()-1) + "_" + Attributes.getLogoutId() + "\"");
                 }
             }
         };

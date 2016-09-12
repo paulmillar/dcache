@@ -52,18 +52,17 @@ import diskCacheV111.util.PnfsHandler;
 
 import org.dcache.acl.enums.AccessMask;
 import org.dcache.auth.Subjects;
-import org.dcache.auth.attributes.Restriction;
 import org.dcache.cells.CellStub;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.webdav.PathMapper;
 import org.dcache.webdav.transfer.RemoteTransferHandler.Direction;
-import org.dcache.webdav.AuthenticationHandler;
 import org.dcache.webdav.transfer.RemoteTransferHandler.TransferType;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.dcache.namespace.FileAttribute.*;
+import static org.dcache.webdav.Attributes.getRestriction;
 
 /**
  * The CopyFilter adds support for initiating third-party copies via
@@ -484,11 +483,5 @@ public class CopyFilter implements Filter
     private Subject getSubject()
     {
         return Subject.getSubject(AccessController.getContext());
-    }
-
-    private Restriction getRestriction()
-    {
-        HttpServletRequest servletRequest = ServletRequest.getRequest();
-        return (Restriction) servletRequest.getAttribute(AuthenticationHandler.DCACHE_RESTRICTION_ATTRIBUTE);
     }
 }
