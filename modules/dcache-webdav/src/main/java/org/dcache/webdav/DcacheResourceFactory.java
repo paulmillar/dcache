@@ -184,7 +184,7 @@ public class DcacheResourceFactory
     private boolean _isAnonymousListingAllowed;
 
     private String _staticContentPath;
-    private ReloadingTemplate _template;
+    private ReloadableTemplate _template;
     private ImmutableMap<String,String> _templateConfig;
 
     private TransferRetryPolicy _retryPolicy =
@@ -475,11 +475,10 @@ public class DcacheResourceFactory
      * Sets the resource containing the StringTemplateGroup for
      * directory listing.
      */
-    public void setTemplateResource(org.springframework.core.io.Resource resource)
-        throws IOException
+    @Required
+    public void setTemplate(ReloadableTemplate template)
     {
-        _template = new ReloadingTemplate(resource, new Slf4jSTErrorListener(_log),
-                HTML_TEMPLATE_LISTING_NAME);
+        _template = template;
     }
 
     @Required
@@ -879,7 +878,7 @@ public class DcacheResourceFactory
      */
     public boolean deliverClient(FsPath path, Writer out) throws IOException
     {
-        final ST t = this._template.getInstanceOfQuietly(HTML_TEMPLATE_CLIENT_NAME);
+        final ST t = _template.getInstanceOfQuietly(HTML_TEMPLATE_CLIENT_NAME);
 
         if (t == null) {
             return false;

@@ -57,7 +57,7 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
     private static final Logger log =
         LoggerFactory.getLogger(DcacheResponseHandler.class);
 
-    private static final String HTML_TEMPLATE_NAME = "errorpage";
+    public static final String HTML_TEMPLATE_NAME = "errorpage";
 
     private static final Splitter PATH_SPLITTER =
         Splitter.on('/').omitEmptyStrings();
@@ -76,8 +76,8 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
 
     private AuthenticationService _authenticationService;
     private String _staticContentPath;
+    private ReloadableTemplate _template;
     private ImmutableMap<String, String> _templateConfig;
-    private ReloadingTemplate _template;
 
     private PathMapper pathMapper;
 
@@ -95,11 +95,9 @@ public class DcacheResponseHandler extends AbstractWrappingResponseHandler
      * Sets the resource containing the StringTemplateGroup for
      * directory listing.
      */
-    public void setTemplateResource(org.springframework.core.io.Resource resource)
-            throws IOException
+    public void setReloadableTemplate(ReloadableTemplate template)
     {
-        _template = new ReloadingTemplate(resource, new Slf4jSTErrorListener(log),
-                HTML_TEMPLATE_NAME);
+        _template = template;
     }
 
     @Required

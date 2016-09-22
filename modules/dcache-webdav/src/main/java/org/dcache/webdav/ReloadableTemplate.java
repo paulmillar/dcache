@@ -27,36 +27,41 @@ import org.stringtemplate.v4.STGroupFile;
 
 import java.io.IOException;
 
+import org.dcache.util.Slf4jSTErrorListener;
+
 import static java.util.Objects.requireNonNull;
 
 /**
- * This is a simple wrapper to allow caching a template-group that
- * refreshes when the content of underlying file has changed.
+ * This is a simple wrapper to allow reloading a template-group.
  */
-public class ReloadingTemplate
+public class ReloadableTemplate
 {
-    private static final Logger LOG = LoggerFactory.getLogger(ReloadingTemplate.class);
-    private static final long CHECK_PERIOD = 1_000;
+    private static final Logger LOG = LoggerFactory.getLogger(ReloadableTemplate.class);
 
     private final Resource _resource;
     private final String _path;
-    private final STErrorListener _listener;
-    private final String _templateName;
 
+    private STErrorListener _listener = new Slf4jSTErrorListener(LOG);
+    private String _templateName;
     private STGroup _templateGroup;
-    private long _lastModified;
-    private long _lastChecked;
 
-    public ReloadingTemplate(Resource resource, STErrorListener listener,
-            String templateName) throws IOException
+    public ReloadableTemplate(Resource resource) throws IOException
     {
         _resource = requireNonNull(resource);
         _path = _resource.getFile().getCanonicalPath();
-        _listener = requireNonNull(listener);
+    }
+
+    /**
+     * Register a template name that should be instantiated when the
+     * template is loaded.  This is a work-around for race conditions in
+     * ST.
+     */
+    public void setTemplateName(String templateName)
+    {
         _templateName = requireNonNull(templateName);
     }
 
-    private STGroupFile load() throws IOException
+    protected void reload() throws IOException
     {
         STGroupFile group = new STGroupFile(_resource.getURL(), "UTF-8", '$', '$');
 
@@ -69,26 +74,15 @@ public class ReloadingTemplate
          *
          * here we force initialisation to work-around this.
          */
-        group.getInstanceOf(_templateName);
-
-        return group;
-    }
-
-    private synchronized STGroup getSTGroup()
-    {
-        if (System.currentTimeMillis() - _lastChecked > CHECK_PERIOD) {
-            try {
-                long lastModified = _resource.lastModified();
-
-                if (_lastModified != lastModified) {
-                    _templateGroup = load();
-                    _lastModified = lastModified;
-                }
-            } catch (IOException e) {
-                LOG.warn("Problem with template file {}: {}", _path, e.toString());
-            }
+        if (_templateName != null) {
+            group.getInstanceOf(_templateName);
         }
 
+        _templateGroup = group;
+    }
+
+    protected STGroup getTemplateGroup()
+    {
         return _templateGroup;
     }
 
@@ -106,7 +100,7 @@ public class ReloadingTemplate
     {
         ST template = null;
 
-        STGroup group = getSTGroup();
+        STGroup group = getTemplateGroup();
 
         if (group != null) {
             template = group.getInstanceOf(name);
@@ -128,5 +122,10 @@ public class ReloadingTemplate
     public String getPath()
     {
         return _path;
+    }
+
+    protected Resource getResource()
+    {
+        return _resource;
     }
 }
