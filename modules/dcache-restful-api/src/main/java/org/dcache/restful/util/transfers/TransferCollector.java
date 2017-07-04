@@ -61,6 +61,9 @@ package org.dcache.restful.util.transfers;
 
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Required;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -68,16 +71,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import diskCacheV111.util.TransferInfo;
 import diskCacheV111.vehicles.IoDoorInfo;
 import diskCacheV111.vehicles.IoJobInfo;
+
 import dmg.cells.nucleus.CellPath;
 import dmg.cells.services.login.LoginBrokerInfo;
 import dmg.cells.services.login.LoginBrokerSubscriber;
 import dmg.cells.services.login.LoginManagerChildrenInfo;
+
+import org.dcache.cells.CellStub;
 import org.dcache.restful.util.admin.CellMessagingCollector;
 
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -91,7 +96,10 @@ import static com.google.common.util.concurrent.Futures.transform;
  *
  * <p>May be overridden for testing purposes.</p>
  */
-public class TransferCollector extends CellMessagingCollector<Map<String, TransferInfo>> {
+public class TransferCollector implements CellMessagingCollector<Map<String, TransferInfo>>
+{
+    private static final Logger LOGGER = LoggerFactory.getLogger(TransferCollector.class);
+
     private static final String   DOOR_INFO_CMD  = "get door info -binary";
     private static final String   LM_INFO_CMD    = "get children -binary";
     private static final String   MOVER_INFO_CMD = "mover ls -binary";
@@ -100,6 +108,14 @@ public class TransferCollector extends CellMessagingCollector<Map<String, Transf
      * <p>For obtaining current door information.</p>
      */
     private LoginBrokerSubscriber loginBrokerSource;
+
+    private CellStub stub;
+
+    @Required
+    public void setCellStub(CellStub stub)
+    {
+        this.stub = stub;
+    }
 
     /**
      * <p>Gathers endpoints for the login managers, pulls

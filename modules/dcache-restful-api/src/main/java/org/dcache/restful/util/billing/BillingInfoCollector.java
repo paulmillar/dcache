@@ -59,6 +59,8 @@ documents or software obtained from this server.
  */
 package org.dcache.restful.util.billing;
 
+import org.springframework.beans.factory.annotation.Required;
+
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -68,8 +70,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import diskCacheV111.util.CacheException;
-import dmg.cells.nucleus.CellPath;
+
 import dmg.cells.nucleus.NoRouteToCellException;
+
+import org.dcache.cells.CellStub;
 import org.dcache.restful.services.billing.BillingInfoService;
 import org.dcache.restful.util.admin.CellMessagingCollector;
 import org.dcache.vehicles.billing.BillingDataRequestMessage;
@@ -85,9 +89,15 @@ import org.dcache.vehicles.billing.BillingRecordRequestMessage;
  * <p>The {@link BillingInfoService} implementation is responsible for
  * the front-end caching of the information gathered.</p>
  */
-public class BillingInfoCollector
-                extends CellMessagingCollector<Map<String, Future<BillingDataRequestMessage>>>{
-    private CellPath billingPath;
+public class BillingInfoCollector implements CellMessagingCollector<Map<String, Future<BillingDataRequestMessage>>>
+{
+    private CellStub stub;
+
+    @Required
+    public void setCellStub(CellStub stub)
+    {
+        this.stub = stub;
+    }
 
     /**
      * <p>Uses the utility method to generate updated messages to
@@ -98,6 +108,7 @@ public class BillingInfoCollector
      *
      * @return map of futures which can be handled by the caller.
      */
+    @Override
     public Map<String, Future<BillingDataRequestMessage>> collectData() {
         Map<String, Future<BillingDataRequestMessage>> replies = new TreeMap<>();
 
@@ -107,7 +118,7 @@ public class BillingInfoCollector
         for (BillingDataRequestMessage message : messages) {
             String key = BillingInfoCollectionUtils.getKey(message);
             try {
-                replies.put(key, stub.send(billingPath, message));
+                replies.put(key, stub.send(message));
             } catch (IllegalStateException e) {
                    /*
                     * This can occur on startup, racing against the billing
@@ -161,7 +172,7 @@ public class BillingInfoCollector
     public BillingRecordRequestMessage sendRecordRequest(
                     BillingRecordRequestMessage message) {
         try {
-            return stub.sendAndWait(billingPath, message);
+            return stub.sendAndWait(message);
         } catch (CacheException e) {
             message.setFailed(e.getRc(), e.getMessage());
             return message;
@@ -178,9 +189,5 @@ public class BillingInfoCollector
                               "Could not send message.");
             return message;
         }
-    }
-
-    public void setBillingPath(CellPath billingPath) {
-        this.billingPath = billingPath;
     }
 }

@@ -116,7 +116,6 @@ public class TransferInfoServiceTest {
             return ImmutableMap.copyOf(map);
         }
 
-        @Override
         public void initialize(Long timeout, TimeUnit timeUnit) {
             JsonParser parser = new JsonParser();
             InputStream input = getClass()
@@ -199,7 +198,6 @@ public class TransferInfoServiceTest {
             });
         }
 
-        @Override
         public void shutdown() {
             map.clear();
         }
@@ -253,11 +251,6 @@ public class TransferInfoServiceTest {
         service.configure();
         collector.initialize(100L, TimeUnit.MILLISECONDS);
         service.run();
-    }
-
-    @After
-    public void shutDown() {
-        service.beforeStop();
     }
 
     @Test

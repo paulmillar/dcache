@@ -165,11 +165,6 @@ public abstract class CellDataCollectingService<D, C extends CellMessagingCollec
                     CellDataCollectingService.this.timeoutUnit = unit;
                     configure();
 
-                    /*
-                     * Time the collector communication out at half the
-                     * refresh interval.
-                     */
-                    collector.reset(timeout / 2, timeoutUnit);
                     response = "Update time set to "
                                     + unit.toSeconds(timeout) + " seconds";
                 }
@@ -206,7 +201,6 @@ public abstract class CellDataCollectingService<D, C extends CellMessagingCollec
     @Override
     public void afterStart() {
         configure();
-        collector.initialize(timeout, timeoutUnit);
         scheduleNext(0, timeoutUnit); // run immediately
     }
 
@@ -249,11 +243,6 @@ public abstract class CellDataCollectingService<D, C extends CellMessagingCollec
 
     public void setTimeoutUnit(TimeUnit timeoutUnit) {
         this.timeoutUnit = timeoutUnit;
-    }
-
-    @Override
-    public void beforeStop() {
-        collector.shutdown();
     }
 
     /**

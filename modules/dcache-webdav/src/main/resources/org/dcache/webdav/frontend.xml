@@ -112,6 +112,12 @@
   <bean id="transfer-collector" class="org.dcache.restful.util.transfers.TransferCollector">
       <description>Collects active transfer info from from pools and doors.</description>
       <property name="loginBrokerSource" ref="login-broker-source"/>
+      <property name="cellStub">
+            <bean class="org.dcache.cells.CellStub">
+                <property name="timeout" value="${frontend.service.transfers.timeout}"/>
+                <property name="timeoutUnit" value="${frontend.service.transfers.timeout.unit}"/>
+            </bean>
+      </property>
   </bean>
 
   <bean id="transfer-info-service" class="org.dcache.restful.services.transfers.TransferInfoServiceImpl">
@@ -137,9 +143,11 @@
 
   <bean id="billing-info-collector" class="org.dcache.restful.util.billing.BillingInfoCollector">
         <description>Collects information from billing backend (database).</description>
-        <property name="billingPath">
-            <bean class="dmg.cells.nucleus.CellPath">
-                <constructor-arg value="${frontend.service.billing}"/>
+        <property name="cellStub">
+            <bean class="org.dcache.cells.CellStub">
+                <property name="destination" value="${frontend.service.billing}"/>
+                <property name="timeout" value="${frontend.service.billing.collection.timeout}"/>
+                <property name="timeoutUnit" value="${frontend.service.billing.collection.timeout.unit}"/>
             </bean>
         </property>
   </bean>
@@ -147,8 +155,6 @@
   <bean id="billing-info-service" class="org.dcache.restful.services.billing.BillingInfoServiceImpl">
         <description>Caches and serves billing records and histogram data.</description>
         <property name="collector" ref="billing-info-collector"/>
-        <property name="timeout" value="${frontend.service.billing.collection.timeout}"/>
-        <property name="timeoutUnit" value="${frontend.service.billing.collection.timeout.unit}"/>
         <property name="executorService" ref="scheduling-service"/>
   </bean>
 
@@ -159,6 +165,19 @@
 
   <bean id="cell-info-collector" class="org.dcache.restful.util.cells.CellInfoCollector">
     <description>Collects cell info from from domains.</description>
+    <property name="cellInfo">
+        <bean class="org.dcache.cells.CellStub">
+            <property name="timeout" value="${frontend.service.cell-info.collection.timeout}"/>
+            <property name="timeoutUnit" value="${frontend.service.cell-info.collection.timeout.unit}"/>
+        </bean>
+    </property>
+    <property name="routingManager">
+        <bean class="org.dcache.cells.CellStub">
+            <property name="destination" value="${frontend.service.routing-manager}"/>
+            <property name="timeout" value="${frontend.service.routing-manager.collection.timeout}"/>
+            <property name="timeoutUnit" value="${frontend.service.routing-manager.collection.timeout.unit}"/>
+        </bean>
+    </property>
   </bean>
 
   <bean id="cell-info-processor" class="org.dcache.restful.util.cells.CellInfoFutureProcessor">

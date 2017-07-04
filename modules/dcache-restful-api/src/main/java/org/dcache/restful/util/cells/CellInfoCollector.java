@@ -60,6 +60,9 @@ documents or software obtained from this server.
 package org.dcache.restful.util.cells;
 
 import com.google.common.util.concurrent.Futures;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Required;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -67,15 +70,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import diskCacheV111.util.CacheException;
 
 import dmg.cells.nucleus.CellInfo;
 import dmg.cells.nucleus.CellInfoAware;
 import dmg.cells.nucleus.CellPath;
+import dmg.cells.nucleus.NoRouteToCellException;
 import dmg.cells.services.GetAllDomainsReply;
 import dmg.cells.services.GetAllDomainsRequest;
+
+import org.dcache.cells.CellStub;
 import org.dcache.restful.util.admin.CellMessagingCollector;
 
 /**
@@ -85,11 +92,26 @@ import org.dcache.restful.util.admin.CellMessagingCollector;
  *      scatter/gathers requests for {@link CellInfo} to all the well-known
  *      cells of all domains visible to the Routing Manager.</p>
  */
-public final class CellInfoCollector extends
-                CellMessagingCollector<Map<String, ListenableFutureWrapper<CellInfo>>>
-                implements CellInfoAware {
+public final class CellInfoCollector implements CellInfoAware,
+        CellMessagingCollector<Map<String, ListenableFutureWrapper<CellInfo>>>
+{
+    private static final Logger LOGGER = LoggerFactory.getLogger(CellInfoCollector.class);
 
+    private CellStub cellInfo;
+    private CellStub routingManager;
     private Supplier<CellInfo>     supplier;
+
+    @Required
+    public void setCellInfo(CellStub stub)
+    {
+        this.cellInfo = stub;
+    }
+
+    @Required
+    public void setRoutingManager(CellStub stub)
+    {
+        this.routingManager = stub;
+    }
 
     @Override
     public Map<String, ListenableFutureWrapper<CellInfo>> collectData()
@@ -97,13 +119,12 @@ public final class CellInfoCollector extends
         GetAllDomainsReply reply;
 
         try {
-            reply = stub.send(new CellPath("RoutingMgr"),
-                              new GetAllDomainsRequest(),
-                              GetAllDomainsReply.class).get();
-        } catch (ExecutionException e) {
-            LOGGER.error("Could not contact Routing Manager: {}, {}.",
-                         e.getMessage(), e.getCause());
-            return Collections.EMPTY_MAP;
+            reply = routingManager.sendAndWait(new GetAllDomainsRequest(),
+                              GetAllDomainsReply.class);
+        } catch (NoRouteToCellException | CacheException e) {
+            LOGGER.error("Could not contact Routing Manager: {}",
+                         e.getMessage());
+            return Collections.emptyMap();
         }
 
         Map<String, ListenableFutureWrapper<CellInfo>> map = new TreeMap<>();
@@ -149,7 +170,7 @@ public final class CellInfoCollector extends
         ListenableFutureWrapper<CellInfo> wrapper = new ListenableFutureWrapper<>();
         wrapper.setKey(path.toAddressString());
         wrapper.setSent(System.currentTimeMillis());
-        wrapper.setFuture(stub.send(path, "xgetcellinfo", CellInfo.class));
+        wrapper.setFuture(cellInfo.send(path, "xgetcellinfo", CellInfo.class));
         return wrapper;
     }
 }
