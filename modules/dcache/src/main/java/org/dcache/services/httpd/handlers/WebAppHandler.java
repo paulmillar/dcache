@@ -17,6 +17,7 @@
  */
 package org.dcache.services.httpd.handlers;
 
+import com.google.common.collect.Lists;
 import org.eclipse.jetty.plus.jndi.EnvEntry;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,12 +25,19 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 
 import java.util.Map;
 import java.util.Properties;
+
 import javax.naming.NamingException;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellMessageSender;
 import dmg.cells.nucleus.EnvironmentAware;
+
 import org.dcache.poolmanager.RemotePoolMonitor;
+
 
 public class WebAppHandler extends WebAppContext
     implements EnvironmentAware, CellMessageSender
@@ -38,6 +46,22 @@ public class WebAppHandler extends WebAppContext
     public static final String JNDI_ARGS = "jndiArgs";
     public static final String POOL_MONITOR = "poolMonitor";
     public static final String BEAN_FACTORY = "beanFactory";
+
+    private static final String[] EXTRA_SYSTEM_CLASSES = {
+            "org.eclipse.jetty.io.Connection",
+            "org.eclipse.jetty.io.SocketChannelEndPoint",
+            "org.eclipse.jetty.server.HttpChannel",
+            "org.eclipse.jetty.server.HttpConnection",
+            "org.eclipse.jetty.io.ssl.SslConnection$DecryptedEndPoint",
+            "org.eclipse.jetty.io.ssl.SslConnection"};
+
+    private static final String[] EXTRA_SERVER_CLASSES = {
+            "-org.eclipse.jetty.io.Connection",
+            "-org.eclipse.jetty.io.SocketChannelEndPoint",
+            "-org.eclipse.jetty.server.HttpChannel",
+            "-org.eclipse.jetty.server.HttpConnection",
+            "-org.eclipse.jetty.io.ssl.SslConnection$DecryptedEndPoint",
+            "-org.eclipse.jetty.io.ssl.SslConnection"};
 
     private static final String[] CONFIGURATION_CLASSES = {
             "org.eclipse.jetty.webapp.WebInfConfiguration",
@@ -59,6 +83,17 @@ public class WebAppHandler extends WebAppContext
     public WebAppHandler()
     {
         setConfigurationClasses(CONFIGURATION_CLASSES);
+
+        setSystemClasses(concat(__dftSystemClasses, EXTRA_SYSTEM_CLASSES));
+        setServerClasses(concat(EXTRA_SERVER_CLASSES, __dftServerClasses));
+    }
+
+    private static String[] concat(String[] first, String[] second)
+    {
+        String[] combined = new String[first.length + second.length];
+        System.arraycopy(first, 0, combined, 0, first.length);
+        System.arraycopy(second, 0, combined, first.length, second.length);
+        return combined;
     }
 
     @Override

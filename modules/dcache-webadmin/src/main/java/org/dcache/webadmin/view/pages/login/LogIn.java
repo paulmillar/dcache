@@ -12,14 +12,21 @@ import org.apache.wicket.markup.html.form.StatelessForm;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.model.CompoundPropertyModel;
-import org.apache.wicket.protocol.http.servlet.ServletWebRequest;
 import org.apache.wicket.protocol.https.RequireHttps;
+import org.apache.wicket.request.Request;
 import org.apache.wicket.request.cycle.RequestCycle;
+import org.eclipse.jetty.io.EndPoint;
+import org.eclipse.jetty.io.ssl.SslConnection.DecryptedEndPoint;
+import org.eclipse.jetty.server.HttpConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.servlet.http.HttpServletRequest;
 
+import java.io.IOException;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
 import org.dcache.webadmin.controller.LogInService;
@@ -29,6 +36,8 @@ import org.dcache.webadmin.view.beans.UserBean;
 import org.dcache.webadmin.view.beans.WebAdminInterfaceSession;
 import org.dcache.webadmin.view.pages.basepage.BasePage;
 import org.dcache.webadmin.view.util.DefaultFocusBehaviour;
+
+import static javax.net.ssl.SSLEngineResult.HandshakeStatus.NEED_UNWRAP;
 
 /**
  * Contains all the page construction and logic for servicing a login
@@ -40,8 +49,7 @@ import org.dcache.webadmin.view.util.DefaultFocusBehaviour;
 @RequireHttps
 public class LogIn extends BasePage {
 
-    private static final String X509_CERTIFICATE_ATTRIBUTE
-        = "javax.servlet.request.X509Certificate";
+    private static final X509Certificate[] EMPTY_X509_ARRAY = new X509Certificate[0];
     private static final Logger _log = LoggerFactory.getLogger(LogIn.class);
     private static final long serialVersionUID = 8902191632839916396L;
 
@@ -213,6 +221,7 @@ public class LogIn extends BasePage {
         }
     }
 
+    @Override
     protected void initialize() {
         super.initialize();
         final FeedbackPanel feedback = new FeedbackPanel("feedback");
@@ -225,25 +234,71 @@ public class LogIn extends BasePage {
     }
 
     public static void signInWithCert(LogInService service)
-                    throws IllegalArgumentException,
-                    LogInServiceException {
+            throws IllegalArgumentException, LogInServiceException
+    {
         X509Certificate[] certChain = getCertChain();
         UserBean user = service.authenticate(certChain);
         WebAdminInterfaceSession session = (WebAdminInterfaceSession) Session.get();
         session.setUser(user);
     }
 
-    private static X509Certificate[] getCertChain() {
-        ServletWebRequest servletWebRequest
-            = (ServletWebRequest) RequestCycle.get().getRequest();
-        HttpServletRequest request = servletWebRequest.getContainerRequest();
-        Object certificate = request.getAttribute(X509_CERTIFICATE_ATTRIBUTE);
-        X509Certificate[] chain;
-        if (certificate instanceof X509Certificate[]) {
-            chain = (X509Certificate[]) certificate;
-        } else {
-            throw new IllegalArgumentException();
+    private static X509Certificate[] getCertChain() throws LogInServiceException
+    {
+        DecryptedEndPoint endpoint = decryptedEndPoint();
+
+        try {
+            renegotiateWantClientAuth(endpoint, true);
+            return peerCertificatesFrom(endpoint);
+        } catch (IOException e) {
+            throw new LogInServiceException("Failed to fetch client certificates: " + e);
+        } finally {
+            try {
+                renegotiateWantClientAuth(endpoint, false);
+            } catch (IOException e) {
+                _log.warn("Failed to renegotiate without requesting client auth: {}",
+                        e.getMessage());
+            }
         }
-        return chain;
+    }
+
+    private static void renegotiateWantClientAuth(DecryptedEndPoint endpoint,
+            boolean wantClientAuth) throws IOException
+    {
+        SSLEngine engine = sslEngineOf(endpoint);
+        engine.setWantClientAuth(wantClientAuth);
+        engine.beginHandshake();
+        do {
+            endpoint.flush();
+        } while (engine.getHandshakeStatus() == NEED_UNWRAP);
+    }
+
+    private static X509Certificate [] peerCertificatesFrom(DecryptedEndPoint endpoint)
+            throws SSLPeerUnverifiedException
+    {
+        Certificate [] chain = sslEngineOf(endpoint).getSession().getPeerCertificates();
+
+        return chain == null ? EMPTY_X509_ARRAY : (X509Certificate []) chain;
+    }
+
+    private static DecryptedEndPoint decryptedEndPoint() throws LogInServiceException
+    {
+        Request request = RequestCycle.get().getRequest();
+        HttpServletRequest servletRequest = (HttpServletRequest) request.getContainerRequest();
+
+        // Jetty makes the Connection available as an attribute with that class' name.
+        HttpConnection connection = (HttpConnection) servletRequest.getAttribute(HttpConnection.class.getName());
+
+        EndPoint endpoint = connection.getHttpChannel().getEndPoint();
+
+        if (!(endpoint instanceof DecryptedEndPoint)) {
+            throw new LogInServiceException("Connection is not TLS encrypted");
+        }
+
+        return (DecryptedEndPoint) endpoint;
+    }
+
+    private static SSLEngine sslEngineOf(DecryptedEndPoint endpoint)
+    {
+        return endpoint.getSslConnection().getSSLEngine();
     }
 }

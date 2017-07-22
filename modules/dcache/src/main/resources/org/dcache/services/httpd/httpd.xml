@@ -103,7 +103,7 @@
 
             <property name="protocol" value="TLS"/>
             <property name="needClientAuth" value="false"/>
-            <property name="wantClientAuth" value="true"/>
+            <property name="wantClientAuth" value="false"/>
 
             <property name="cipherFlags" value="${httpd.authn.ciphers}"/>
 
