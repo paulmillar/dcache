@@ -88,6 +88,27 @@ public class AnnotatedCommandExecutor implements CommandExecutor
     }
 
     @Override
+    public int hashCode()
+    {
+        return _parent.hashCode() ^ _command.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (other == this) {
+            return true;
+        }
+
+        if (!(other instanceof AnnotatedCommandExecutor)) {
+            return false;
+        }
+
+        AnnotatedCommandExecutor otherExecutor = (AnnotatedCommandExecutor) other;
+        return _parent == otherExecutor._parent && _command == otherExecutor._command;
+    }
+
+    @Override
     public boolean isDeprecated()
     {
         return _isDeprecated;

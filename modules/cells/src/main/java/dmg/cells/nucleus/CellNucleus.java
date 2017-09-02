@@ -595,6 +595,11 @@ public class CellNucleus implements ThreadFactory
         _cellEventListeners.add(listener);
     }
 
+    public void removeCellEventListener(CellEventListener listener)
+    {
+        _cellEventListeners.remove(listener);
+    }
+
     void addToEventQueue(CellEvent ce)
     {
         try {

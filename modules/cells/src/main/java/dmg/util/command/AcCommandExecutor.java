@@ -38,6 +38,28 @@ class AcCommandExecutor implements CommandExecutor
     }
 
     @Override
+    public int hashCode()
+    {
+        return _method.hashCode() ^ _listener.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (other == this) {
+            return true;
+        }
+
+        if (!(other instanceof AcCommandExecutor)) {
+            return false;
+        }
+
+        AcCommandExecutor otherExecutor = (AcCommandExecutor) other;
+
+        return _listener == otherExecutor._listener && _method == otherExecutor._method;
+    }
+
+    @Override
     public boolean isDeprecated()
     {
         return _isDeprecated;

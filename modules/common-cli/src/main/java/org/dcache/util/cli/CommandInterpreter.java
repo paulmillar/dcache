@@ -58,6 +58,15 @@ public class CommandInterpreter
         _commandListeners.add(commandListener);
     }
 
+    public final synchronized void removeCommandListener(Object listener)
+    {
+        for (CommandScanner scanner : _scanners) {
+            removeCommands(scanner.scan(listener));
+        }
+
+        _commandListeners.remove(listener);
+    }
+
     private void addCommands(Map<List<String>,? extends CommandExecutor> commands)
     {
         for (Map.Entry<List<String>,? extends CommandExecutor> entry: commands.entrySet()) {
@@ -68,6 +77,16 @@ public class CommandInterpreter
                         currentEntry.getCommand() + " and " + entry.getValue());
             }
             currentEntry.setCommand(entry.getValue());
+        }
+    }
+
+    private void removeCommands(Map<List<String>,? extends CommandExecutor> commands)
+    {
+        for (Map.Entry<List<String>,? extends CommandExecutor> entry: commands.entrySet()) {
+            CommandEntry currentEntry = _rootEntry.getOrCreate(entry.getKey());
+            if (currentEntry.hasCommand(currentEntry.getCommand())) {
+                currentEntry.clearCommand();
+            }
         }
     }
 
@@ -196,6 +215,11 @@ public class CommandInterpreter
             _commandExecutor = commandExecutor;
         }
 
+        public void clearCommand()
+        {
+            _commandExecutor = null;
+        }
+
         public CommandExecutor getCommand()
         {
             return _commandExecutor;
@@ -204,6 +228,11 @@ public class CommandInterpreter
         boolean hasCommand()
         {
             return _commandExecutor != null;
+        }
+
+        boolean hasCommand(CommandExecutor executor)
+        {
+            return _commandExecutor != null && _commandExecutor.equals(executor);
         }
 
         public boolean hasACLs()

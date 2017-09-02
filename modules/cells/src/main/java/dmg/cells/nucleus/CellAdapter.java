@@ -213,6 +213,11 @@ public class CellAdapter
         _commandInterpreter.addCommandListener(commandListener);
     }
 
+    public void removeCommandListener(Object commandListener)
+    {
+        _commandInterpreter.removeCommandListener(commandListener);
+    }
+
     public String command(String command) throws CommandExitException
     {
         return _commandInterpreter.command(command);
@@ -283,6 +288,16 @@ public class CellAdapter
      */
     public void addCellEventListener(CellEventListener cel) {
         _nucleus.addCellEventListener(cel);
+    }
+
+    /**
+     * Removes a CellEventListener to the current CellNucleus.
+     * @param cel has to be an object which implements CellEventListener.
+     * @see CellEventListener
+     */
+    public void removeCellEventListener(CellEventListener cel)
+    {
+        _nucleus.removeCellEventListener(cel);
     }
 
     /**

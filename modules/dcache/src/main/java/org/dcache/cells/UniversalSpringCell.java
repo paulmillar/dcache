@@ -31,8 +31,8 @@ import org.springframework.beans.PropertyAccessorUtils;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -121,7 +121,7 @@ import static java.nio.file.Files.readAllBytes;
  */
 public class UniversalSpringCell
     extends AbstractCell
-    implements BeanPostProcessor,
+    implements DestructionAwareBeanPostProcessor,
                EnvironmentAware
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(UniversalSpringCell.class);
@@ -172,6 +172,7 @@ public class UniversalSpringCell
     /**
      * Command interpreter for processing setup files.
      */
+    @GuardedBy("_setupProviders")
     private final CommandInterpreter _setupInterpreter = new CommandInterpreter();
 
     /**
@@ -256,8 +257,10 @@ public class UniversalSpringCell
     {
         /* Run the final initialisation hooks.
          */
-        for (CellLifeCycleAware bean: _lifeCycleAware.values()) {
-            bean.afterStart();
+        synchronized (_lifeCycleAware) {
+            for (CellLifeCycleAware bean: _lifeCycleAware.values()) {
+                bean.afterStart();
+            }
         }
     }
 
@@ -268,8 +271,10 @@ public class UniversalSpringCell
         if (_setupManager != null) {
             _setupManager.close();
         }
-        for (CellLifeCycleAware bean: _lifeCycleAware.values()) {
-            bean.beforeStop();
+        synchronized (_lifeCycleAware) {
+            for (CellLifeCycleAware bean: _lifeCycleAware.values()) {
+                bean.beforeStop();
+            }
         }
     }
 
@@ -284,9 +289,15 @@ public class UniversalSpringCell
             _context.close();
             _context = null;
         }
-        _infoProviders.clear();
-        _setupProviders.clear();
-        _lifeCycleAware.clear();
+        synchronized (_infoProviders) {
+            _infoProviders.clear();
+        }
+        synchronized (_setupProviders) {
+            _setupProviders.clear();
+        }
+        synchronized (_lifeCycleAware) {
+            _lifeCycleAware.clear();
+        }
     }
 
     private File firstMissing(File[] files)
@@ -334,7 +345,9 @@ public class UniversalSpringCell
             throws CommandException
     {
         CommandInterpreter mockInterpreter = new CommandInterpreter();
-        _setupProviders.values().stream().map(CellSetupProvider::mock).forEach(mockInterpreter::addCommandListener);
+        synchronized (_setupProviders) {
+            _setupProviders.values().stream().map(CellSetupProvider::mock).forEach(mockInterpreter::addCommandListener);
+        }
         executeSetup(mockInterpreter, source, data);
     }
 
@@ -342,11 +355,17 @@ public class UniversalSpringCell
             throws CommandException
     {
         try {
-            _lifeCycleAware.values().forEach(CellLifeCycleAware::beforeSetup);
+            synchronized (_lifeCycleAware) {
+                _lifeCycleAware.values().forEach(CellLifeCycleAware::beforeSetup);
+            }
             try {
-                executeSetup(_setupInterpreter, source, data);
+                synchronized (_setupProviders) {
+                    executeSetup(_setupInterpreter, source, data);
+                }
             } finally {
-                _lifeCycleAware.values().forEach(CellLifeCycleAware::afterSetup);
+                synchronized (_lifeCycleAware) {
+                    _lifeCycleAware.values().forEach(CellLifeCycleAware::afterSetup);
+                }
             }
         } catch (RuntimeException e) {
             kill();
@@ -436,23 +455,25 @@ public class UniversalSpringCell
         ConfigurableApplicationContext context = _context;
         if (context != null) {
             ConfigurableListableBeanFactory factory = context.getBeanFactory();
-            for (Map.Entry<String, CellInfoProvider> entry : _infoProviders.entrySet()) {
-                String name = entry.getKey();
-                CellInfoProvider provider = entry.getValue();
-                try {
-                    BeanDefinition definition = factory.getBeanDefinition(name);
-                    String description = definition.getDescription();
-                    if (description != null) {
-                        pw.println(String.format("--- %s (%s) ---",
-                                                 name, description));
-                    } else {
+            synchronized (_infoProviders) {
+                for (Map.Entry<String, CellInfoProvider> entry : _infoProviders.entrySet()) {
+                    String name = entry.getKey();
+                    CellInfoProvider provider = entry.getValue();
+                    try {
+                        BeanDefinition definition = factory.getBeanDefinition(name);
+                        String description = definition.getDescription();
+                        if (description != null) {
+                            pw.println(String.format("--- %s (%s) ---",
+                                                     name, description));
+                        } else {
+                            pw.println(String.format("--- %s ---", name));
+                        }
+                    } catch (NoSuchBeanDefinitionException e) {
                         pw.println(String.format("--- %s ---", name));
                     }
-                } catch (NoSuchBeanDefinitionException e) {
-                    pw.println(String.format("--- %s ---", name));
+                    provider.getInfo(pw);
+                    pw.println();
                 }
-                provider.getInfo(pw);
-                pw.println();
             }
         }
     }
@@ -466,8 +487,10 @@ public class UniversalSpringCell
     public CellInfo getCellInfo()
     {
         CellInfo info = super.getCellInfo();
-        for (CellInfoProvider provider : _infoProviders.values()) {
-            info = provider.getCellInfo(info);
+        synchronized (_infoProviders) {
+            for (CellInfoProvider provider : _infoProviders.values()) {
+                info = provider.getCellInfo(info);
+            }
         }
         return info;
     }
@@ -480,8 +503,10 @@ public class UniversalSpringCell
         pw.println("#\n# Created by " + getCellName() + "("
                    + getNucleus().getCellClass() + ") at " + (new Date()).toString()
                    + "\n#");
-        for (CellSetupProvider provider: _setupProviders.values()) {
-            provider.printSetup(pw);
+        synchronized (_setupProviders) {
+            for (CellSetupProvider provider: _setupProviders.values()) {
+                provider.printSetup(pw);
+            }
         }
     }
 
@@ -919,7 +944,20 @@ public class UniversalSpringCell
      */
     public void addInfoProviderBean(CellInfoProvider bean, String name)
     {
-        _infoProviders.put(name, bean);
+        synchronized (_infoProviders) {
+            _infoProviders.put(name, bean);
+        }
+    }
+
+    /**
+     * Remove an info provider. The bean will no longer contribute to the
+     * result of the <code>getInfo</code> method.
+     */
+    public void removeInfoProviderBean(CellInfoProvider bean, String name)
+    {
+        synchronized (_infoProviders) {
+            _infoProviders.remove(name, bean);
+        }
     }
 
     /**
@@ -932,13 +970,36 @@ public class UniversalSpringCell
     }
 
     /**
+     * Remove a message receiver. Message receiver no longer receive
+     * messages via message handlers
+     */
+    public void removeMessageReceiver(CellMessageReceiver bean)
+    {
+        removeMessageListener(bean);
+    }
+
+    /**
      * Registers a setup provider. Setup providers contribute to the
      * result of the <code>save</code> method.
      */
     public void addSetupProviderBean(CellSetupProvider bean, String name)
     {
-        _setupProviders.put(name, bean);
-        _setupInterpreter.addCommandListener(bean);
+        synchronized (_setupProviders) {
+            _setupProviders.put(name, bean);
+            _setupInterpreter.addCommandListener(bean);
+        }
+    }
+
+    /**
+     * Deregister a setup provider. The bean no longer contributes to the
+     * result of the <code>save</code> method.
+     */
+    public void removeSetupProviderBean(CellSetupProvider bean, String name)
+    {
+        synchronized (_setupProviders) {
+            _setupProviders.remove(name, bean);
+            _setupInterpreter.removeCommandListener(bean);
+        }
     }
 
     /**
@@ -947,7 +1008,20 @@ public class UniversalSpringCell
      */
     public void addLifeCycleAwareBean(CellLifeCycleAware bean, String name)
     {
-        _lifeCycleAware.put(name, bean);
+        synchronized (_lifeCycleAware) {
+            _lifeCycleAware.put(name, bean);
+        }
+    }
+
+    /**
+     * Deregister a life cycle aware bean. This bean is no longer notified
+     * about cell start and stop events.
+     */
+    public void removeLifeCycleAwareBean(CellLifeCycleAware bean, String name)
+    {
+        synchronized (_lifeCycleAware) {
+            _lifeCycleAware.remove(name, bean);
+        }
     }
 
     /**
@@ -1022,6 +1096,45 @@ public class UniversalSpringCell
         }
 
         return bean;
+    }
+
+    @Override
+    public void postProcessBeforeDestruction(Object bean, String beanName)
+    {
+        if (bean instanceof CellCommandListener) {
+            removeCommandListener(bean);
+        }
+
+        if (bean instanceof CellInfoProvider) {
+            removeInfoProviderBean((CellInfoProvider) bean, beanName);
+        }
+
+        if (bean instanceof CellMessageReceiver) {
+            removeMessageReceiver((CellMessageReceiver) bean);
+        }
+
+        if (bean instanceof CellSetupProvider) {
+            removeSetupProviderBean((CellSetupProvider) bean, beanName);
+        }
+
+        if (bean instanceof CellLifeCycleAware) {
+            removeLifeCycleAwareBean((CellLifeCycleAware) bean, beanName);
+        }
+
+        if (bean instanceof CellEventListener) {
+            removeCellEventListener((CellEventListener) bean);
+        }
+    }
+
+    @Override
+    public boolean requiresDestruction(Object bean)
+    {
+        return bean instanceof CellCommandListener
+                || bean instanceof CellInfoProvider
+                || bean instanceof CellMessageReceiver
+                || bean instanceof CellSetupProvider
+                || bean instanceof CellLifeCycleAware
+                || bean instanceof CellEventListener;
     }
 
     private void createContext() throws CommandThrowableException
@@ -1216,7 +1329,9 @@ public class UniversalSpringCell
         protected void notifyListeners()
         {
             version++;
-            _lifeCycleAware.values().forEach(b -> b.setupChanged(version));
+            synchronized (_lifeCycleAware) {
+                _lifeCycleAware.values().forEach(b -> b.setupChanged(version));
+            }
         }
     }
 
@@ -1434,7 +1549,9 @@ public class UniversalSpringCell
             testSetup("zookeeper:" + _node, setup.getData());
             executeSetup("zookeeper:" + _node, setup.getData());
             _current = setup.getStat();
-            _lifeCycleAware.values().forEach(b -> b.setupChanged(_current.getVersion()));
+            synchronized (_lifeCycleAware) {
+                _lifeCycleAware.values().forEach(b -> b.setupChanged(_current.getVersion()));
+            }
         }
     }
 }
