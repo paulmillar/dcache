@@ -79,6 +79,11 @@ import org.dcache.util.histograms.TimeseriesHistogram;
  * {@link org.dcache.services.billing.cells.receivers.BillingDataRequestReceiver}.</p>
  */
 public final class BillingDataRequestMessage extends Message {
+
+    public BillingDataRequestMessage() {
+        super(true);
+    }
+
     public enum SeriesType {
         READ, WRITE, P2P, STORE, RESTORE, CONNECTION, CACHED
     }

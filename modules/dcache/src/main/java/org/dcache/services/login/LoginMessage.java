@@ -25,6 +25,7 @@ public class LoginMessage extends Message
 
     public LoginMessage(Subject subject)
     {
+        super(true);
         setSubject(subject);
     }
 

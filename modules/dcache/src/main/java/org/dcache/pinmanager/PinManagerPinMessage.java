@@ -32,6 +32,7 @@ public class PinManagerPinMessage extends Message
                                 String requestId,
                                 long lifetime)
     {
+        super(true);
         _fileAttributes = checkNotNull(fileAttributes);
         _protocolInfo = checkNotNull(protocolInfo);
         _requestId = requestId;

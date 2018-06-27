@@ -35,7 +35,9 @@ public abstract class TransferManagerMessage extends Message {
             String pnfsPath,
             String remoteUrl,
             boolean store,
-            Long remoteCredentialId) {
+            Long remoteCredentialId,
+            boolean isReplyRequired) {
+        super(isReplyRequired);
         this.pnfsPath = pnfsPath;
         this.remoteUrl = remoteUrl;
         this.store = store;

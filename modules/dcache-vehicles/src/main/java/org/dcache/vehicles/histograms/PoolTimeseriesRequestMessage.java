@@ -102,6 +102,10 @@ public class PoolTimeseriesRequestMessage extends Message {
     private Set<TimeseriesType> keys;
     private Map<TimeseriesType, TimeseriesHistogram> histogramMap;
 
+    public PoolTimeseriesRequestMessage() {
+        super(true);
+    }
+
     public Map<TimeseriesType, TimeseriesHistogram> getHistogramMap() {
         return histogramMap;
     }

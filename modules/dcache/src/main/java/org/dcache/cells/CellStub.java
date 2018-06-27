@@ -7,6 +7,8 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.RateLimiter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.concurrent.ExecutionException;
@@ -44,6 +46,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class CellStub
     implements CellMessageSender
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CellStub.class);
+
     private CellEndpoint _endpoint;
     private CellPath _destination;
     private long _timeout = 30000;
@@ -386,7 +390,12 @@ public class CellStub
     @SuppressWarnings("unchecked")
     public <T extends Message> ListenableFuture<T> send(CellPath destination, T message, long timeout, CellEndpoint.SendFlag... flags)
     {
-        message.setReplyRequired(true);
+        if (!message.getReplyRequired()) {
+            LOGGER.warn("Sending {} expecting a reply without replyRequired",
+                    message.getClass().getName(), new Exception("Bad sender"));
+            message.setReplyRequired(true);
+        }
+
         return send(destination, message, (Class<T>) message.getClass(), timeout, flags);
     }
 
@@ -465,6 +474,12 @@ public class CellStub
         CellMessage envelope = new CellMessage(destination, message);
         if (timeout < Long.MAX_VALUE) {
             envelope.setTtl(timeout);
+
+            // Assume that, if we have a finite timeout then we are expecting a reply.
+            if ((message instanceof Message) && !((Message)message).getReplyRequired()) {
+                LOGGER.error("Notifying {} with without replyRequired", message.getClass().getName(),
+                        new Exception("Bad sender"));
+            }
         }
         _endpoint.sendMessage(envelope);
     }

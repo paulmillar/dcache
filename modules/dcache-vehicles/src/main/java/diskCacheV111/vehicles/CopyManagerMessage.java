@@ -24,7 +24,7 @@ public class CopyManagerMessage extends Message
 
   public CopyManagerMessage(String srcPnfsPath, String dstPnfsPath,  long id, int bufferSize, int tcpBufferSize)
   {
-    super();
+    super(true);
     setId(id);
     this.srcPnfsPath = srcPnfsPath;
     this.dstPnfsPath = dstPnfsPath;

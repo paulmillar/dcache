@@ -17,6 +17,7 @@ public class ReverseMapMessage extends Message
 
     public ReverseMapMessage(Principal principal)
     {
+        super(true);
         _principal = principal;
     }
 

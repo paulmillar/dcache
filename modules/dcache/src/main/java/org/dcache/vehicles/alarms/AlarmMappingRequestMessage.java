@@ -71,6 +71,10 @@ public class AlarmMappingRequestMessage extends Message {
 
     private Map<String, AlarmPriority> map;
 
+    public AlarmMappingRequestMessage() {
+        super(true);
+    }
+
     public Map<String, AlarmPriority> getMap() {
         return map;
     }

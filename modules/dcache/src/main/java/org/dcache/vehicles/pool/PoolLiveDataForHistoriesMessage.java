@@ -77,6 +77,10 @@ public class PoolLiveDataForHistoriesMessage extends Message {
 
     private SweeperData sweeperData;
 
+    public PoolLiveDataForHistoriesMessage() {
+        super(true);
+    }
+
     public PoolCostData getPoolCostData() {
         return poolCostData;
     }

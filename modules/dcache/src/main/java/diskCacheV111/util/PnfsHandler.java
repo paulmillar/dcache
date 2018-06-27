@@ -51,6 +51,8 @@ import static org.dcache.namespace.FileType.LINK;
 
 public class PnfsHandler implements CellMessageSender
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PnfsHandler.class);
+
     private final String _poolName;
     private static final long DEFAULT_PNFS_TIMEOUT = TimeUnit.MINUTES.toMillis(
                     30);
@@ -178,6 +180,7 @@ public class PnfsHandler implements CellMessageSender
             msg.setRestriction(_restriction);
         }
 
+        _cellStub.send(msg, timeout);
         _cellStub.notify(msg, timeout);
     }
 
@@ -188,7 +191,11 @@ public class PnfsHandler implements CellMessageSender
      */
     public void notify(PnfsMessage msg)
     {
-        msg.setReplyRequired(false);
+        if (msg.getReplyRequired()) {
+            LOGGER.warn("Notifying {} without expecting a reply with replyRequired",
+                    msg.getClass().getName(), new Exception("Bad sender"));
+            msg.setReplyRequired(false);
+        }
         send(msg);
     }
 

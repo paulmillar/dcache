@@ -13,9 +13,8 @@ public class PoolMoverKillMessage extends PoolMessage {
 
     public PoolMoverKillMessage(String poolName, int moverId,
             String explanation){
-	super(poolName);
+        super(poolName, true);
         this.moverId = moverId ;
-        setReplyRequired(true);
         this.explanation = requireNonNull(explanation);
     }
 

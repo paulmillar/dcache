@@ -49,11 +49,10 @@ public class PnfsDeleteEntryMessage extends PnfsMessage
     public PnfsDeleteEntryMessage(PnfsId pnfsId, String path,
                                   Set<FileType> allowed, Set<FileAttribute> attr)
     {
-        super(pnfsId);
+        super(pnfsId, true);
         _allowed = allowed;
         _requestedAttributes = requireNonNull(attr);
         setPnfsPath(path);
-        setReplyRequired(false);
     }
 
     public Set<FileType> getAllowedFileTypes()

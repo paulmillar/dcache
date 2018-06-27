@@ -18,6 +18,7 @@ public class PinManagerCountPinsMessage extends Message {
 
 
     public PinManagerCountPinsMessage(PnfsId pnfsId) {
+        super(true);
         _pnfsId = checkNotNull(pnfsId);
     }
 

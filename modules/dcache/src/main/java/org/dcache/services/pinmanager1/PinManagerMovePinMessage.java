@@ -39,6 +39,7 @@ public class PinManagerMovePinMessage extends Message
                                     Collection<StickyRecord> records,
                                     String sourcePool, String targetPool)
     {
+        super(true);
         _pnfsId = pnfsId;
         _records = records;
         _sourcePool = sourcePool;

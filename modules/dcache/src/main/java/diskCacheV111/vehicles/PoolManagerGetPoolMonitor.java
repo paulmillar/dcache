@@ -10,6 +10,7 @@ public class PoolManagerGetPoolMonitor extends PoolManagerMessage
 
     public PoolManagerGetPoolMonitor()
     {
+        super(true);
     }
 
     public void setPoolMonitor(SerializablePoolMonitor poolMonitor)

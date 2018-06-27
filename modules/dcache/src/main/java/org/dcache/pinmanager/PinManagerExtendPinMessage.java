@@ -24,6 +24,7 @@ public class PinManagerExtendPinMessage extends Message
 
     public PinManagerExtendPinMessage(FileAttributes fileAttributes, long pinId, long lifetime)
     {
+        super(true);
         checkNotNull(fileAttributes);
         _fileAttributes = fileAttributes;
         _pinId = pinId;

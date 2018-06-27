@@ -15,6 +15,11 @@ public class PoolMessage extends Message {
 	_poolName = poolName;
     }
 
+    public PoolMessage(String poolName, boolean isReplyRequired) {
+        super(isReplyRequired);
+        _poolName = poolName;
+    }
+
     public String getPoolName(){
 	return _poolName;
     }

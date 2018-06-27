@@ -15,6 +15,7 @@ public class PinManagerUnpinMessage extends Message
 
     public PinManagerUnpinMessage(PnfsId pnfsId)
     {
+        super(true);
         checkNotNull(pnfsId);
         _pnfsId = pnfsId;
     }

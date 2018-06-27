@@ -33,7 +33,16 @@ public class PnfsMessage extends Message {
 	_pnfsId = pnfsId ;
     }
 
+    public PnfsMessage(PnfsId pnfsId, boolean isReplyRequired) {
+        super(isReplyRequired);
+        _pnfsId = pnfsId;
+    }
+
     public PnfsMessage(){ }
+
+    public PnfsMessage(boolean isReplyRequired) {
+        super(isReplyRequired);
+    }
 
     public void setPnfsPath(String pnfsPath) {
         checkArgument(pnfsPath == null || pnfsPath.charAt(0) == '/');

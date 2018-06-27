@@ -70,6 +70,10 @@ public class PoolDataRequestMessage extends Message {
     private static final long serialVersionUID = -4821198021981241309L;
     private PoolData data;
 
+    public PoolDataRequestMessage() {
+        super(true);
+    }
+
     public PoolData getData() {
         return data;
     }

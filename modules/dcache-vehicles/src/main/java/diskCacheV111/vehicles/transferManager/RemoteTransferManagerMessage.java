@@ -16,7 +16,7 @@ public class RemoteTransferManagerMessage extends TransferManagerMessage
                                         Long credentialId,
                                         IpProtocolInfo protocolInfo)
     {
-        super(pnfsPath.toString(), uri.toString(), store, credentialId);
+        super(pnfsPath.toString(), uri.toString(), store, credentialId, true);
         _protocolInfo = protocolInfo;
     }
 

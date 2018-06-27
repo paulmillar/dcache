@@ -33,7 +33,7 @@ public class PoolIoFileMessage extends PoolMessage {
                              FileAttributes fileAttributes,
                              Assumption assumption)
     {
-        super(pool);
+        super(pool, true);
 
         checkNotNull(fileAttributes);
         checkArgument(fileAttributes.isDefined(EnumSet.of(STORAGEINFO, PNFSID)));
@@ -48,7 +48,7 @@ public class PoolIoFileMessage extends PoolMessage {
                              ProtocolInfo protocolInfo,
                              Assumption assumption)
     {
-        super(pool);
+        super(pool, true);
         _protocolInfo = protocolInfo;
         _fileAttributes = FileAttributes.ofPnfsId(pnfsId);
         _assumption = assumption;

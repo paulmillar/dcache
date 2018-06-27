@@ -1069,7 +1069,7 @@ public class PoolV4
             LOGGER.info(e.toString());
             kill.setReply(CacheException.MOVER_NOT_FOUND, e);
         }
-        return kill;
+        return kill.getReplyRequired() ? kill : null;
     }
 
     public void messageArrived(CellMessage envelope, PoolIoFileMessage msg)

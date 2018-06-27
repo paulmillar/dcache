@@ -30,6 +30,11 @@ public class PoolMgrGetHandler extends PoolManagerMessage
 
     private SerializablePoolManagerHandler handler;
 
+    public PoolMgrGetHandler()
+    {
+        super(true);
+    }
+
     public SerializablePoolManagerHandler getHandler()
     {
         return handler;
