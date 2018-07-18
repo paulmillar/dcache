@@ -85,6 +85,10 @@ public class MacaroonLoginStrategy implements LoginStrategy
             principals.add(new UserNamePrincipal(context.getUsername()));
             principals.add(origin);
             principals.add(new MacaroonPrincipal(context.getId()));
+            int i = 1;
+            for (String cid : context.getCids()) {
+                principals.add(new ClientIdPrincipal("macaroon", (i++) + ":" + cid));
+            }
 
             LOG.debug("Login successful: {}", reply);
             return reply;

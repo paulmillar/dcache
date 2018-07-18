@@ -104,6 +104,8 @@ public class MacaroonProcessor
                 .map(CaveatValues::asActivityCaveatValue)
                 .ifPresent(a -> builder.addCaveat(CaveatType.ACTIVITY, a));
 
+        identity.getCids().stream().forEachOrdered(id -> builder.addCaveat(CaveatType.CLIENT_ID, id));
+
         userSuppliedCaveats.stream().forEach(builder::addCaveat);
 
         return builder.getMacaroon().serialize();

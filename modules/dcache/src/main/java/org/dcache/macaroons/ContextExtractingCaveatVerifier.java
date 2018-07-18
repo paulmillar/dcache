@@ -74,6 +74,10 @@ public class ContextExtractingCaveatVerifier implements GeneralCaveatVerifier
                 } catch (DateTimeParseException e) {
                     throw InvalidCaveatException.wrap("Bad ISO 8601 timestamp", e);
                 }
+
+            case CLIENT_ID:
+                context.addCid(value);
+                break;
             }
         } catch (InvalidCaveatException e) {
             error = e.getMessage() + ": " + serialised;

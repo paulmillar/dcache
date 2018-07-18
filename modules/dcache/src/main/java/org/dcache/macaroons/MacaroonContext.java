@@ -32,6 +32,9 @@ import org.dcache.auth.attributes.Activity;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import static java.util.Objects.requireNonNull;
 import static org.dcache.macaroons.InvalidCaveatException.checkCaveat;
 
@@ -52,6 +55,7 @@ public class MacaroonContext
     private EnumSet<Activity> activities = EnumSet.allOf(Activity.class);
     private String id;
     private Optional<Instant> expiry = Optional.empty();
+    private List<String> cids = new ArrayList<>();
 
     public void updateHome(String directory) throws InvalidCaveatException
     {
@@ -235,5 +239,15 @@ public class MacaroonContext
     public Optional<Instant> getExpiry()
     {
         return expiry;
+    }
+
+    public void addCid(String id)
+    {
+        cids.add(id);
+    }
+
+    public List<String> getCids()
+    {
+        return Collections.unmodifiableList(cids);
     }
 }

@@ -54,6 +54,7 @@ import dmg.cells.nucleus.CellAddressCore;
 import dmg.cells.nucleus.CellIdentityAware;
 
 import org.dcache.auth.Subjects;
+import org.dcache.auth.ClientIdPrincipal;
 import org.dcache.auth.attributes.DenyActivityRestriction;
 import org.dcache.auth.attributes.Expiry;
 import org.dcache.auth.attributes.HomeDirectory;
@@ -240,6 +241,26 @@ public class MacaroonRequestHandler extends AbstractHandler implements CellIdent
         return expiry;
     }
 
+    private static int compare(String clientId1, String clientId2)
+    {
+        int colon1 = clientId1.indexOf(':');
+        checkArgument(colon1 > -1, "Missing ':' in %s", clientId1);
+        int ord1 = Integer.parseInt(clientId1.substring(0, colon1));
+
+        int colon2 = clientId2.indexOf(':');
+        checkArgument(colon2 > -1, "Missing ':' in %s", clientId2);
+        int ord2 = Integer.parseInt(clientId2.substring(0, colon2));
+
+        return ord1 < ord2 ? -1 : (ord1 == ord2 ? 0 : 1);
+    }
+
+    private static String withoutColon(String clientId)
+    {
+        int colon = clientId.indexOf(':');
+        checkArgument(colon > -1, "Missing ':' in %s", clientId);
+        return clientId.substring(colon+1);
+    }
+
     private MacaroonContext buildContext(String target, Request request) throws ErrorResponseException
     {
         MacaroonContext context = new MacaroonContext();
@@ -267,6 +288,15 @@ public class MacaroonRequestHandler extends AbstractHandler implements CellIdent
         context.setUid(Subjects.getUid(subject));
         context.setGids(Subjects.getGids(subject));
         context.setUsername(Subjects.getUserName(subject));
+
+        subject.getPrincipals().stream()
+                .filter(ClientIdPrincipal.class::isInstance)
+                .map(ClientIdPrincipal.class::cast)
+                .filter(id -> id.getSource().equals("macaroon"))
+                .map(ClientIdPrincipal::getId)
+                .sorted((a,b) -> compare(a,b))
+                .map(MacaroonRequestHandler::withoutColon)
+                .forEachOrdered(context::addCid);
 
         context.setRoot(_pathMapper.effectiveRoot(userRoot, m -> new ErrorResponseException(SC_BAD_REQUEST, m)));
 
