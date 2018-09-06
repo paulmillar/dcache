@@ -64,14 +64,15 @@ public final class NamespaceUtils {
 
         PinManagerCountPinsMessage msg
                         = new PinManagerCountPinsMessage(attributes.getPnfsId());
-        boolean isPinned = pinmanager.sendAndWait(msg).getCount() != 0;
+        boolean isPinnedOrSticky = directoryQoS(attributes).equals(QosManagement.DISK_TAPE)
+                || pinmanager.sendAndWait(msg).getCount() != 0;
 
         FileLocality locality = poolMonitor.getFileLocality(attributes,
                                                         request.getRemoteHost());
         switch (locality) {
             case NEARLINE:
                 json.setCurrentQos(QosManagement.TAPE);
-                if (isPinned) {
+                if (isPinnedOrSticky) {
                     json.setTargetQos(QosManagement.DISK_TAPE);
                 }
                 break;
@@ -85,7 +86,7 @@ public final class NamespaceUtils {
                 break;
 
             case ONLINE_AND_NEARLINE:
-                json.setCurrentQos(isPinned ? QosManagement.DISK_TAPE :
+                json.setCurrentQos(isPinnedOrSticky ? QosManagement.DISK_TAPE :
                                               QosManagement.TAPE);
                 break;
 
