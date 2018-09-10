@@ -570,7 +570,7 @@
                            <entry key="client.id" value="${pool.cell.name}@${dcache.domain.name}-remove"/>
                            <!-- TODO  values for max.block.ms and retries are important for Non Blocking (Async) callback.-->
                            <!-- maximum time producer.send() will block by default set to 60000. Could be changed latter. -->
-                           <entry key="max.block.ms" value="0" />
+                           <entry key="max.block.ms" value="1000" />
                            <!-- The maximum number of times to retry a call before failing it.-->
                            <entry key="retries" value="0" />
                        </map>
@@ -595,7 +595,7 @@
                             <entry key="client.id" value="${pool.cell.name}@${dcache.domain.name}-hsm"/>
                             <!-- TODO  values for max.block.ms and retries are important for Non Blocking (Async) callback.-->
                             <!-- maximum time producer.send() will block by default set to 60000. Could be changed latter. -->
-                            <entry key="max.block.ms" value="0" />
+                            <entry key="max.block.ms" value="1000" />
                             <!-- The maximum number of times to retry a call before failing it.-->
                             <entry key="retries" value="0" />
                         </map>
@@ -620,7 +620,7 @@
                             <entry key="client.id" value="${pool.cell.name}@${dcache.domain.name}-transfer"/>
                             <!-- TODO  values for max.block.ms and retries are important for Non Blocking (Async) callback.-->
                             <!-- maximum time producer.send() will block by default set to 60000. Could be changed latter. -->
-                            <entry key="max.block.ms" value="0" />
+                            <entry key="max.block.ms" value="1000" />
                             <!-- The maximum number of times to retry a call before failing it.-->
                             <entry key="retries" value="0" />
                         </map>
