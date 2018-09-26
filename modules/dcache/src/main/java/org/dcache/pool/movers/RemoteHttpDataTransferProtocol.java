@@ -12,18 +12,32 @@ import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPut;
+import org.apache.http.config.ConnectionConfig;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.conn.ManagedHttpClientConnection;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
+import org.apache.http.impl.conn.DefaultHttpClientConnectionOperator;
+import org.apache.http.impl.conn.ManagedHttpClientConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.file.OpenOption;
 import java.nio.file.StandardOpenOption;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
@@ -118,7 +132,7 @@ import static org.dcache.util.Exceptions.genericCheck;
  * triggered the delete.
  */
 public class RemoteHttpDataTransferProtocol implements MoverProtocol,
-        ChecksumMover
+        ChecksumMover, RemoteConnectionReporting
 {
     private static final Logger _log =
         LoggerFactory.getLogger(RemoteHttpDataTransferProtocol.class);
@@ -164,7 +178,8 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     private volatile MoverChannel<RemoteHttpDataTransferProtocolInfo> _channel;
     private Consumer<Checksum> _integrityChecker;
 
-    private CloseableHttpClient _client;
+    private volatile CloseableHttpClient _client;
+    private volatile InetSocketAddress _connection;
 
     public RemoteHttpDataTransferProtocol(CellEndpoint cell)
     {
@@ -215,7 +230,21 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
 
     protected CloseableHttpClient createHttpClient() throws CacheException
     {
-        return HttpClients.custom().setUserAgent(USER_AGENT).build();
+        Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("http", PlainConnectionSocketFactory.getSocketFactory())
+                .register("https", SSLConnectionSocketFactory.getSocketFactory())
+                .build();
+        HttpClientConnectionManager connManager = new BasicHttpClientConnectionManager(new DefaultHttpClientConnectionOperator(registry, null, null),
+                new ManagedHttpClientConnectionFactory() {
+                    @Override
+                    public ManagedHttpClientConnection create(final HttpRoute route, final ConnectionConfig config) {
+                        // TODO add subclass to update _connection when connection is closed.
+                        ManagedHttpClientConnection connection = super.create(route, config);
+                        _connection = new InetSocketAddress(connection.getRemoteAddress(), connection.getRemotePort());
+                        return connection;
+                    }
+                });
+        return HttpClients.custom().setConnectionManager(connManager).setUserAgent(USER_AGENT).build();
     }
 
     private void receiveFile(final RemoteHttpDataTransferProtocolInfo info)
@@ -553,5 +582,15 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     {
         MoverChannel<RemoteHttpDataTransferProtocolInfo> channel = _channel;
         return channel == null ? 0 : channel.getTransferTime();
+    }
+
+    @Override
+    public Collection<InetSocketAddress> getConnections()
+    {
+        if (_client != null && _connection != null) {
+            return Collections.singletonList(_connection);
+        } else {
+            return Collections.emptyList();
+        }
     }
 }

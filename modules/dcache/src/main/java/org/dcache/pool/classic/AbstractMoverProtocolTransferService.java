@@ -42,6 +42,8 @@ import org.dcache.pool.movers.Mover;
 import org.dcache.pool.movers.MoverFactory;
 import org.dcache.pool.movers.MoverProtocol;
 import org.dcache.pool.movers.MoverProtocolMover;
+import org.dcache.pool.movers.RemoteConnectionReporting;
+import org.dcache.pool.movers.RemoteConnectionReportingMoverProtocolMover;
 import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.util.CDCExecutorServiceDecorator;
@@ -78,7 +80,11 @@ public abstract class AbstractMoverProtocolTransferService
         ProtocolInfo info = message.getProtocolInfo();
         try {
             MoverProtocol moverProtocol = createMoverProtocol(info);
-            return new MoverProtocolMover(handle, message, pathToDoor, this, moverProtocol, _checksumModule);
+            if (moverProtocol instanceof RemoteConnectionReporting) {
+                return new RemoteConnectionReportingMoverProtocolMover(handle, message, pathToDoor, this, moverProtocol, _checksumModule);
+            } else {
+                return new MoverProtocolMover(handle, message, pathToDoor, this, moverProtocol, _checksumModule);
+            }
         } catch (InvocationTargetException e) {
             throw new CacheException(27, "Could not create mover for " + info, e.getTargetException());
         } catch (ClassNotFoundException e) {

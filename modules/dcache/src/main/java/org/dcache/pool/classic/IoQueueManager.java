@@ -21,6 +21,7 @@ import java.util.function.Function;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.vehicles.IoJobInfo;
+import diskCacheV111.vehicles.RemoteTransferJobInfo;
 
 import dmg.cells.nucleus.CellCommandListener;
 import dmg.cells.nucleus.CellSetupProvider;
@@ -444,7 +445,7 @@ public class IoQueueManager
 
             if (isBinary) {
                 // ignore sortin and grouping by queue name if binnary
-                return queues.stream().flatMap(s -> s.getJobInfos().stream()).toArray(IoJobInfo[]::new);
+                return queues.stream().flatMap(s -> s.getJobInfos().stream()).toArray(RemoteTransferJobInfo[]::new);
             } else {
 
                 Comparator<MoverRequestScheduler.PrioritizedRequest> comparator;

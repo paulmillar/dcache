@@ -18,6 +18,7 @@
 package org.dcache.webdav.transfer;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.net.InetAddresses;
 import com.google.common.util.concurrent.ListenableFuture;
 import eu.emi.security.authn.x509.X509Credential;
 import io.milton.http.Response;
@@ -40,6 +41,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import diskCacheV111.services.TransferManagerHandler;
 import diskCacheV111.util.CacheException;
@@ -55,6 +57,7 @@ import diskCacheV111.vehicles.IpProtocolInfo;
 import diskCacheV111.vehicles.PnfsCreateEntryMessage;
 import diskCacheV111.vehicles.RemoteHttpDataTransferProtocolInfo;
 import diskCacheV111.vehicles.RemoteHttpsDataTransferProtocolInfo;
+import diskCacheV111.vehicles.RemoteTransferJobInfo;
 import diskCacheV111.vehicles.transferManager.CancelTransferMessage;
 import diskCacheV111.vehicles.transferManager.RemoteGsiftpTransferProtocolInfo;
 import diskCacheV111.vehicles.transferManager.RemoteTransferManagerMessage;
@@ -567,7 +570,7 @@ public class RemoteTransferHandler implements CellMessageReceiver
                     _transferManager.send(message, _performanceMarkerPeriod/2);
 
             int state = TransferManagerHandler.UNKNOWN_ID;
-            IoJobInfo info = null;
+            RemoteTransferJobInfo info = null;
             try {
                 TransferStatusQueryMessage reply = CellStub.getMessage(future);
                 state = reply.getState();
@@ -594,7 +597,7 @@ public class RemoteTransferHandler implements CellMessageReceiver
          *     End
          *
          */
-        public void sendMarker(int state, IoJobInfo info)
+        public void sendMarker(int state, RemoteTransferJobInfo info)
         {
             _out.println("Perf Marker");
             _out.println("    Timestamp: " +
@@ -612,6 +615,9 @@ public class RemoteTransferHandler implements CellMessageReceiver
                 _out.println("    Stripe Bytes Transferred: " +
                         info.getBytesTransferred());
                 _out.println("    Stripe Status: " + info.getStatus());
+                _out.println(info.getCurrentConnections().stream()
+                        .map(a -> "tcp:" + InetAddresses.toUriString(a.getAddress()) + ":" + a.getPort())
+                        .collect(Collectors.joining(",", "    RemoteConnections: ", "")));
             }
             _out.println("    Total Stripe Count: 1");
             _out.println("End");

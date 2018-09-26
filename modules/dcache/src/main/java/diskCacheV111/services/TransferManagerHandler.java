@@ -37,6 +37,7 @@ import diskCacheV111.vehicles.PoolMgrSelectPoolMsg;
 import diskCacheV111.vehicles.PoolMgrSelectReadPoolMsg;
 import diskCacheV111.vehicles.PoolMgrSelectWritePoolMsg;
 import diskCacheV111.vehicles.PoolMoverKillMessage;
+import diskCacheV111.vehicles.RemoteTransferJobInfo;
 import diskCacheV111.vehicles.transferManager.TransferCompleteMessage;
 import diskCacheV111.vehicles.transferManager.TransferFailedMessage;
 import diskCacheV111.vehicles.transferManager.TransferManagerMessage;
@@ -755,13 +756,13 @@ public class TransferManagerHandler extends AbstractMessageCallback<Message>
 
         final MessageReply<TransferStatusQueryMessage> reply = new MessageReply<>();
 
-        final ListenableFuture<IoJobInfo> future = manager.getPoolStub().
+        final ListenableFuture<RemoteTransferJobInfo> future = manager.getPoolStub().
                 send(new CellPath(pool.getAddress()), "mover ls -binary " + moverId,
-                IoJobInfo.class, 30_000);
-        Futures.addCallback(future, new FutureCallback<IoJobInfo>()
+                RemoteTransferJobInfo.class, 30_000);
+        Futures.addCallback(future, new FutureCallback<RemoteTransferJobInfo>()
         {
             @Override
-            public void onSuccess(IoJobInfo info)
+            public void onSuccess(RemoteTransferJobInfo info)
             {
                 message.setMoverInfo(info);
                 reply.reply(message);

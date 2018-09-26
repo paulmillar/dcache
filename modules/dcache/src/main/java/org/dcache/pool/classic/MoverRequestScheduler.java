@@ -3,6 +3,7 @@ package org.dcache.pool.classic;
 import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.InterruptedIOException;
 import java.nio.channels.CompletionHandler;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import java.net.InetSocketAddress;
+
 import dmg.cells.nucleus.CDC;
 
 import diskCacheV111.util.CacheException;
@@ -31,11 +34,13 @@ import diskCacheV111.util.DiskErrorCacheException;
 import diskCacheV111.vehicles.IoJobInfo;
 import diskCacheV111.vehicles.JobInfo;
 import diskCacheV111.vehicles.ProtocolInfo;
+import diskCacheV111.vehicles.RemoteTransferJobInfo;
 
 import org.dcache.pool.FaultAction;
 import org.dcache.pool.FaultEvent;
 import org.dcache.pool.FaultListener;
 import org.dcache.pool.movers.Mover;
+import org.dcache.pool.movers.RemoteConnectionReporting;
 import org.dcache.pool.movers.json.MoverData;
 import org.dcache.util.AdjustableSemaphore;
 import org.dcache.util.IoPrioritizable;
@@ -708,10 +713,18 @@ public class MoverRequestScheduler
 
         public synchronized IoJobInfo toJobInfo()
         {
-            return new IoJobInfo(_submitTime, _startTime, _state.toString(), _id,
-                                 _mover.getPathToDoor().getDestinationAddress().toString(), _mover.getClientId(),
-                                 _mover.getFileAttributes().getPnfsId(), _mover.getBytesTransferred(),
-                                 _mover.getTransferTime(), _mover.getLastTransferred());
+            if (_mover instanceof RemoteConnectionReporting) {
+                return new RemoteTransferJobInfo(_submitTime, _startTime, _state.toString(), _id,
+                                     _mover.getPathToDoor().getDestinationAddress().toString(), _mover.getClientId(),
+                                     _mover.getFileAttributes().getPnfsId(), _mover.getBytesTransferred(),
+                                     _mover.getTransferTime(), _mover.getLastTransferred(),
+                                     ((RemoteConnectionReporting)_mover).getConnections());
+            } else {
+                return new IoJobInfo(_submitTime, _startTime, _state.toString(), _id,
+                                     _mover.getPathToDoor().getDestinationAddress().toString(), _mover.getClientId(),
+                                     _mover.getFileAttributes().getPnfsId(), _mover.getBytesTransferred(),
+                                     _mover.getTransferTime(), _mover.getLastTransferred());
+            }
         }
 
         public synchronized MoverData toMoverData()

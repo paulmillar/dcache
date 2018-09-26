@@ -1,6 +1,7 @@
 package diskCacheV111.vehicles.transferManager;
 
 import diskCacheV111.vehicles.IoJobInfo;
+import diskCacheV111.vehicles.RemoteTransferJobInfo;
 
 /**
  * Message to query the transfermanager service to discover the current
@@ -11,14 +12,14 @@ public class TransferStatusQueryMessage extends TransferManagerMessage
     private static final long serialVersionUID = 1L;
 
     private int _state;
-    private IoJobInfo _info;
+    private RemoteTransferJobInfo _info;
 
     public TransferStatusQueryMessage(long id)
     {
         setId(id);
     }
 
-    public void setMoverInfo(IoJobInfo info)
+    public void setMoverInfo(RemoteTransferJobInfo info)
     {
         _info = info;
     }
@@ -27,7 +28,7 @@ public class TransferStatusQueryMessage extends TransferManagerMessage
      * Returns an IoJobInfo for the mover, or null if no mover is currently
      * active.
      */
-    public IoJobInfo getMoverInfo()
+    public RemoteTransferJobInfo getMoverInfo()
     {
         return _info;
     }
