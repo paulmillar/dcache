@@ -176,7 +176,9 @@ public class RemoteGsiftpTransferProtocol
     @Override
     public Set<ChecksumType> desiredChecksums(ProtocolInfo info)
     {
-        return EnumSet.noneOf(ChecksumType.class);
+        return ((RemoteGsiftpTransferProtocolInfo)info).getDesiredChecksum()
+                .map(EnumSet::of)
+                .orElse(EnumSet.noneOf(ChecksumType.class));
     }
 
     @Override

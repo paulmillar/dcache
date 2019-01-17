@@ -30,6 +30,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -214,7 +215,9 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     @Override
     public Set<ChecksumType> desiredChecksums(ProtocolInfo info)
     {
-        return EnumSet.noneOf(ChecksumType.class);
+        return ((RemoteHttpDataTransferProtocolInfo) info).getDesiredChecksum()
+                .map(EnumSet::of)
+                .orElse(EnumSet.noneOf(ChecksumType.class));
     }
 
     @Override
