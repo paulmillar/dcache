@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.DiskErrorCacheException;
@@ -411,6 +412,15 @@ public class ReplicaStoreCache
                 _faultListener.faultOccurred(event);
                 throw e;
             }
+        }
+
+        @Override
+        public synchronized <T> void forEach(Class<T> type, Consumer<T> action)
+        {
+            if (type.isInstance(this)) {
+                action.accept(type.cast(this));
+            }
+            _record.forEach(type, action);
         }
     }
 

@@ -23,6 +23,7 @@ import org.dcache.alarms.AlarmMarkerFactory;
 import org.dcache.alarms.PredefinedAlarm;
 import org.dcache.pool.repository.Allocator;
 import org.dcache.pool.repository.AllocatorAwareRepositoryChannel;
+import org.dcache.pool.repository.FileAttributesAware;
 import org.dcache.pool.repository.FileStore;
 import org.dcache.pool.repository.ReplicaState;
 import org.dcache.pool.repository.ReplicaRecord;
@@ -111,6 +112,8 @@ class WriteHandleImpl implements ReplicaDescriptor
 
         checkState(_initialState != ReplicaState.FROM_CLIENT || _fileAttributes.isDefined(EnumSet.of(RETENTION_POLICY, ACCESS_LATENCY)));
         checkState(_initialState == ReplicaState.FROM_CLIENT || _fileAttributes.isDefined(SIZE));
+
+        _entry.forEach(FileAttributesAware.class, a -> a.accept(fileAttributes));
     }
 
     private synchronized void setState(HandleState state)

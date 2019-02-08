@@ -120,6 +120,7 @@ import org.dcache.pool.p2p.P2PClient;
 import org.dcache.pool.repository.AbstractStateChangeListener;
 import org.dcache.pool.repository.Account;
 import org.dcache.pool.repository.CacheEntry;
+import org.dcache.pool.repository.FileAttributesAware;
 import org.dcache.pool.repository.IllegalTransitionException;
 import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.ReplicaState;
@@ -794,6 +795,9 @@ public class PoolV4
                                 ? EnumSet.of(Repository.OpenFlags.NOATIME)
                                 : EnumSet.noneOf(Repository.OpenFlags.class);
                 handle = _repository.openEntry(pnfsId, openFlags);
+            }
+            if (handle instanceof FileAttributesAware) {
+                ((FileAttributesAware)handle).accept(attributes);
             }
         } catch (FileNotInCacheException e) {
             throw new FileNotInCacheException("File " + pnfsId + " does not exist in " + _poolName, e);

@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.file.OpenOption;
 import java.util.Set;
 import java.util.Collection;
+import java.util.function.Consumer;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
@@ -135,5 +136,16 @@ public interface ReplicaRecord
         ReplicaState getState();
 
         int getLinkCount();
+    }
+
+    /**
+     * Walk through the decoration layers and apply some action on each
+     * decorator that implements the specified type.
+     */
+    default <T> void forEach(Class<T> type, Consumer<T> action)
+    {
+        if (type.isInstance(this)) {
+            action.accept(type.cast(this));
+        }
     }
 }

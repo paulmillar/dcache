@@ -12,6 +12,7 @@ import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsHandler;
 
 import org.dcache.namespace.FileAttribute;
+import org.dcache.pool.repository.FileAttributesAware;
 import org.dcache.pool.repository.FileStore;
 import org.dcache.pool.repository.ReplicaRecord;
 import org.dcache.pool.repository.ReplicaDescriptor;
@@ -23,7 +24,7 @@ import org.dcache.vehicles.FileAttributes;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.unmodifiableIterable;
 
-class ReadHandleImpl implements ReplicaDescriptor
+class ReadHandleImpl implements ReplicaDescriptor, FileAttributesAware
 {
     private static final Set<OpenOption> OPEN_OPTIONS = ImmutableSet.<OpenOption>builder()
             .addAll(FileStore.O_READ)
@@ -56,6 +57,12 @@ class ReadHandleImpl implements ReplicaDescriptor
         }
         _entry.decrementLinkCount();
         _open = false;
+    }
+
+    @Override
+    public void accept(FileAttributes fromPnfsManager)
+    {
+        _entry.forEach(FileAttributesAware.class, a -> a.accept(fromPnfsManager));
     }
 
     @Override

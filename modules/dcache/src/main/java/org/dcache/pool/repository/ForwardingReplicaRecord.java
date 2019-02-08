@@ -22,6 +22,7 @@ import java.net.URI;
 import java.nio.file.OpenOption;
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
@@ -129,5 +130,14 @@ public abstract class ForwardingReplicaRecord implements ReplicaRecord
     public <T> T update(Update<T> update) throws CacheException
     {
         return delegate().update(update);
+    }
+
+    @Override
+    public <T> void forEach(Class<T> type, Consumer<T> action)
+    {
+        if (type.isInstance(this)) {
+            action.accept(type.cast(this));
+        }
+        delegate().forEach(type, action);
     }
 }
