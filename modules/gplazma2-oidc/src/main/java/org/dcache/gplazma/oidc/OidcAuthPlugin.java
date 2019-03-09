@@ -71,11 +71,17 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
     private final static String HTTP_SLOW_LOOKUP_UNIT = "gplazma.oidc.http.slow-threshold.unit";
     private final static String DISCOVERY_CACHE_REFRESH = "gplazma.oidc.discovery-cache";
     private final static String DISCOVERY_CACHE_REFRESH_UNIT = "gplazma.oidc.discovery-cache.unit";
+    private final static String ACCESS_TOKEN_CACHE_SIZE = "gplazma.oidc.access-token-cache.size";
+    private final static String ACCESS_TOKEN_CACHE_REFRESH = "gplazma.oidc.access-token-cache.refresh";
+    private final static String ACCESS_TOKEN_CACHE_REFRESH_UNIT = "gplazma.oidc.access-token-cache.refresh.unit";
+    private final static String ACCESS_TOKEN_CACHE_EXPIRE = "gplazma.oidc.access-token-cache.expire";
+    private final static String ACCESS_TOKEN_CACHE_EXPIRE_UNIT = "gplazma.oidc.access-token-cache.expire.unit";
 
     private final ExecutorService executor;
 
     private final Map<URI,IdentityProvider> providersByIssuer;
     private final LoadingCache<IdentityProvider, JsonNode> discoveryCache;
+    private final LoadingCache<String,List<LookupResult>> userInfoCache;
     private final Random random = new Random();
     private final JsonHttpClient jsonHttpClient;
     private final Duration slowLookupThreshold;
@@ -174,6 +180,11 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
                 TimeUnit.valueOf(properties.getProperty(DISCOVERY_CACHE_REFRESH_UNIT)));
         slowLookupThreshold = Duration.of(asInt(properties, HTTP_SLOW_LOOKUP),
                 ChronoUnit.valueOf(properties.getProperty(HTTP_SLOW_LOOKUP_UNIT)));
+        userInfoCache = createUserInfoCache( asInt(properties, ACCESS_TOKEN_CACHE_SIZE),
+                asInt(properties, ACCESS_TOKEN_CACHE_REFRESH),
+                TimeUnit.valueOf(properties.getProperty(ACCESS_TOKEN_CACHE_REFRESH_UNIT)),
+                asInt(properties, ACCESS_TOKEN_CACHE_EXPIRE),
+                TimeUnit.valueOf(properties.getProperty(ACCESS_TOKEN_CACHE_EXPIRE_UNIT)));
     }
 
     private static Set<IdentityProvider> buildHosts(Properties properties)
@@ -247,6 +258,58 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
                                  );
     }
 
+    private LoadingCache<String,List<LookupResult>> createUserInfoCache(int size,
+            int refresh, TimeUnit refreshUnits, int expire, TimeUnit expireUnits)
+    {
+        return CacheBuilder.newBuilder()
+                .maximumSize(size)
+                .refreshAfterWrite(refresh, refreshUnits)
+                .expireAfterWrite(expire, expireUnits)
+                .build(new CacheLoader<String, List<LookupResult>>()
+                        {
+                            private ListenableFuture<List<LookupResult>> asyncFetch(String token)
+                            {
+                                List<ListenableFuture<LookupResult>> futures =
+                                        new ArrayList<>();
+
+                                for (IdentityProvider ip : identityProviders(token)) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Scheduling lookup against {} of token {}",
+                                                ip.getName(), describe(token, 20));
+                                    }
+
+                                    ListenableFutureTask<LookupResult> lookupTask =
+                                            ListenableFutureTask.create(() -> queryUserInfo(ip, token));
+                                    executor.execute(lookupTask);
+                                    futures.add(lookupTask);
+                                }
+
+                                return Futures.allAsList(futures);
+                            }
+
+                            @Override
+                            public List<LookupResult> load(String token)
+                                    throws InterruptedException, ExecutionException
+                            {
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug("User-info cache miss for token {}",
+                                            describe(token, 20));
+                                }
+                                return asyncFetch(token).get();
+                            }
+
+                            @Override
+                            public ListenableFuture<List<LookupResult>> reload(String token,
+                                    List<LookupResult> results)
+                            {
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug("Refreshing user-info for token {}", describe(token, 20));
+                                }
+                                return asyncFetch(token);
+                            }
+                       });
+    }
+
     private static <T> Predicate<T> not(Predicate<T> t)
     {
         return t.negate();
@@ -258,38 +321,26 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
                              Set<Principal> identifiedPrincipals)
             throws AuthenticationException
     {
-        boolean foundBearerToken = false;
-
         Stopwatch userinfoLookupTiming = Stopwatch.createStarted();
 
-        List<ListenableFuture<LookupResult>> futures = new ArrayList<>();
+        String token = null;
         for (Object credential : privateCredentials) {
             if (credential instanceof BearerTokenCredential) {
-                String token = ((BearerTokenCredential) credential).getToken();
+                checkAuthentication(token == null, "Multiple bearer tokens");
+
+                token = ((BearerTokenCredential) credential).getToken();
                 LOG.debug("Found bearer token: {}", token);
-                foundBearerToken = true;
-
-                for (IdentityProvider ip : identityProviders(token)) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Scheduling lookup of token {}", ip.getName(), describe(token, 10));
-                    }
-
-                    ListenableFutureTask<LookupResult> lookupTask =
-                            ListenableFutureTask.create(() -> queryUserInfo(ip, token));
-                    executor.execute(lookupTask);
-                    futures.add(lookupTask);
-                }
             }
         }
 
-        checkAuthentication(foundBearerToken, "No bearer token in the credentials");
+        checkAuthentication(token != null, "No bearer token in the credentials");
 
         try {
-            List<LookupResult> allResults = Futures.allAsList(futures).get();
+            List<LookupResult> allResults = userInfoCache.get(token);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Doing user-info lookup against {} OPs took {}",
-                        futures.size(),
+                        allResults.size(),
                         TimeUtils.describe(userinfoLookupTiming.elapsed()).orElse("no time"));
             }
 
@@ -323,8 +374,6 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
             Throwable reportable = e.getCause() == null ? e : e.getCause();
             LOG.warn("OIDC-Connect user lookup failed: ", reportable);
             throw new AuthenticationException("Bug detected");
-        } catch (InterruptedException e) {
-            throw new AuthenticationException("interrupted while waiting for reply");
         }
     }
 
@@ -334,7 +383,7 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin
 
         try {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Starting querying {} about token {}", ip.getName(), describe(token, 10));
+                LOG.debug("Starting querying {} about token {}", ip.getName(), describe(token, 20));
             }
 
             JsonNode discoveryDoc = discoveryCache.get(ip);
