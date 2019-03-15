@@ -61,6 +61,8 @@ package org.dcache.resilience.data;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -72,7 +74,9 @@ import java.util.Set;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.PnfsId;
+
 import dmg.cells.nucleus.CellPath;
+
 import org.dcache.cells.CellStub;
 import org.dcache.pool.migration.PoolMigrationCopyFinishedMessage;
 import org.dcache.resilience.handlers.FileOperationHandler;
@@ -122,6 +126,9 @@ import org.dcache.vehicles.resilience.ForceSystemStickyBitMessage;
  *      to be unsynchronized.</p>
  */
 public final class FileOperation {
+    private static final Logger ACTIVITY_LOGGER =
+            LoggerFactory.getLogger("org.dcache.resilience-log");
+
     /*
      * Stored state. Instead of using enum, to leave less of a memory footprint.
      * As above.
@@ -250,6 +257,7 @@ public final class FileOperation {
 
         String pool = poolInfoMap.getPool(getNullForNil(source));
 
+        ACTIVITY_LOGGER.info("Setting system sticky for {} on {}", pnfsId, pool);
         pools.send(new CellPath(pool),
                    new ForceSystemStickyBitMessage(pool, pnfsId));
     }
