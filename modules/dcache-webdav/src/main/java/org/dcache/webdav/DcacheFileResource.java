@@ -26,6 +26,8 @@ import java.net.URLConnection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
@@ -68,6 +70,7 @@ public class DcacheFileResource
      * Our dCache WebDAV properties.
      */
     private static final String PROPERTY_CHECKSUMS = "Checksums";
+    private static final String PROPERTY_ZONES = "Zones";
     /*
      * Our SRM WebDAV properties.
      */
@@ -82,6 +85,8 @@ public class DcacheFileResource
                     .put(new QName(SRM_NAMESPACE_URI, PROPERTY_RETENTION_POLICY),
                             new PropertyMetaData(READ_ONLY, RetentionPolicy.class))
                     .put(new QName(DCACHE_NAMESPACE_URI, PROPERTY_CHECKSUMS),
+                            new PropertyMetaData(READ_ONLY, String.class))
+                    .put(new QName(DCACHE_NAMESPACE_URI, PROPERTY_ZONES),
                             new PropertyMetaData(READ_ONLY, String.class))
                     .put(new QName(SRM_NAMESPACE_URI, PROPERTY_FILE_LOCALITY),
                             new PropertyMetaData(READ_ONLY, String.class))
@@ -223,6 +228,27 @@ public class DcacheFileResource
         switch(localPart) {
         case PROPERTY_CHECKSUMS:
             return _attributes.getChecksumsIfPresent().map(TO_RFC3230::apply).orElse(null);
+        case PROPERTY_ZONES:
+            Set<String> zones = _factory.fileZones(_attributes);
+
+            /* REVISIT: property values may be any valid XML fragment, so we
+             * could deliver the zone information like:
+             *
+             *     <d:Zones xmlns:d="...">
+             *         <d:Zone>ZONE-1</d:Zone>
+             *         <d:Zone>ZONE-2</d:Zone>
+             *         ...
+             *     </d:Zones>
+             *
+             * However, it isn't clear how to achieve this output with Milton,
+             * unless by returning a String that happens to be valid XML
+             * framement.  The problem there is that the XML namespace ('d' in
+             * the above example) must not clash with any namespace that Milton
+             * has declared.
+             *
+             * For the time being, use a simple serialisation.
+             */
+            return zones.stream().collect(Collectors.joining(" "));
         }
 
         throw new RuntimeException("unknown dCache property " + localPart);

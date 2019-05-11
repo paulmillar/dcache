@@ -1409,6 +1409,11 @@ public class DcacheResourceFactory
         return _poolMonitor.getFileLocality(attributes, clientIP);
     }
 
+    Set<String> fileZones(FileAttributes attributes)
+    {
+        return _poolMonitor.getZones(attributes);
+    }
+
     private Optional<Space> lookupSpaceById(String id)
     {
         try {
