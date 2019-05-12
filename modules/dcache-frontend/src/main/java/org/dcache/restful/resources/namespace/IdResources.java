@@ -183,6 +183,7 @@ public class IdResources {
                                                    poolMonitor);
 
             NamespaceUtils.addQoSAttributes(result, attributes, request, poolMonitor, pinmanager);
+            NamespaceUtils.addZones(result, attributes, poolMonitor);
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Bad pnsfid " + value, e);
         } catch (FileNotFoundCacheException e) {

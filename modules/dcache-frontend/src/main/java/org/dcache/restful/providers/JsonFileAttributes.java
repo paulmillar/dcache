@@ -134,6 +134,9 @@ public class JsonFileAttributes
     @ApiModelProperty("The target QoS if the file is changing QoS.")
     public String targetQos;
 
+    @ApiModelProperty("The zones within which this file resides.")
+    public List<String> zones;
+
     public ACL getAcl() {
         return _acl;
     }
@@ -404,4 +407,11 @@ public class JsonFileAttributes
         return targetQos;
     }
 
+    public void setZones(List<String> zones) {
+        this.zones = zones;
+    }
+
+    public List<String> getZones() {
+        return zones;
+    }
 }

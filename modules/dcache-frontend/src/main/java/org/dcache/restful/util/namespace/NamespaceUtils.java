@@ -3,6 +3,9 @@ package org.dcache.restful.util.namespace;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.InternalServerErrorException;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileLocality;
 import diskCacheV111.util.RetentionPolicy;
@@ -259,5 +262,16 @@ public final class NamespaceUtils {
      * Static class, should not be instantiated.
      */
     private NamespaceUtils() {
+    }
+
+    public static void addZones(JsonFileAttributes json,
+            FileAttributes attributes, PoolMonitor poolMonitor)
+    {
+        if (attributes.getFileType() == FileType.REGULAR) {
+            List<String> zones = poolMonitor.getZones(attributes).stream()
+                    .sorted()
+                    .collect(Collectors.toList());
+            json.setZones(zones);
+        }
     }
 }

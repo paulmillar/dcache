@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileLocality;
@@ -140,6 +141,8 @@ public class FileResources {
                                                 @QueryParam("locality") boolean isLocality,
                                                 @ApiParam(value="Whether to include replica locations.")
                                                 @QueryParam("locations") boolean isLocations,
+                                                @ApiParam(value="Whether to include zone locations.")
+                                                @QueryParam("zones") boolean isZones,
                                                 @ApiParam(value="Whether to include quality of service.")
                                                 @DefaultValue("false")
                                                 @QueryParam("qos") boolean isQos,
@@ -164,6 +167,10 @@ public class FileResources {
                 NamespaceUtils.addQoSAttributes(fileAttributes,
                                                 namespaceAttributes,
                                                 request, poolMonitor, pinmanager);
+            }
+
+            if (isZones) {
+                NamespaceUtils.addZones(fileAttributes, namespaceAttributes, poolMonitor);
             }
 
             // fill children list id it's a directory and listing is requested
@@ -207,6 +214,10 @@ public class FileResources {
                         NamespaceUtils.addQoSAttributes(childrenAttributes,
                                                         entry.getFileAttributes(),
                                                         request, poolMonitor, pinmanager);
+                    }
+                    if (isZones) {
+                        NamespaceUtils.addZones(childrenAttributes,
+                                entry.getFileAttributes(), poolMonitor);
                     }
                     children.add(childrenAttributes);
                 }
