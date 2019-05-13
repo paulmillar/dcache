@@ -283,6 +283,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -311,6 +312,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -335,6 +337,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.WRITE,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -358,6 +361,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.WRITE,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -381,6 +385,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -406,6 +411,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -460,6 +466,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       "h1-link-group"); // linkGroup
 
@@ -493,6 +500,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.CACHE,  // operation
                                                       "131.169.214.149", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       "h1-link-group"); // linkGroup
 
@@ -518,6 +526,7 @@ public class PoolSelectionUnitTest {
             _psu.match(DirectionType.P2P,  // operation
                        "131.169.214.149", // net unit
                        null,  // protocol
+                       null,  // zone
                        fileAttributes,
                        null); // linkGroup
 
@@ -545,6 +554,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -573,6 +583,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -597,6 +608,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.WRITE,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -620,6 +632,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.WRITE,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -643,6 +656,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -668,6 +682,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       null); // linkGroup
 
@@ -696,6 +711,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.READ,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       "h1-link-group"); // linkGroup
 
@@ -729,6 +745,7 @@ public class PoolSelectionUnitTest {
                                                       DirectionType.CACHE,  // operation
                                                       "2001:638:700::f00:ba", // net unit
                                                       null,  // protocol
+                                                      null,  // zone
                                                       fileAttributes,
                                                       "h1-link-group"); // linkGroup
 
@@ -754,6 +771,7 @@ public class PoolSelectionUnitTest {
             _psu.match(DirectionType.P2P,  // operation
                        "2001:638:700::f00:ba", // net unit
                        null,  // protocol
+                       null,  // zone
                        fileAttributes,
                        null); // linkGroup
 
@@ -821,6 +839,7 @@ public class PoolSelectionUnitTest {
             psu.match(DirectionType.READ,  // operation
                       "111.111.111.201", // net unit
                       null,  // protocol
+                      null,  // zone
                       fileAttributes,
                       null); // linkGroup
         assertEquals(0, preference.length);

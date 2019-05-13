@@ -32,7 +32,7 @@ public interface PoolSelectionUnitAccess {
     void createPoolGroup(String name, boolean isResilient);
 
     void createUnit(String name, boolean isNet, boolean isStore,
-                    boolean isDcache, boolean isProtocol);
+                    boolean isDcache, boolean isProtocol, boolean isZone);
 
     void createUnitGroup(String name);
 
@@ -69,11 +69,12 @@ public interface PoolSelectionUnitAccess {
     String matchUnits(String netUnitName, ImmutableList<String> units);
 
     String matchLinkGroups(String linkGroup, String op, String storeUnit,
-                    String dCacheUnit, String netUnit, String protocolUnit);
+                    String dCacheUnit, String netUnit, String protocolUnit,
+                    String zoneUnit);
 
     PoolPreferenceLevel[] matchLinkGroupsXml(String linkGroup, String op,
                     String storeUnit, String dCacheUnit, String netUnit,
-                    String protocolUnit);
+                    String protocolUnit, String zoneUnit);
 
     String netMatch(String hostAddress) throws UnknownHostException;
 

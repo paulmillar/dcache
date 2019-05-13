@@ -40,7 +40,8 @@ public interface PoolSelectionUnit  {
         STORE,
         DCACHE,
         NET,
-        PROTOCOL
+        PROTOCOL,
+        ZONE
     }
 
     interface SelectionEntity {
@@ -221,7 +222,7 @@ public interface PoolSelectionUnit  {
 
    SelectionLink getLinkByName(String linkName) throws NoSuchElementException ;
    PoolPreferenceLevel []
-            match(DirectionType type, String net, String protocol,
+            match(DirectionType type, String net, String protocol, Optional<String> zone,
                    FileAttributes fileAttributes, String linkGroup);
    String[] getActivePools() ;
    String[] getDefinedPools(boolean enabledOnly) ;

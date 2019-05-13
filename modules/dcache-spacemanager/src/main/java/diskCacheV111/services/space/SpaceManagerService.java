@@ -51,6 +51,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -87,6 +88,7 @@ import diskCacheV111.vehicles.PoolMgrSelectPoolMsg;
 import diskCacheV111.vehicles.PoolMgrSelectWritePoolMsg;
 import diskCacheV111.vehicles.ProtocolInfo;
 import diskCacheV111.vehicles.StorageInfo;
+import diskCacheV111.vehicles.ZoneProtocolInfo;
 
 import dmg.cells.nucleus.CellAddressCore;
 import dmg.cells.nucleus.CellCommandListener;
@@ -1074,12 +1076,14 @@ public final class SpaceManagerService
     {
         String protocol = protocolFrom(protocolInfo);
         String hostName = hostnameFrom(protocolInfo);
+        Optional<String> zone = zoneFrom(protocolInfo);
 
         for (String linkGroup : linkGroups) {
             PoolPreferenceLevel[] levels =
                     poolMonitor.getPoolSelectionUnit().match(PoolSelectionUnit.DirectionType.WRITE,
                                                              hostName,
                                                              protocol,
+                                                             zone,
                                                              fileAttributes,
                                                              linkGroup);
             if (levels.length > 0) {
@@ -1101,6 +1105,13 @@ public final class SpaceManagerService
         return info.getProtocol() + '/' + info.getMajorVersion();
     }
 
+    private Optional<String> zoneFrom(ProtocolInfo info)
+    {
+        return (info instanceof ZoneProtocolInfo)
+                ? ((ZoneProtocolInfo)info).getZone()
+                : null;
+    }
+
     private String storageFrom(FileAttributes attributes)
     {
         return attributes.getStorageClass() + '@' + attributes.getHsm();
@@ -1115,10 +1126,11 @@ public final class SpaceManagerService
     {
         String protocol = protocolFrom(info);
         String hostname = hostnameFrom(info);
+        Optional<String> zone = zoneFrom(info);
 
         PoolPreferenceLevel[] levels = poolMonitor.getPoolSelectionUnit().
                 match(PoolSelectionUnit.DirectionType.WRITE, hostname, protocol,
-                        attributes, linkGroup);
+                        zone, attributes, linkGroup);
 
         return levels.length != 0;
     }

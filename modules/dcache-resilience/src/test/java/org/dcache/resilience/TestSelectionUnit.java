@@ -65,6 +65,7 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 
 import diskCacheV111.poolManager.PoolPreferenceLevel;
@@ -72,7 +73,9 @@ import diskCacheV111.poolManager.PoolSelectionUnit;
 import diskCacheV111.poolManager.PoolSelectionUnitV2;
 import diskCacheV111.poolManager.StorageUnit;
 import diskCacheV111.pools.PoolV2Mode;
+
 import dmg.cells.nucleus.CellAddressCore;
+
 import org.dcache.vehicles.FileAttributes;
 
 final class TestSelectionUnit implements PoolSelectionUnit {
@@ -191,9 +194,9 @@ final class TestSelectionUnit implements PoolSelectionUnit {
 
     @Override
     public PoolPreferenceLevel[] match(DirectionType type, String net,
-                    String protocol, FileAttributes fileAttributes,
+                    String protocol, Optional<String> zone, FileAttributes fileAttributes,
                     String linkGroup) {
-        return psu.match(type, net, protocol, fileAttributes, linkGroup);
+        return psu.match(type, net, protocol, zone, fileAttributes, linkGroup);
     }
 
     String getInfo() {
@@ -296,16 +299,16 @@ final class TestSelectionUnit implements PoolSelectionUnit {
 
     private void createUnits(PoolSelectionUnitV2 psu) {
         for (String unit : TestData.PROTOCOL_UNITS) {
-            psu.createUnit(unit, false, false, false, true);
+            psu.createUnit(unit, false, false, false, true, false);
         }
 
         for (String unit : TestData.NET_UNITS) {
-            psu.createUnit(unit, true, false, false, false);
+            psu.createUnit(unit, true, false, false, false, false);
         }
 
         for (int i = 0; i < TestData.STORAGE_UNITS.length; ++i) {
             psu.createUnit(TestData.STORAGE_UNITS[i], false, true, false,
-                            false);
+                            false, false);
             if (TestData.STORAGE_UNITS_SET[i] != null) {
                 psu.setStorageUnit(TestData.STORAGE_UNITS[i],
                                 Integer.parseInt(TestData.STORAGE_UNITS_SET[i][0]),

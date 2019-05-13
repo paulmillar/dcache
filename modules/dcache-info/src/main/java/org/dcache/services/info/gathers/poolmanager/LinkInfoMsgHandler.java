@@ -24,7 +24,7 @@ import org.dcache.services.info.gathers.MessageMetadataRepository;
 public class LinkInfoMsgHandler extends CellMessageHandlerSkel
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(LinkInfoMsgHandler.class);
-    private static final int EXPECTED_ARRAY_SIZE = 13;
+    private static final int EXPECTED_ARRAY_SIZE = 14;
 
     public LinkInfoMsgHandler(StateUpdateManager sum,
             MessageMetadataRepository<UOID> msgMetaRepo)
@@ -90,6 +90,7 @@ public class LinkInfoMsgHandler extends CellMessageHandlerSkel
         Object[] net = (Object[]) o[10];
         Object[] dcache = (Object[]) o[11];
         Object[] protocol = (Object[]) o[12];
+        Object[] zone = (Object[]) o[13];
 
         StatePath thisLinkPath = linksPath.newChild(name);
 
@@ -115,6 +116,7 @@ public class LinkInfoMsgHandler extends CellMessageHandlerSkel
         addItems(update, unitPath.newChild("net"), net, lifetime);
         addItems(update, unitPath.newChild("dcache"), dcache, lifetime);
         addItems(update, unitPath.newChild("protocol"), protocol, lifetime);
+        addItems(update, unitPath.newChild("zone"), zone, lifetime);
 
         /**
          * We must add the space branch explicitly as it must be mortal.  This is to prevent the

@@ -36,6 +36,7 @@ import diskCacheV111.util.FileNotOnlineCacheException;
 import diskCacheV111.util.PermissionDeniedCacheException;
 import diskCacheV111.vehicles.IpProtocolInfo;
 import diskCacheV111.vehicles.ProtocolInfo;
+import diskCacheV111.vehicles.ZoneProtocolInfo;
 
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
@@ -136,9 +137,11 @@ public class PoolMonitorV5
         {
             String hostName = getHostName();
             String protocol = getProtocol();
+            Optional<String> zone = getZone();
             return _selectionUnit.match(direction,
                                         hostName,
                                         protocol,
+                                        zone,
                                         _fileAttributes,
                                         _linkGroup);
         }
@@ -160,9 +163,11 @@ public class PoolMonitorV5
         {
             String hostName = getHostName();
             String protocol = getProtocol();
+            Optional<String> zone = getZone();
             PoolPreferenceLevel[] levels = _selectionUnit.match(DirectionType.WRITE,
                     hostName,
                     protocol,
+                    zone,
                     _fileAttributes,
                     _linkGroup);
 
@@ -234,9 +239,11 @@ public class PoolMonitorV5
              */
             String hostName = getHostName();
             String protocol = getProtocol();
+            Optional<String> zone = getZone();
             PoolPreferenceLevel[] level = _selectionUnit.match(DirectionType.READ,
                     hostName,
                     protocol,
+                    zone,
                     _fileAttributes,
                     _linkGroup);
 
@@ -322,6 +329,15 @@ public class PoolMonitorV5
                 return addr == null ? null : addr.getHostAddress();
             }
             return null;
+        }
+
+        private Optional<String> getZone()
+        {
+            if (_protocolInfo instanceof ZoneProtocolInfo) {
+                return ((ZoneProtocolInfo)_protocolInfo).getZone();
+            } else {
+                return Optional.empty();
+            }
         }
 
         private String getProtocol() {
@@ -463,9 +479,11 @@ public class PoolMonitorV5
             boolean isRequestSatisfiable = false;
             String hostName = getHostName();
             String protocol = getProtocol();
+            Optional<String> zone = getZone();
             PoolPreferenceLevel[] levels = _selectionUnit.match(DirectionType.READ,
                                                                 hostName,
                                                                 protocol,
+                                                                zone,
                                                                 _fileAttributes,
                                                                 _linkGroup);
             for (PoolPreferenceLevel level: levels) {
@@ -526,8 +544,7 @@ public class PoolMonitorV5
     }
 
     @Override
-    public FileLocality
-        getFileLocality(FileAttributes attributes, String hostName)
+    public FileLocality getFileLocality(FileAttributes attributes, String hostName)
     {
         if (attributes.getFileType() == FileType.DIR || !attributes.isDefined(SIZE)) {
             return FileLocality.NONE;
@@ -537,6 +554,7 @@ public class PoolMonitorV5
             _selectionUnit.match(DirectionType.READ,
                                  hostName,
                                  "*/*",
+                                 Optional.empty(), // REVISIT: safe to assume client isn't local?
                                  attributes,
                                  null);
 

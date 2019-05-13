@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -1642,6 +1643,7 @@ public class DCapDoorInterpreterV3
                   new PoolMgrQueryPoolsMsg(DirectionType.READ,
                                            _protocolName ,
                                            _destination ,
+                                           Optional.empty(),
                                            _fileAttributes);
                 List<String>[] lists = CellStub.getMessage(_poolMgrStub.sendAsync(query)).getPools();
                 Set<String> assumedHash = new HashSet<>(_assumedLocations);

@@ -242,6 +242,9 @@ public class PoolSelectionUnitV2
                         case NET:
                             pw.append("-net");
                             break;
+                        case ZONE:
+                            pw.append("-zone");
+                            break;
                         }
                         pw.append(" ").println(unit.getName());
 
@@ -557,18 +560,19 @@ public class PoolSelectionUnitV2
     }
 
     @Override
-    public PoolPreferenceLevel[] match(DirectionType type,  String netUnitName, String protocolUnitName,
-                    FileAttributes fileAttributes, String linkGroupName) {
-
+    public PoolPreferenceLevel[] match(DirectionType type,  String netUnitName,
+            String protocolUnitName, Optional<String> zoneUnitName,
+            FileAttributes fileAttributes, String linkGroupName)
+    {
         StorageInfo storageInfo = fileAttributes.getStorageInfo();
         String storeUnitName = storageInfo.getStorageClass()+"@"+storageInfo.getHsm();
         String dCacheUnitName = storageInfo.getCacheClass();
 
         Map<String, String> variableMap = storageInfo.getMap();
 
-        _log.debug("running match: type={} store={} dCacheUnit={} net={} protocol={} keys={} locations={} linkGroup={}",
+        _log.debug("running match: type={} store={} dCacheUnit={} net={} protocol={} zone={} keys={} locations={} linkGroup={}",
                         type, storeUnitName, dCacheUnitName, netUnitName, protocolUnitName,
-                        variableMap, storageInfo.locations(), linkGroupName);
+                        zoneUnitName, variableMap, storageInfo.locations(), linkGroupName);
 
 
         PoolPreferenceLevel[] result = null;
@@ -675,6 +679,15 @@ public class PoolSelectionUnitV2
                     throw new IllegalArgumentException(
                                     "NetUnit not resolved : " + netUnitName);
                 }
+            }
+            if (zoneUnitName != null) {
+                Unit unit = _units.get(zoneUnitName);
+                if (unit == null) {
+                    _log.debug("no matching zone unit found for: {}", zoneUnitName);
+                    throw new IllegalArgumentException("Unit not found : " + zoneUnitName);
+                }
+                _log.debug("matching zone unit found: {}", unit);
+                list.add(unit);
             }
             //
             // match the requests ( logical AND )
@@ -1024,12 +1037,13 @@ public class PoolSelectionUnitV2
                     String storeUnit,
                     String dCacheUnit,
                     String netUnit,
-                    String protocolUnit) {
+                    String protocolUnit,
+                    String zoneUnit) {
         try {
             long start = System.currentTimeMillis();
             PoolPreferenceLevel[] list
                             = matchLinkGroupsXml(linkGroup, direction,
-                            storeUnit, dCacheUnit, netUnit, protocolUnit);
+                            storeUnit, dCacheUnit, netUnit, protocolUnit, zoneUnit);
             start = System.currentTimeMillis() - start;
 
             StringBuilder sb = new StringBuilder();
@@ -1267,7 +1281,7 @@ public class PoolSelectionUnitV2
     }
 
     public void createUnit(String name, boolean isNet, boolean isStore,
-                    boolean isDcache, boolean isProtocol) {
+                    boolean isDcache, boolean isProtocol, boolean isZone) {
         Unit unit = null;
         wlock();
         try {
@@ -1281,6 +1295,8 @@ public class PoolSelectionUnitV2
                 unit = new Unit(name, DCACHE);
             } else if (isProtocol) {
                 unit = new ProtocolUnit(name);
+            } else if (isZone) {
+                unit = new ZoneUnit(name);
             }
             if (unit == null) {
                 throw new IllegalArgumentException(
@@ -1532,7 +1548,7 @@ public class PoolSelectionUnitV2
             }
         }
 
-        Object[] result = new Object[resolve ? 13 : 9];
+        Object[] result = new Object[resolve ? 14 : 9];
         result[0] = link.getName();
         result[1] = link.getReadPref();
         result[2] = link.getCachePref();
@@ -1551,6 +1567,7 @@ public class PoolSelectionUnitV2
         List<String> protocol = new ArrayList<>();
         List<String> dcache = new ArrayList<>();
         List<String> store = new ArrayList<>();
+        List<String> zone = new ArrayList<>();
 
         for (UGroup ug : link._uGroupList.values()) {
             if (ug._unitList == null) {
@@ -1570,12 +1587,15 @@ public class PoolSelectionUnitV2
                     case STORE:
                         store.add(unit.getName());
                         break;
+                    case ZONE:
+                        zone.add(unit.getName());
                 }
             }
             result[9] = store.toArray();
             result[10] = net.toArray();
             result[11] = dcache.toArray();
             result[12] = protocol.toArray();
+            result[13] = zone.toArray();
         }
 
         return result;
@@ -1586,11 +1606,13 @@ public class PoolSelectionUnitV2
                     String storeUnit,
                     String dCacheUnit,
                     String netUnit,
-                    String protocolUnit) {
+                    String protocolUnit,
+                    String zoneUnit) {
         StorageInfo info = GenericStorageInfo.valueOf(storeUnit, dCacheUnit);
         return match(DirectionType.valueOf(direction.toUpperCase()),
                      netUnit.equals("*") ? null : netUnit,
                      protocolUnit.equals("*") ? null : protocolUnit,
+                     zoneUnit.equals("*") ? Optional.empty() : Optional.of(zoneUnit), // FIXME
                      FileAttributes.ofStorageInfo(info), linkGroup);
     }
 
@@ -2590,8 +2612,8 @@ public class PoolSelectionUnitV2
             "\tthat is used to select which pools are eligable for a specific user\n" +
             "\trequest (to read data from dCache or write data).  Units are\n" +
             "\tcombined in unit-groups; see psu create unitgroup for more details.\n\n" +
-            "\tThe UNITTYPE is one of '-net', '-store', '-dcache' or '-protocol'\n" +
-            "\tto create a network, store, dCache or protocol unit, respectively.\n\n" +
+            "\tThe UNITTYPE is one of '-net', '-store', '-dcache', '-protocol' or '-zone'\n" +
+            "\tto create a network, store, dCache, protocol or zone unit, respectively.\n\n" +
             "\tThe NAME of the unit describes which particular subset of user\n" +
             "\trequests will be selected; for example, a network unit with the\n" +
             "\tname '10.1.0.0/24' will select only those requests from a computer\n" +
@@ -2610,6 +2632,9 @@ public class PoolSelectionUnitV2
             "\tnamespace in a similar fashion to the storage-class.\n\n" +
             "\tThe NAME for a protocol unit has the form <protocol>/<version>. If\n" +
             "\t<version> is '*' then all versions of that protocol match.\n\n" +
+            "\tThe NAME for a zone unit is an arbitrary string. This matches\n" +
+            "\tagainst the zone within which the door resides.  If the value is\n" +
+            "\t'*' then this matches any zone without a corresponding zone unit.\n\n" +
             "OPTIONS\n" +
             "\tnone\n";
 
@@ -2620,7 +2645,8 @@ public class PoolSelectionUnitV2
                    args.hasOption("net"),
                    args.hasOption("store"),
                    args.hasOption("dcache"),
-                   args.hasOption("protocol"));
+                   args.hasOption("protocol"),
+                   args.hasOption("zone"));
         return "";
     }
 
@@ -2704,12 +2730,13 @@ public class PoolSelectionUnitV2
 
     public static final String hh_psu_match = "[-linkGroup=<link group>] "
                                               + "read|cache|write|p2p <store unit>|* <store unit>|* "
-                                              + "<store unit>|* <protocol unit>|* ";
+                                              + "<store unit>|* <protocol unit>|* <zone unit>|*";
 
-    public String ac_psu_match_$_5(Args args) throws Exception
+    public String ac_psu_match_$_6(Args args) throws Exception
     {
         return matchLinkGroups(args.getOpt("linkGroup"), args.argv(0),
-                               args.argv(1), args.argv(2), args.argv(3), args.argv(4));
+                               args.argv(1), args.argv(2), args.argv(3), args.argv(4),
+                               args.argv(5));
     }
 
     public static final String hh_psu_match2 = "<unit> [...] [-net=<net unit>}";
@@ -3054,13 +3081,13 @@ public class PoolSelectionUnitV2
 
     public static final String hh_psux_match = "[-linkGroup=<link group>] "
                                                + "read|cache|write <store unit>|* <store unit>|* "
-                                               + "<store unit>|* <protocol unit>|* ";
+                                               + "<store unit>|* <protocol unit>|* <zone unit>|*";
 
-    public Object ac_psux_match_$_5(Args args)
+    public Object ac_psux_match_$_6(Args args)
     {
         return matchLinkGroupsXml(args.getOpt("linkGroup"),
                                   args.argv(0), args.argv(1), args.argv(2), args.argv(3),
-                                  args.argv(4));
+                                  args.argv(4), args.argv(5));
     }
 
     private void writeObject(ObjectOutputStream stream) throws IOException

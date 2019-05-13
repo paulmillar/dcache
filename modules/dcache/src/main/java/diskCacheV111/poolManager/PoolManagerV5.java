@@ -595,6 +595,7 @@ public class PoolManagerV5
            _selectionUnit.match(accessType,
                                 msg.getNetUnitName(),
                                 msg.getProtocolUnitName(),
+                                msg.getZone(),
                                 msg.getFileAttributes(),
                                 null)));
         msg.setSucceeded();

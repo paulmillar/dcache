@@ -437,7 +437,7 @@ public class PoolInfoChangeHandlerTest extends TestBase {
     }
 
     private void whenPsuUpdateContainsNewStorageUnit(String unit) {
-        getUpdatedPsu().createUnit(unit, false, true, false, false);
+        getUpdatedPsu().createUnit(unit, false, true, false, false, false);
     }
 
     private void whenPsuUpdateContainsPoolGroupAddedToNewLink(String group,
