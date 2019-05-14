@@ -39,6 +39,7 @@ import diskCacheV111.vehicles.ProtocolInfo;
 
 import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
+import org.dcache.pool.classic.PoolV4;
 import org.dcache.poolmanager.Partition;
 import org.dcache.poolmanager.PartitionManager;
 import org.dcache.poolmanager.PoolInfo;
@@ -49,9 +50,7 @@ import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Strings.nullToEmpty;
 import static java.util.stream.Collectors.toList;
-import static org.dcache.namespace.FileAttribute.LOCATIONS;
-import static org.dcache.namespace.FileAttribute.SIZE;
-import static org.dcache.namespace.FileAttribute.STORAGEINFO;
+import static org.dcache.namespace.FileAttribute.*;
 
 public class PoolMonitorV5
     extends SerializablePoolMonitor
@@ -572,5 +571,17 @@ public class PoolMonitorV5
             }
         }
         return FileLocality.UNAVAILABLE;
+    }
+
+    @Override
+    public Set<String> getZones(FileAttributes attr)
+    {
+        return attr.getLocations().stream()
+                .map(_selectionUnit::getPool)
+                .filter(Objects::nonNull)
+                .map(SelectionPool::getZone)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toSet());
     }
 }

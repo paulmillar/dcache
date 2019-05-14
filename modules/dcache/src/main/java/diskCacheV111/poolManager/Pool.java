@@ -1,10 +1,12 @@
 package diskCacheV111.poolManager;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,6 +16,8 @@ import diskCacheV111.poolManager.PoolSelectionUnit.SelectionPoolGroup;
 import diskCacheV111.pools.PoolV2Mode;
 
 import dmg.cells.nucleus.CellAddressCore;
+
+import static java.util.Objects.requireNonNull;
 
 public class Pool extends PoolCore implements SelectionPool {
     private static final long serialVersionUID = 8108406418388363116L;
@@ -26,6 +30,7 @@ public class Pool extends PoolCore implements SelectionPool {
     private ImmutableSet<String> _hsmInstances = ImmutableSet.of();
     private PoolV2Mode _mode = new PoolV2Mode(PoolV2Mode.DISABLED);
     private CellAddressCore _address;
+    private String _zone;
 
     public Pool(String name) {
         super(name);
@@ -190,5 +195,16 @@ public class Pool extends PoolCore implements SelectionPool {
     public void setAddress(CellAddressCore address)
     {
         _address = address;
+    }
+
+    public void setZone(Optional<String> zone)
+    {
+        _zone = zone.orElse(null);
+    }
+
+    @Override
+    public Optional<String> getZone()
+    {
+        return Optional.ofNullable(_zone);
     }
 }

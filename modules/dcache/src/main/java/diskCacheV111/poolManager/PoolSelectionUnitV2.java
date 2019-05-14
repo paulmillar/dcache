@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
@@ -48,6 +49,7 @@ import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.Option;
 
+import org.dcache.pool.classic.PoolV4;
 import org.dcache.util.Args;
 import org.dcache.util.Glob;
 import org.dcache.vehicles.FileAttributes;
@@ -510,6 +512,7 @@ public class PoolSelectionUnitV2
             pool.setAddress(address);
             pool.setPoolMode(mode);
             pool.setHsmInstances(hsmInstances);
+            pool.setZone(Optional.ofNullable(tags.get(PoolV4.ZONE_TAG)));
             pool.setActive(!disabled);
 
             // create a dynamic pool group based on pool tags.

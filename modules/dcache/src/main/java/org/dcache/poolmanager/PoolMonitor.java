@@ -1,6 +1,7 @@
 package org.dcache.poolmanager;
 
 import java.util.Collection;
+import java.util.Set;
 
 import diskCacheV111.poolManager.CostModule;
 import diskCacheV111.poolManager.PoolSelectionUnit;
@@ -33,4 +34,9 @@ public interface PoolMonitor
     Collection<PoolCostInfo> queryPoolsByLinkName(String linkName);
 
     FileLocality getFileLocality(FileAttributes attributes, String hostName);
+
+    /**
+     * Return the set of zones with one or more pools containing this file.
+     */
+    Set<String> getZones(FileAttributes attributes);
 }

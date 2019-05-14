@@ -28,6 +28,7 @@ import org.springframework.remoting.RemoteProxyFailureException;
 
 import java.io.PrintWriter;
 import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import diskCacheV111.poolManager.CostModule;
@@ -151,6 +152,12 @@ public class RemotePoolMonitor
     public FileLocality getFileLocality(FileAttributes attributes, String hostName)
     {
         return getPoolMonitor().getFileLocality(attributes, hostName);
+    }
+
+    @Override
+    public Set<String> getZones(FileAttributes attributes)
+    {
+        return getPoolMonitor().getZones(attributes);
     }
 
     public void refresh() throws CacheException, InterruptedException, NoRouteToCellException

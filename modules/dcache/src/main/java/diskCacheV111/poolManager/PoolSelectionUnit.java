@@ -4,6 +4,7 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 
 import diskCacheV111.pools.PoolV2Mode;
@@ -165,6 +166,8 @@ public interface PoolSelectionUnit  {
         CellAddressCore getAddress();
 
         void setAddress(CellAddressCore address);
+
+        Optional<String> getZone();
     }
 
     interface SelectionPoolGroup extends SelectionEntity {
