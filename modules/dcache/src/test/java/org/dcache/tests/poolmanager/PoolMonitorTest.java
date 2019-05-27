@@ -83,10 +83,10 @@ public class PoolMonitorTest
         poolCost2.setSpaceUsage(100, 20, 30, 50);
 
         PoolManagerPoolUpMessage pool1UpMessage = new PoolManagerPoolUpMessage("pool1",
-                serialId, poolMode, poolCost1);
+                serialId, poolMode, poolCost1, 0.5);
 
         PoolManagerPoolUpMessage pool2UpMessage = new PoolManagerPoolUpMessage("pool2",
-                serialId, poolMode, poolCost2);
+                serialId, poolMode, poolCost2, 0.5);
 
         CellMessage envelope1 = new CellMessage(new CellAddressCore("PoolManager"), null);
         envelope1.addSourceAddress(new CellAddressCore("pool1"));

@@ -13,6 +13,7 @@ public class PoolManagerPoolUpMessage extends PoolManagerMessage {
     private final long      _serialId ;
     private final PoolCostInfo _poolCostInfo ;
     private final PoolV2Mode _mode;
+    private final double _load;
 
     private Map<String, String>       _tagMap;
     private Set<String> _hsmInstances;
@@ -25,11 +26,12 @@ public class PoolManagerPoolUpMessage extends PoolManagerMessage {
     public PoolManagerPoolUpMessage(String poolName, long serialId,
                                     PoolV2Mode mode)
     {
-        this(poolName, serialId, mode, null);
+        this(poolName, serialId, mode, null, 0d);
     }
 
     public PoolManagerPoolUpMessage(String poolName, long serialId,
-                                    PoolV2Mode mode, PoolCostInfo costInfo)
+                                    PoolV2Mode mode, PoolCostInfo costInfo,
+                                    double load)
     {
         assert mode != null;
 
@@ -37,6 +39,7 @@ public class PoolManagerPoolUpMessage extends PoolManagerMessage {
         _serialId = serialId;
         _mode = mode;
         _poolCostInfo = costInfo;
+        _load = load;
         setReplyRequired(false);
     }
 

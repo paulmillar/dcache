@@ -163,7 +163,7 @@ public class HsmRestoreTest {
 
             CellMessage envelope = new CellMessage(new CellAddressCore("irrelevant"), null);
             envelope.addSourceAddress(new CellAddressCore(pool));
-            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo);
+            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo, 0.5);
 
             prepareSelectionUnit(pool, poolMode, connectedHSM);
             _costModule.messageArrived(envelope, poolUpMessage);
@@ -242,7 +242,7 @@ public class HsmRestoreTest {
 
             CellMessage envelope = new CellMessage(new CellAddressCore("PoolManager"), null);
             envelope.addSourceAddress(new CellAddressCore(pool));
-            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo);
+            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo, 0.5);
 
             prepareSelectionUnit(pool, poolMode, connectedHSM);
             _costModule.messageArrived(envelope, poolUpMessage);
@@ -343,7 +343,7 @@ public class HsmRestoreTest {
 
             CellMessage envelope = new CellMessage(new CellAddressCore("PoolManager"), null);
             envelope.addSourceAddress(new CellAddressCore(pool));
-            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo);
+            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo, 0.5);
 
             prepareSelectionUnit(pool, poolMode, connectedHSM);
             _costModule.messageArrived(envelope, poolUpMessage);
@@ -443,7 +443,7 @@ public class HsmRestoreTest {
 
             CellMessage envelope = new CellMessage(new CellAddressCore("PoolManager"), null);
             envelope.addSourceAddress(new CellAddressCore(pool));
-            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo);
+            PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool, serialId, poolMode, poolCostInfo, 0.5);
 
             prepareSelectionUnit(pool, poolMode, connectedHSM);
             _costModule.messageArrived(envelope, poolUpMessage);

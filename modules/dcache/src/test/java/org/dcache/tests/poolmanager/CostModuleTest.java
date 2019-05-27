@@ -292,7 +292,7 @@ public class CostModuleTest {
 
         long serialId = System.currentTimeMillis();
 
-        return new PoolManagerPoolUpMessage( poolName, serialId, poolMode, poolCost);
+        return new PoolManagerPoolUpMessage( poolName, serialId, poolMode, poolCost, 0.5);
     }
 
     /**
@@ -328,7 +328,7 @@ public class CostModuleTest {
 
         long serialId = System.currentTimeMillis();
 
-        return new PoolManagerPoolUpMessage( poolName, serialId, poolMode, poolCost);
+        return new PoolManagerPoolUpMessage( poolName, serialId, poolMode, poolCost, 0.5);
     }
 
     /**

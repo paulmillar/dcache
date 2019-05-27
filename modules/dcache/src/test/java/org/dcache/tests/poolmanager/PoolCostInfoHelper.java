@@ -26,7 +26,7 @@ public class PoolCostInfoHelper {
         CellMessage envelope = new CellMessage(new CellAddressCore("PoolManager"), null);
         envelope.addSourceAddress(new CellAddressCore(pool));
         PoolManagerPoolUpMessage poolUpMessage = new PoolManagerPoolUpMessage(pool,
-                serialId, poolMode, poolCost);
+                serialId, poolMode, poolCost, 0.1);
 
         cm.messageArrived(envelope, poolUpMessage);
     }

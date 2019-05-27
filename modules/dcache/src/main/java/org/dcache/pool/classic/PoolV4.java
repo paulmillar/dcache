@@ -111,6 +111,7 @@ import org.dcache.pool.json.PoolDataDetails;
 import org.dcache.pool.json.PoolDataDetails.Duplicates;
 import org.dcache.pool.json.PoolDataDetails.Lsf;
 import org.dcache.pool.json.PoolDataDetails.P2PMode;
+import org.dcache.pool.load.LoadObserver;
 import org.dcache.pool.movers.Mover;
 import org.dcache.pool.movers.MoverFactory;
 import org.dcache.pool.nearline.HsmSet;
@@ -217,6 +218,7 @@ public class PoolV4
     private Executor _executor;
 
     private boolean _enableHsmFlag;
+    private LoadObserver _loadObserver;
 
     private Consumer<RemoveFileInfoMessage> _kafkaSender = (s) -> {};
 
@@ -460,6 +462,12 @@ public class PoolV4
     public void setEnableHsmFlag(boolean enable)
     {
         _enableHsmFlag = enable;
+    }
+
+    @Required
+    public void setLoadObserver(LoadObserver observer)
+    {
+        _loadObserver = observer;
     }
 
     public void init()
@@ -1527,7 +1535,7 @@ public class PoolV4
 
             PoolManagerPoolUpMessage poolManagerMessage =
                 new PoolManagerPoolUpMessage(_poolName, _serialId,
-                                             _poolMode, info);
+                                             _poolMode, info, _loadObserver.currentLoad());
 
             poolManagerMessage.setTagMap(_tags);
             if (_hsmSet != null) {
