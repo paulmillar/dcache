@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.dcache.util.ByteUnit.BYTES;
@@ -75,7 +76,22 @@ public class ColumnWriter
 
     public ColumnWriter bytes(String name)
     {
-        addColumn(new ByteColumn(name));
+        addColumn(new ByteColumn(name, ByteUnit.Type.DECIMAL));
+        return this;
+    }
+
+    public ColumnWriter bytes(String name, Optional<ByteUnit> units, ByteUnit.Type displayUnits)
+    {
+        Column c = units.isPresent()
+                ? new ByteColumn(name, units.get())
+                : new ByteColumn(name, displayUnits);
+        addColumn(c);
+        return this;
+    }
+
+    public ColumnWriter bytes(String name, ByteUnit units)
+    {
+        addColumn(new ByteColumn(name, units));
         return this;
     }
 
@@ -314,9 +330,21 @@ public class ColumnWriter
      */
     private class ByteColumn extends AbstractColumn
     {
-        public ByteColumn(String name)
+        private final Optional<ByteUnit> unit;
+        private final ByteUnit.Type displayUnits;
+
+        public ByteColumn(String name, ByteUnit.Type displayUnits)
         {
             super(name);
+            this.unit = Optional.empty();
+            this.displayUnits = displayUnits;
+        }
+
+        public ByteColumn(String name, ByteUnit unit)
+        {
+            super(name);
+            this.unit = Optional.of(unit);
+            this.displayUnits = ByteUnit.Type.DECIMAL; // FIXME: this shouldn't be needed.
         }
 
         @Override
@@ -326,12 +354,20 @@ public class ColumnWriter
         }
 
         @Override
-        public int width(Object value)
+        public int width(Object rawValue)
         {
-            if (abbrev && value != null) {
-                return DECIMAL.unitsOf((long) value) == BYTES ? 4 : 5;
+            if (rawValue == null) {
+                return 0;
+            }
+
+            long value = (long)rawValue;
+
+            if (abbrev) {
+                return displayUnits.unitsOf(value) == BYTES ? 4 : 5;
+            } else if (unit.isPresent()) {
+                return render(value, unit.get()).length();
             } else {
-                return Objects.toString(value, "").length();
+                return String.format("%d", value).length();
             }
         }
 
@@ -351,7 +387,7 @@ public class ColumnWriter
 
         private void render(long value, int actualWidth, PrintWriter out)
         {
-            ByteUnit units = DECIMAL.unitsOf(value);
+            ByteUnit units = displayUnits.unitsOf(value);
             String symbol = isoSymbol().of(units);
             String numerical = render(value, units);
 
@@ -360,6 +396,12 @@ public class ColumnWriter
                 out.append(' ');
             }
             out.append(numerical).append(symbol);
+        }
+
+        private void render(long value, int actualWidth, PrintWriter out, ByteUnit units)
+        {
+            String renderedValue = render(value, units);
+            out.format("%" + actualWidth + 's', renderedValue);
         }
 
         @Override
@@ -373,6 +415,8 @@ public class ColumnWriter
                 long value = (long) o;
                 if (abbrev) {
                     render(value, actualWidth, out);
+                } else if (unit.isPresent()) {
+                    render(value, actualWidth, out, unit.get());
                 } else {
                     out.format("%" + actualWidth + 'd', value);
                 }
