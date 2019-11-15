@@ -12,10 +12,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.dcache.util.ByteUnit.BYTES;
-import static org.dcache.util.ByteUnit.Type.DECIMAL;
 import static org.dcache.util.ByteUnits.isoSymbol;
 
 /**
@@ -30,7 +30,6 @@ public class ColumnWriter
     private final List<Integer> spaces = new ArrayList<>();
     private final List<Column> columns = new ArrayList<>();
     private final List<Row> rows = new ArrayList<>();
-    private boolean abbrev;
     private boolean headersAffectRowWidth;
 
     public enum DateStyle {
@@ -73,9 +72,29 @@ public class ColumnWriter
         return this;
     }
 
-    public ColumnWriter bytes(String name)
+    /**
+     * Create a column for showing a number of bytes.  If units is present then
+     * the value is scaled to this units and written as a number.  If units is
+     * absent then values are scaled automatically and written along with
+     * the ISO label for that unit.  The base for the units (base-2 or base-10)
+     * is decided by the displayUnits value.
+     * @param name the column's name
+     * @param units the specific unit into which values will be scaled, if present.
+     * @param displayUnits the base of the units when automatically scaling values.
+     * @return
+     */
+    public ColumnWriter bytes(String name, Optional<ByteUnit> units, ByteUnit.Type displayUnits)
     {
-        addColumn(new ByteColumn(name));
+        Column c = units.isPresent()
+                ? new ByteColumn(name, units.get())
+                : new ByteColumn(name, displayUnits);
+        addColumn(c);
+        return this;
+    }
+
+    public ColumnWriter bytes(String name, ByteUnit units)
+    {
+        addColumn(new ByteColumn(name, units));
         return this;
     }
 
@@ -97,12 +116,6 @@ public class ColumnWriter
     public ColumnWriter headersInColumns()
     {
         headersAffectRowWidth = true;
-        return this;
-    }
-
-    public ColumnWriter abbreviateBytes(boolean abbrev)
-    {
-        this.abbrev = abbrev;
         return this;
     }
 
@@ -314,9 +327,21 @@ public class ColumnWriter
      */
     private class ByteColumn extends AbstractColumn
     {
-        public ByteColumn(String name)
+        private final Optional<ByteUnit> unit;
+        private final ByteUnit.Type displayUnits;
+
+        public ByteColumn(String name, ByteUnit.Type displayUnits)
         {
             super(name);
+            this.unit = Optional.empty();
+            this.displayUnits = displayUnits;
+        }
+
+        public ByteColumn(String name, ByteUnit unit)
+        {
+            super(name);
+            this.unit = Optional.of(unit);
+            this.displayUnits = ByteUnit.Type.DECIMAL; // FIXME: this shouldn't be needed.
         }
 
         @Override
@@ -326,12 +351,21 @@ public class ColumnWriter
         }
 
         @Override
-        public int width(Object value)
+        public int width(Object rawValue)
         {
-            if (abbrev && value != null) {
-                return DECIMAL.unitsOf((long) value) == BYTES ? 4 : 5;
+            if (rawValue == null) {
+                return 0;
+            }
+
+            long value = (long)rawValue;
+
+            if (unit.isPresent()) {
+                return render(value, unit.get()).length();
             } else {
-                return Objects.toString(value, "").length();
+                if (displayUnits.unitsOf(value) == BYTES) {
+                    return 4;
+                }
+                return displayUnits == ByteUnit.Type.DECIMAL ? 5 : 6;
             }
         }
 
@@ -351,7 +385,7 @@ public class ColumnWriter
 
         private void render(long value, int actualWidth, PrintWriter out)
         {
-            ByteUnit units = DECIMAL.unitsOf(value);
+            ByteUnit units = displayUnits.unitsOf(value);
             String symbol = isoSymbol().of(units);
             String numerical = render(value, units);
 
@@ -360,6 +394,12 @@ public class ColumnWriter
                 out.append(' ');
             }
             out.append(numerical).append(symbol);
+        }
+
+        private void render(long value, int actualWidth, PrintWriter out, ByteUnit units)
+        {
+            String renderedValue = render(value, units);
+            out.format("%" + actualWidth + 's', renderedValue);
         }
 
         @Override
@@ -371,10 +411,10 @@ public class ColumnWriter
                 }
             } else {
                 long value = (long) o;
-                if (abbrev) {
-                    render(value, actualWidth, out);
+                if (unit.isPresent()) {
+                    render(value, actualWidth, out, unit.get());
                 } else {
-                    out.format("%" + actualWidth + 'd', value);
+                    render(value, actualWidth, out);
                 }
             }
         }
