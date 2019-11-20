@@ -74,6 +74,7 @@ public class Task
     private Deque<String> _locations = new ArrayDeque<>(0);
     private final Set<String> _replicas = new HashSet<>();
     private CellPath _target;
+    private String _cancelReason;
 
     public Task(TaskParameters parameters,
                 TaskCompletionHandler callbackHandler,
@@ -405,9 +406,15 @@ public class Task
      * Cancels the task, if not already completed. This will trigger a
      * notification (postponed).
      */
-    public synchronized void cancel()
+    public synchronized void cancel(String why)
     {
+        _cancelReason = why;
         _fsm.cancel();
+    }
+
+    public synchronized String getCancelReason()
+    {
+        return _cancelReason == null ? "an unknown reason" : _cancelReason;
     }
 
     /**
