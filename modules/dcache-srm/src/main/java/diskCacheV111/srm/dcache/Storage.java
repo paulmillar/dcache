@@ -854,8 +854,20 @@ public final class Storage
         checkValidPath(surl.getHost() != null, "missing host");
         checkValidPath(!CharMatcher.whitespace().matchesAllOf(surl.getHost()), "empty host");
 
+        Collection<LoginBrokerInfo> doors = loginBrokerSource.doors();
+
+        if (doors.isEmpty()) {
+            // We don't have any SRM doors; however, there is SRM activity.
+            // Most likely this is due to SrmManager attempting to restart
+            // activity (e.g., srmBringOnline requests).
+
+            // Let's say this SURL is local and hopefully an SRM door will come
+            // up soon.
+            return true;
+        }
+
         int port = surl.getPort();
-        boolean result = loginBrokerSource.anyMatch(i -> (port == -1 || port == i.getPort())
+        boolean result = doors.stream().anyMatch(i -> (port == -1 || port == i.getPort())
                 && i.getProtocolFamily().equals(srmProtocol)
                 && i.getAddresses().stream()
                         .map(InetAddress::getHostName)
@@ -863,7 +875,7 @@ public final class Storage
         if (_log.isDebugEnabled() && result == false) {
             StringBuilder sb = new StringBuilder();
             sb.append("Identifying SURL ").append(surl).append(" as non-local: no matching door:\n");
-            for (LoginBrokerInfo i : loginBrokerSource.doors()) {
+            for (LoginBrokerInfo i : doors) {
                 sb.append("    ").append(i.toString()).append(" ");
                 if (port != -1 && port != i.getPort()) {
                     sb.append("mismatch on port");
