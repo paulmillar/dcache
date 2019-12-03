@@ -100,6 +100,21 @@ public class X509Plugin implements GPlazmaAuthenticationPlugin
             .put("1.2.840.113612.5.2.3.3.3", PERSON)
             .build();
 
+    private static final Set<LoA> IGTF_AP = EnumSet.of(IGTF_AP_CLASSIC,
+            IGTF_AP_SGCS, IGTF_AP_SLCS, IGTF_AP_EXPERIMENTAL, IGTF_AP_MICS,
+            IGTF_AP_IOTA);
+
+    private static final Set<LoA> IGTF_LOA = EnumSet.of(IGTF_LOA_ASPEN,
+            IGTF_LOA_BIRCH, IGTF_LOA_CEDAR, IGTF_LOA_DOGWOOD);
+
+    /** From https://www.igtf.net/ap/authn-assurance/ */
+    private static final Map<LoA,LoA> EQUIVALENT_LOA = ImmutableMap.<LoA,LoA>builder()
+            .put(LoA.IGTF_AP_SLCS, LoA.IGTF_LOA_ASPEN)
+            .put(LoA.IGTF_AP_MICS, LoA.IGTF_LOA_BIRCH)
+            .put(LoA.IGTF_AP_CLASSIC, LoA.IGTF_LOA_CEDAR)
+            .put(LoA.IGTF_AP_IOTA, LoA.IGTF_LOA_DOGWOOD)
+            .build();
+
     private static final Pattern ROBOT_CN_PATTERN = Pattern.compile("/CN=[rR]obot[^/\\p{Alnum}]");
     private static final Pattern CN_PATTERN = Pattern.compile("/CN=([^/]*)");
 
@@ -181,11 +196,46 @@ public class X509Plugin implements GPlazmaAuthenticationPlugin
 
         List<Principal> principals = new ArrayList<>();
         principals.addAll(caPrincipals);
-        principals.add(subject);
         principals.addAll(loaPrincipals);
+
+        principals = filterOutErroneousLoAs(principals);
+
+        principals.add(subject);
         principals.addAll(emailPrincipals);
         entity.map(EntityDefinitionPrincipal::new).ifPresent(principals::add);
+
         return principals;
+    }
+
+    private List<Principal> filterOutErroneousLoAs(List<Principal> principals)
+    {
+        Optional<Stream<Principal>> filteredPrincipals = Optional.empty();
+
+        EnumSet<LoA> assertedLoAs = principals.stream().filter(LoAPrincipal.class::isInstance)
+                .map(LoAPrincipal.class::cast)
+                .map(LoAPrincipal::getLoA)
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(LoA.class)));
+
+        EnumSet<LoA> assertedIgtfAp = EnumSet.copyOf(assertedLoAs);
+        assertedIgtfAp.retainAll(IGTF_AP);
+
+        if (assertedIgtfAp.size() > 1) {
+            LOG.warn("Suppressing IGTF AP principals as an incompatible set are"
+                    + " asserted: {}", assertedIgtfAp);
+            filteredPrincipals = Optional.of(principals.stream().filter(p -> !(p instanceof LoAPrincipal && IGTF_AP.contains(((LoAPrincipal)p).getLoA()))));
+        }
+
+        EnumSet<LoA> assertedIgtfLoAs = EnumSet.copyOf(assertedLoAs);
+        assertedIgtfLoAs.retainAll(IGTF_LOA);
+
+        if (assertedIgtfLoAs.size() > 1) {
+            LOG.warn("Suppressing IGTF LoA principals as an incompatible set are"
+                    + " asserted: {}", assertedIgtfLoAs);
+            filteredPrincipals = Optional.of(filteredPrincipals.orElse(principals.stream())
+                    .filter(p -> !(p instanceof LoAPrincipal && IGTF_LOA.contains(((LoAPrincipal)p).getLoA()))));
+        }
+
+        return filteredPrincipals.map(s -> s.collect(Collectors.toList())).orElse(principals);
     }
 
     private Optional<EntityDefinition> identifyEntityDefinition(X509Certificate eec,
