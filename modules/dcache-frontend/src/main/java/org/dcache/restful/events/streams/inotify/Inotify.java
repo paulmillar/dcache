@@ -37,13 +37,20 @@ import org.springframework.beans.factory.annotation.Required;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 
 import diskCacheV111.namespace.EventNotifier;
@@ -104,6 +111,21 @@ public class Inotify implements EventStream, CellMessageReceiver,
         CuratorFrameworkAware, CellIdentityAware, CellLifeCycleAware
 {
     /**
+     * The current state of a selection-specific sender task.
+     */
+    enum SenderState
+    {
+        /** Currently no sender task. */
+        NOT_RUNNING,
+
+        /** Sender task is running and will terminate once finished. */
+        FINAL_RUN,
+
+        /** Sender task is running and will start another run once the current run completes. */
+        NONFINAL_RUN
+    }
+
+    /**
      * Represents the kind of inotify events selected by a specific client from
      * a specific PNFS-ID.  This is the client-supplied selector plus some
      * operational field-members.
@@ -116,6 +138,10 @@ public class Inotify implements EventStream, CellMessageReceiver,
         private Set<EventType> selectedEvents;
         private InotifySelector selector;
         private boolean isClosed;
+        private final AtomicReference<SenderState> senderTask =
+                new AtomicReference<>(SenderState.NOT_RUNNING);
+        private final Queue<JsonNode> in = new ArrayBlockingQueue(1000);
+
 
         private InotifySelection(BiConsumer<String,JsonNode> receiver,
                 InotifySelector selector, WatchIdentity id) throws CacheException,
@@ -167,7 +193,7 @@ public class Inotify implements EventStream, CellMessageReceiver,
         public synchronized void requestClose()
         {
             if (!isClosed) {
-                sendEvent(EventStream.CLOSE_STREAM);
+                queueEvent(EventStream.CLOSE_STREAM);
             }
         }
 
@@ -182,7 +208,7 @@ public class Inotify implements EventStream, CellMessageReceiver,
                 justClosed = !isClosed;
 
                 if (justClosed) {
-                    sendEvent(IN_IGNORED_JSON);
+                    queueEvent(IN_IGNORED_JSON);
                     isClosed = true;
                 }
             }
@@ -201,10 +227,13 @@ public class Inotify implements EventStream, CellMessageReceiver,
         }
 
         @GuardedBy("this")
-        private void sendEvent(JsonNode json)
+        private void queueEvent(JsonNode json)
         {
-            /* MUST NOT cause this thread to enter the Inotify monitor. */
-            eventReceiver.accept(identity.selectionId(), json);
+            if (in.offer(json)) {
+                notifyEventToSend();
+            } else {
+                LOGGER.warn("Dropping events: inotify receipient too slow");
+            }
         }
 
         public synchronized boolean isSendableEvent(EventType type, String filename)
@@ -225,7 +254,7 @@ public class Inotify implements EventStream, CellMessageReceiver,
 
         private synchronized void acceptEvent(JsonNode json)
         {
-            sendEvent(json);
+            queueEvent(json);
 
             if (selector.flags().contains(AddWatchFlag.IN_ONESHOT)) {
                 requestClose();
@@ -237,6 +266,39 @@ public class Inotify implements EventStream, CellMessageReceiver,
             if (isSendableEvent(type, filename)) {
                 acceptEvent(json);
             }
+        }
+
+        public synchronized List<JsonNode> drainQueuedEvents()
+        {
+            if (in.isEmpty()) {
+                return Collections.emptyList();
+            } else {
+                List<JsonNode> todo = new ArrayList<>(in);
+                in.clear();
+                return todo;
+            }
+        }
+
+        private void notifyEventToSend()
+        {
+            if (senderTask.compareAndSet(SenderState.FINAL_RUN, SenderState.NONFINAL_RUN)) {
+                LOGGER.debug("Sender task updated to non-final run.");
+            } else if (senderTask.compareAndSet(SenderState.NOT_RUNNING, SenderState.FINAL_RUN)) {
+                LOGGER.debug("Executing sender task");
+                executor.execute(this::sendQueuedEvents);
+            }
+        }
+
+        private void sendQueuedEvents()
+        {
+            do {
+                LOGGER.debug("Sender task starting send run");
+                senderTask.set(SenderState.FINAL_RUN);
+
+                List<JsonNode> events = drainQueuedEvents();
+                events.forEach(json -> { eventReceiver.accept(identity.selectionId(), json); });
+            } while (!senderTask.compareAndSet(SenderState.FINAL_RUN, SenderState.NOT_RUNNING));
+            LOGGER.debug("Sender task terminating");
         }
     }
 
@@ -256,6 +318,7 @@ public class Inotify implements EventStream, CellMessageReceiver,
     private CuratorFramework curator;
     private String subscriptionPath;
     private PersistentNode subscriptions;
+    private Executor executor;
 
     @Override
     public void setCuratorFramework(CuratorFramework client)
@@ -279,6 +342,12 @@ public class Inotify implements EventStream, CellMessageReceiver,
     public void setPnfsHandler(PnfsHandler handler)
     {
         pnfsHandler = handler;
+    }
+
+    @Required
+    public void setExecutor(Executor executor)
+    {
+        this.executor = executor;
     }
 
     @Override
