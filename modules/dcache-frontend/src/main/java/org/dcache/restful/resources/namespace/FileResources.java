@@ -147,7 +147,6 @@ public class FileResources {
             NamespaceUtils.chimeraToJsonAttributes(path.name(), fileAttributes,
                                                    namespaceAttributes,
                                                    isLocality, isLocations,
-                                                   false,
                                                    request, poolMonitor);
             if (isQos) {
                 NamespaceUtils.addQoSAttributes(fileAttributes,
@@ -189,7 +188,6 @@ public class FileResources {
                                                            childrenAttributes,
                                                            entry.getFileAttributes(),
                                                            isLocality, isLocations,
-                                                           false,
                                                            request, poolMonitor);
                     childrenAttributes.setFileName(fName);
                     if (isQos) {

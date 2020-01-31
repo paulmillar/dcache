@@ -73,7 +73,6 @@ public final class NamespaceUtils {
                                                FileAttributes attributes,
                                                boolean isLocality,
                                                boolean isLocations,
-                                               boolean isOptional,
                                                HttpServletRequest request,
                                                PoolMonitor poolMonitor) throws CacheException {
         json.setPnfsId(attributes.getPnfsId());
@@ -119,20 +118,6 @@ public final class NamespaceUtils {
             }
         }
 
-        if (isOptional) {
-            addAllOptionalAttributes(json, attributes);
-        }
-    }
-
-    /**
-     * <p>Adds the rest of the file attributes in the case full
-     *    information on the file is requested.</p>
-     *
-     * @param json                mapped from attributes
-     * @param attributes          returned by the query to namespace
-     */
-    private static void addAllOptionalAttributes(JsonFileAttributes json,
-                                                 FileAttributes attributes) {
         if (attributes.isDefined(FileAttribute.ACCESS_LATENCY)) {
             json.setAccessLatency(attributes.getAccessLatency());
         }
