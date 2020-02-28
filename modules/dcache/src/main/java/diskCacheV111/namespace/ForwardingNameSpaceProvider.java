@@ -201,4 +201,11 @@ public abstract class ForwardingNameSpaceProvider implements NameSpaceProvider
     {
         return delegate().cancelUpload(subject, uploadPath, path, attr, explanation);
     }
+
+    @Override
+    public StatsResult directoryStats(Subject subject, FsPath directory)
+            throws CacheException
+    {
+        return delegate().directoryStats(subject, directory);
+    }
 }

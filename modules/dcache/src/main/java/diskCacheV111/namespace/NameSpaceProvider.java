@@ -7,11 +7,13 @@ import javax.security.auth.Subject;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FsPath;
+import diskCacheV111.util.NotDirCacheException;
 import diskCacheV111.util.PnfsId;
 import diskCacheV111.util.RetentionPolicy;
 
@@ -22,6 +24,8 @@ import org.dcache.namespace.ListHandler;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.Glob;
 import org.dcache.vehicles.FileAttributes;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Any mechanism of storing dCache namespace must implement this interface.
@@ -55,6 +59,34 @@ public interface NameSpaceProvider
         public String getName()
         {
             return name;
+        }
+    }
+
+    public static class StatsResult
+    {
+        private final Map<Long,UsageDescription> usage;
+        private final List<String> directories;
+
+        public StatsResult(Map<Long,UsageDescription> usage, List<String> directories)
+        {
+            this.usage = requireNonNull(usage);
+            this.directories = requireNonNull(directories);
+        }
+
+        /**
+         * @return Per-gid usage in this directory.
+         */
+        public Map<Long,UsageDescription> usagePerGid()
+        {
+            return usage;
+        }
+
+        /**
+         * @return The subdirectories within this directory.
+         */
+        public List<String> directories()
+        {
+            return directories;
         }
     }
 
@@ -328,4 +360,19 @@ public interface NameSpaceProvider
      */
     Collection<FileAttributes> cancelUpload(Subject subject, FsPath uploadPath, FsPath path,
             Set<FileAttribute> attr, String explanation) throws CacheException;
+
+    /**
+     * Obtain statistics about a specific directory.
+     *
+     * This method provides a statistical summary of a specific directory.
+     *
+     * @param subject the subject of the user requesting this information
+     * @param directory the directory to query
+     * @return The statistics of the targeted directory.
+     * @throws FileNotFoundCacheException if the path does not exist
+     * @throws NotDirCacheException if the target isn't a directory
+     * @throws PermissionDeniedCacheException if the user is not allows to list this directory
+     * @throws CacheException if there is some other problem.
+     */
+    StatsResult directoryStats(Subject subject, FsPath directory) throws CacheException;
 }

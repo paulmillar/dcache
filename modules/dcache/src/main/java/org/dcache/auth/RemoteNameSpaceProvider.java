@@ -249,4 +249,11 @@ public class RemoteNameSpaceProvider implements NameSpaceProvider
         return _pnfs.request(new PnfsCancelUpload(subject, Restrictions.none(),
                 uploadPath, path, requested, explanation)).getDeletedFiles();
     }
+
+    @Override
+    public StatsResult directoryStats(Subject subject, FsPath directory)
+            throws CacheException
+    {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
 }

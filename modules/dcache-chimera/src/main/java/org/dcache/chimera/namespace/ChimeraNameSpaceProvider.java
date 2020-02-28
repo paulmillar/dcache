@@ -1612,4 +1612,10 @@ public class ChimeraNameSpaceProvider
         }
     }
 
+    @Override
+    public StatsResult directoryStats(Subject subject, FsPath directory)
+            throws CacheException
+    {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
 }
