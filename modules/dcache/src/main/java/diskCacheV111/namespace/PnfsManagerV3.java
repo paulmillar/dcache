@@ -20,15 +20,18 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -39,6 +42,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import diskCacheV111.namespace.NameSpaceProvider.StatsResult;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileNotFoundCacheException;
@@ -81,6 +85,7 @@ import dmg.util.CommandException;
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.CommandLine;
+import dmg.util.command.DelayedCommand;
 import dmg.util.command.Option;
 
 import org.dcache.acl.enums.AccessMask;
@@ -113,6 +118,8 @@ import static org.dcache.acl.enums.AccessType.*;
 import static org.dcache.auth.Subjects.ROOT;
 import static org.dcache.auth.attributes.Activity.*;
 import static org.dcache.namespace.FileAttribute.*;
+import static org.dcache.util.Strings.describe;
+import static org.dcache.util.Strings.describeSize;
 
 public class PnfsManagerV3
     extends AbstractCellComponent
@@ -983,6 +990,122 @@ public class PnfsManagerV3
             return "";
         }
 
+    }
+
+    @Command(name="usage", hint = "report on per-gid usage",
+            description = "Provide a report of dCache usage per gid and in"
+                    + " total.\n"
+                    + "\n"
+                    + "The target is a directory and, by default, only usage"
+                    + " within that directory is recorded.  If the -R option is"
+                    + " specified then the usage within all subdirectories are"
+                    + " also include in the report.\n"
+                    + "\n"
+                    + "The report includes the number of specific objects, such"
+                    + " as files and directories.  For files, a summary of"
+                    + " creation time and last-accessed times is provided,"
+                    + " along with information about capacity usage.")
+    public class UsageReport extends DelayedCommand<String>
+    {
+        @Argument(usage = "The path of a directory within dCache.")
+        FsPath path;
+
+        @Option(name="R", usage="Whether to account for the directory"
+                + " and all its subdirectories, recursively.  Warning: enabling"
+                + " this option can result in an operation taking a long time"
+                + " to complete.")
+        boolean recursive;
+
+        @Option(name="g", metaVar="gid", usage="Limit results to specific gids", separator=",")
+        Long[] gids;
+
+        @Override
+        protected String execute() throws CommandException
+        {
+            try {
+                StringBuilder output = new StringBuilder();
+                StatsResult results = _nameSpaceProvider.directoryStats(Subjects.ROOT, path);
+
+                Optional<Set<Long>> interestedGids = gids == null ? Optional.empty() : Optional.of(new HashSet<>(Arrays.asList(gids)));
+
+                Map<Long,UsageDescription> usage = results.usagePerGid();
+                interestedGids.ifPresent(g -> usage.keySet().retainAll(g));
+
+                if (recursive) {
+                    Queue<FsPath> todo = new ArrayDeque();
+                    results.directories().stream().map(path::child).forEach(todo::add);
+
+                    FsPath target = todo.poll();
+                    while (target != null) {
+                        StatsResult childResult = _nameSpaceProvider.directoryStats(Subjects.ROOT, target);
+                        childResult.directories().stream().map(target::child).forEach(todo::add);
+
+                        Map<Long,UsageDescription> childUsage = childResult.usagePerGid();
+                        interestedGids.ifPresent(g -> childUsage.keySet().retainAll(g));
+                        for (Map.Entry<Long,UsageDescription> e : childUsage.entrySet()) {
+                            if (usage.computeIfPresent(e.getKey(), (g,u) -> u.combine(e.getValue())) == null) {
+                                usage.put(e.getKey(), e.getValue());
+                            }
+                        }
+
+                        target = todo.poll();
+                    }
+                }
+
+                usage.entrySet().stream()
+                        .sorted((e1,e2) -> e1.getKey().compareTo(e2.getKey()))
+                        .map(e -> reportUsage("GID " + e.getKey(), e.getValue()))
+                        .reduce((a,b) -> a.append('\n').append(b))
+                        .ifPresent(output::append);
+
+                if (usage.size() > 1) {
+                    Optional<UsageDescription> combined = usage.values().stream().reduce((a,b) -> a.combine(b));
+                    combined.map(u -> reportUsage("TOTAL", u))
+                            .ifPresent(r -> output.append('\n').append(r));
+                }
+
+                return output.toString();
+            } catch (CacheException e) {
+                throw new CommandException("Unable to generate statistics: " + e.getMessage());
+            }
+        }
+
+        private StringBuilder optionallyAppend(StringBuilder sb, String name, long count)
+        {
+            if (count > 0) {
+                sb.append("    ").append(name).append(": ").append(count).append('\n');
+            }
+
+            return sb;
+        }
+
+        private StringBuilder reportUsage(String title, UsageDescription usage)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.append(title).append('\n');
+            optionallyAppend(sb, "Files", usage.fileCount());
+            optionallyAppend(sb, "Directories", usage.directoryCount());
+            optionallyAppend(sb, "Sym-links", usage.symLinkCount());
+            optionallyAppend(sb, "Special", usage.specialCount());
+            if (usage.fileCount() > 0) {
+                sb.append("    File time-stamps:\n");
+                if (usage.fileCount() == 1) {
+                    sb.append("        Created: ").append(describe(usage.oldestFile())).append('\n');
+                    sb.append("        Accessed: ").append(describe(usage.leastRecentlyAccessedFile())).append('\n');
+                    sb.append("    File size: ").append(describeSize(usage.usage())).append('\n');
+                } else {
+                    sb.append("        Oldest: ").append(describe(usage.oldestFile())).append('\n');
+                    sb.append("        Newest: ").append(describe(usage.newestFile())).append('\n');
+                    sb.append("        Least recently accessed: ").append(describe(usage.leastRecentlyAccessedFile())).append('\n');
+                    sb.append("        Most recently accessed: ").append(describe(usage.mostRecentlyAccessedFile())).append('\n');
+                    sb.append("    File size:\n");
+                    usage.smallestFile().ifPresent(s -> sb.append("        Smallest file: ").append(describeSize(s)).append('\n'));
+                    usage.largestFile().ifPresent(s -> sb.append("        Largest file: ").append(describeSize(s)).append('\n'));
+                    sb.append("        Total usage: ").append(describeSize(usage.usage())).append('\n');
+                }
+            }
+            return sb;
+        }
     }
 
     private void dumpThreadQueue(int queueId) {
