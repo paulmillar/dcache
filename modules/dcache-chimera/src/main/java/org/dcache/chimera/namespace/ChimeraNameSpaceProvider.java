@@ -1,6 +1,9 @@
 package org.dcache.chimera.namespace;
 
 import com.google.common.base.Charsets;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -21,15 +24,19 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -37,6 +44,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import diskCacheV111.namespace.NameSpaceProvider;
+import diskCacheV111.namespace.UsageDescription;
 import diskCacheV111.util.AccessLatency;
 import diskCacheV111.util.CacheException;
 import diskCacheV111.util.FileCorruptedCacheException;
@@ -55,6 +63,7 @@ import diskCacheV111.vehicles.StorageInfo;
 
 import dmg.cells.nucleus.CellInfo;
 import dmg.cells.nucleus.CellInfoProvider;
+import dmg.util.Exceptions;
 
 import org.dcache.acl.ACE;
 import org.dcache.acl.ACL;
@@ -124,6 +133,37 @@ public class ChimeraNameSpaceProvider
             EnumSet.of(ACCESS_LATENCY, CACHECLASS, CHECKSUM, CREATION_TIME,
                     FLAGS, HSM, LOCATIONS, NLINK, PNFSID, RETENTION_POLICY,
                     SIZE, STORAGECLASS, STORAGEINFO, SIMPLE_TYPE, TYPE);
+
+    /**
+     * A class similar to UsageDescription but one that may be updated.
+     * @see UsageDescription
+     */
+    private static class MutableUsageDescription
+    {
+        private long fileCount;
+        private long directoryCount;
+        private long symLinkCount;
+        private long specialCount;
+        private long usage;
+        private Optional<Instant> leastRecentlyAccessFile = Optional.empty();
+        private Optional<Instant> mostRecentlyAccessFile = Optional.empty();
+        private Optional<Instant> oldestFile = Optional.empty();
+        private Optional<Instant> newestFile = Optional.empty();
+        private OptionalLong smallestFile = OptionalLong.empty();
+        private OptionalLong largestFile = OptionalLong.empty();
+
+        /**
+         * @return a snapshot of the current state.
+         */
+        public UsageDescription asUsageDescription()
+        {
+            return new UsageDescription(fileCount, directoryCount, symLinkCount,
+                    specialCount, usage,
+                    oldestFile, newestFile,
+                    leastRecentlyAccessFile, mostRecentlyAccessFile,
+                    smallestFile, largestFile);
+        }
+    }
 
     private FileSystemProvider       _fs;
     private ChimeraStorageInfoExtractable _extractor;
@@ -1613,9 +1653,102 @@ public class ChimeraNameSpaceProvider
     }
 
     @Override
-    public StatsResult directoryStats(Subject subject, FsPath directory)
+    public StatsResult directoryStats(Subject subject, FsPath path)
             throws CacheException
     {
-        throw new UnsupportedOperationException("Not yet implemented");
+        try {
+            ExtendedInode dir = pathToInode(subject, path.toString());
+            if (!dir.isDirectory()) {
+                throw new NotDirCacheException("Not a directory: " + path);
+            }
+
+            if (!Subjects.isRoot(subject)) {
+                FileAttributes attributes =
+                    getFileAttributesForPermissionHandler(dir);
+                if (_permissionHandler.canListDir(subject, attributes) != ACCESS_ALLOWED) {
+                    throw new PermissionDeniedCacheException("Access denied: " +
+                                                             path);
+                }
+            }
+
+            List<String> subdirectories = new ArrayList<>();
+            Map<Long,MutableUsageDescription> usage = new HashMap<>();
+            try (DirectoryStreamB<HimeraDirectoryEntry> dirStream = dir
+                    .newDirectoryStream()) {
+                for (HimeraDirectoryEntry entry : dirStream) {
+                    String name = entry.getName();
+                    if (name.equals(".") || name.equals("..")) {
+                        continue;
+                    }
+                    try {
+                        ExtendedInode child = new ExtendedInode(_fs, entry.getInode());
+                        FileAttributes fa = getFileAttributes(child, EnumSet.of(TYPE, SIZE, OWNER_GROUP, ACCESS_TIME, CREATION_TIME));
+
+                        MutableUsageDescription groupUsage = usage.computeIfAbsent((long)fa.getGroup(), g -> new MutableUsageDescription());
+
+                        switch (fa.getFileType()) {
+                        case REGULAR:
+                            groupUsage.fileCount++;
+                            Instant creation = Instant.ofEpochMilli(fa.getCreationTime());
+                            Instant lastAccessed = Instant.ofEpochMilli(fa.getAccessTime());
+                            if (!groupUsage.newestFile.isPresent()
+                                    || creation.isAfter(groupUsage.newestFile.get())) {
+                                groupUsage.newestFile = Optional.of(creation);
+                            }
+                            if (!groupUsage.oldestFile.isPresent()
+                                    || creation.isBefore(groupUsage.oldestFile.get())) {
+                                groupUsage.oldestFile = Optional.of(creation);
+                            }
+                            if (!groupUsage.leastRecentlyAccessFile.isPresent()
+                                    || lastAccessed.isBefore(groupUsage.leastRecentlyAccessFile.get())) {
+                                groupUsage.leastRecentlyAccessFile = Optional.of(lastAccessed);
+                            }
+                            if (!groupUsage.mostRecentlyAccessFile.isPresent()
+                                    || lastAccessed.isAfter(groupUsage.mostRecentlyAccessFile.get())) {
+                                groupUsage.mostRecentlyAccessFile = Optional.of(lastAccessed);
+                            }
+                            if (fa.isDefined(SIZE)) { // File being uploaded has no size yet.
+                                long size = fa.getSize();
+                                groupUsage.usage += size;
+                                if (!groupUsage.largestFile.isPresent()
+                                        || size > groupUsage.largestFile.getAsLong()) {
+                                    groupUsage.largestFile = OptionalLong.of(size);
+                                }
+                                if (!groupUsage.smallestFile.isPresent()
+                                        || size < groupUsage.smallestFile.getAsLong()) {
+                                    groupUsage.smallestFile = OptionalLong.of(size);
+                                }
+                            }
+                            break;
+
+                        case DIR:
+                            groupUsage.directoryCount++;
+                            subdirectories.add(name);
+                            break;
+
+                        case LINK:
+                            groupUsage.symLinkCount++;
+                            break;
+
+                        case SPECIAL:
+                            groupUsage.specialCount++;
+                            break;
+                        }
+                    } catch (FileNotFoundHimeraFsException e) {
+                        /* Not an error; files may be deleted during the
+                         * list operation.
+                         */
+                    }
+                }
+            }
+
+            Map<Long,UsageDescription> immutableUsage = usage.entrySet().stream()
+                    .collect(Collectors.toMap(e->e.getKey(), e -> e.getValue().asUsageDescription()));
+            return new StatsResult(immutableUsage, subdirectories);
+        } catch (FileNotFoundHimeraFsException e) {
+            throw new FileNotFoundCacheException(e.getMessage(), e);
+        } catch (IOException e) {
+            throw new CacheException(Exceptions.meaningfulMessage(e), e);
+        }
     }
 }
