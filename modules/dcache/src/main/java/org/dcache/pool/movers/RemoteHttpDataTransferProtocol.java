@@ -1,9 +1,13 @@
 package org.dcache.pool.movers;
 
+import com.google.common.base.Stopwatch;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
+import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.HttpStatus;
 import org.apache.http.ProtocolException;
 import org.apache.http.StatusLine;
@@ -17,7 +21,6 @@ import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -28,6 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -37,7 +42,6 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -55,9 +59,11 @@ import dmg.cells.nucleus.CellEndpoint;
 
 import org.dcache.auth.OpenIdCredentialRefreshable;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.statistics.IoStatisticsChannel;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.Checksums;
+import org.dcache.util.LineIndentingPrintWriter;
 import org.dcache.util.Version;
 import org.dcache.vehicles.FileAttributes;
 
@@ -156,6 +162,10 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     private static final Logger _log =
         LoggerFactory.getLogger(RemoteHttpDataTransferProtocol.class);
 
+    private static final String CONTEXT_ATTRIBUTE_LOG_HTTP_REQUESTS = "dcache.log-http";
+    private static final String CONTEXT_ATTRIBUTE_RESPONSE_STOPWATCH = "dcache.response-stopwatch";
+    private static final String CONTEXT_ATTRIBUTE_LOG_ENTRY = "dcache.log-entry";
+
     /** Maximum time to wait when establishing a connection. */
     private static final int CONNECTION_TIMEOUT = (int) TimeUnit.MINUTES.toMillis(1);
 
@@ -242,10 +252,77 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     protected static final String USER_AGENT = "dCache/" +
             Version.of(RemoteHttpDataTransferProtocol.class).getVersion();
 
+    private static final RequestLogger REQUEST_LOGGER = new RequestLogger();
+    private static final ResponseLogger RESPONSE_LOGGER = new ResponseLogger();
+
     private volatile MoverChannel<RemoteHttpDataTransferProtocolInfo> _channel;
     private Consumer<Checksum> _integrityChecker;
 
     private CloseableHttpClient _client;
+
+    private final HttpClientContext context = new HttpClientContext();
+
+    /**
+     * Provide the ability to log HTTP requests sent to remote storage.
+     */
+    private static class RequestLogger implements HttpRequestInterceptor
+    {
+        @Override
+        public void process(HttpRequest request, HttpContext context)
+                throws HttpException, IOException
+        {
+            if (context.getAttribute(CONTEXT_ATTRIBUTE_LOG_HTTP_REQUESTS) == null) {
+                return;
+            }
+
+            context.setAttribute(CONTEXT_ATTRIBUTE_RESPONSE_STOPWATCH,
+                    Stopwatch.createStarted());
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("        ").append(request.getRequestLine()).append('\n');
+            for (Header h : request.getAllHeaders()) {
+                String value;
+                if (h.getName().equalsIgnoreCase("authorization")) {
+                    value = "SUPPRESSED";
+                } else {
+                    value = h.getValue() == null ? "" : h.getValue();
+                }
+                sb.append("        ").append(h.getName()).append(": ").append(value).append('\n');
+            }
+            context.setAttribute(CONTEXT_ATTRIBUTE_LOG_ENTRY, sb);
+        }
+    }
+
+    /**
+     * Provide the ability to log HTTP responses received from remote storage.
+     */
+    private static class ResponseLogger implements HttpResponseInterceptor
+    {
+        @Override
+        public void process(HttpResponse response, HttpContext context)
+                throws HttpException, IOException
+        {
+            if (context.getAttribute(CONTEXT_ATTRIBUTE_LOG_HTTP_REQUESTS) == null) {
+                return;
+            }
+
+            Stopwatch responseStopwatch =
+                    (Stopwatch) context.getAttribute(CONTEXT_ATTRIBUTE_RESPONSE_STOPWATCH);
+
+            StringBuilder sb = (StringBuilder)
+                    context.getAttribute(CONTEXT_ATTRIBUTE_LOG_ENTRY);
+
+            sb.append("    HTTP Response:\n");
+            sb.append("        ").append(response.getStatusLine());
+            for (Header h : response.getAllHeaders()) {
+                String value = h.getValue() == null ? "" : h.getValue();
+                sb.append("\n        ").append(h.getName()).append(": ").append(value);
+            }
+
+            _log.warn("HTTP-TPC interaction:\n    HTTP Request ({} ago):\n{}",
+                    responseStopwatch.toString(), sb);
+        }
+    }
 
     public RemoteHttpDataTransferProtocol(CellEndpoint cell)
     {
@@ -296,7 +373,31 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
             }
         } finally {
             _client.close();
+
+            if (context.getAttribute(CONTEXT_ATTRIBUTE_LOG_HTTP_REQUESTS) != null) {
+                Optional<IoStatisticsChannel> maybeStatsChannel = _channel.optionallyAs(IoStatisticsChannel.class);
+                maybeStatsChannel.ifPresent(this::logStatistics);
+            }
         }
+    }
+
+    private void logStatistics(IoStatisticsChannel channel)
+    {
+        StringWriter writer = new StringWriter();
+        channel.getStatistics().getInfo(new LineIndentingPrintWriter(writer, "    "));
+        String output = writer.toString();
+        if (!output.isEmpty() && output.charAt(output.length()-1) == '\n') {
+            output = output.substring(0, output.length()-1);
+        }
+        _log.warn("Filesystem IO statistics:\n{}", output);
+    }
+
+    /**
+     * Indicate that additional logging should be enabled for this transfer.
+     */
+    public void enableTransferLogging()
+    {
+        context.setAttribute(CONTEXT_ATTRIBUTE_LOG_HTTP_REQUESTS, Boolean.TRUE);
     }
 
     protected CloseableHttpClient createHttpClient() throws CacheException
@@ -307,6 +408,8 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     protected HttpClientBuilder customise(HttpClientBuilder builder) throws CacheException
     {
         return builder
+                .addInterceptorLast(REQUEST_LOGGER)
+                .addInterceptorFirst(RESPONSE_LOGGER)
                 .setUserAgent(USER_AGENT)
                 .setRequestExecutor(new HttpRequestExecutor((int)EXPECT_100_TIMEOUT.toMillis()))
                 .setRedirectStrategy(DROP_AUTHORIZATION_HEADER);
@@ -319,9 +422,8 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
 
         long deadline = System.currentTimeMillis() + GET_RETRY_DURATION;
 
-        HttpClientContext context = new HttpClientContext();
         try {
-            try (CloseableHttpResponse response = doGet(info, context, deadline)) {
+            try (CloseableHttpResponse response = doGet(info, deadline)) {
                 String rfc3230 = headerValue(response, "Digest");
                 checksums = Checksums.decodeRfc3230(rfc3230);
                 checksums.forEach(_integrityChecker);
@@ -407,7 +509,7 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
     }
 
     private CloseableHttpResponse doGet(final RemoteHttpDataTransferProtocolInfo info,
-            HttpContext context, long deadline) throws IOException,
+            long deadline) throws IOException,
             ThirdPartyTransferFailedCacheException, InterruptedException
     {
         HttpGet get = buildGetRequest(info, deadline);
@@ -476,7 +578,7 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
                 HttpPut put = buildPutRequest(info, location,
                         redirectionCount > 0 ? REDIRECTED_REQUEST : INITIAL_REQUEST);
 
-                try (CloseableHttpResponse response = _client.execute(put)) {
+                try (CloseableHttpResponse response = _client.execute(put, context)) {
                     StatusLine status = response.getStatusLine();
                     switch (status.getStatusCode()) {
                     case 200: /* OK (not actually a valid response from PUT) */
@@ -615,7 +717,6 @@ public class RemoteHttpDataTransferProtocol implements MoverProtocol,
                 }
                 isFirstAttempt = false;
 
-                HttpClientContext context = new HttpClientContext();
                 HttpHead head = buildHeadRequest(info, deadline);
                 buildWantDigest().ifPresent(v -> head.addHeader("Want-Digest", v));
 

@@ -465,6 +465,9 @@
       <property name="namespaceMode" value="${pool.authn.namespace-mode}"/>
       <property name="crlCheckingMode" value="${pool.authn.crl-mode}"/>
       <property name="ocspCheckingMode" value="${pool.authn.ocsp-mode}"/>
+      <property name="debuggedTransferMatcher">
+          <bean class="org.dcache.util.AdminManagedDebuggedTransferMatcher"/>
+      </property>
   </bean>
 
   <bean id="banned-ciphers" class="org.dcache.util.Crypto"

@@ -36,7 +36,7 @@ public class AbstractMoverProtocolTransferServiceTest {
 
         transferService = new AbstractMoverProtocolTransferService() {
             @Override
-            protected MoverProtocol createMoverProtocol(ProtocolInfo info) throws Exception {
+            protected MoverProtocol createMoverProtocol(String localPath, ProtocolInfo info) throws Exception {
                 return null;
             }
         };

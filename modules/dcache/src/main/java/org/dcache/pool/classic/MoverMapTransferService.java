@@ -49,7 +49,7 @@ public class MoverMapTransferService extends AbstractMoverProtocolTransferServic
     }
 
     @Override
-    protected MoverProtocol createMoverProtocol(ProtocolInfo info) throws
+    protected MoverProtocol createMoverProtocol(String localPath, ProtocolInfo info) throws
             NoSuchMethodException, InstantiationException, IllegalAccessException,
             InvocationTargetException, ClassNotFoundException
     {

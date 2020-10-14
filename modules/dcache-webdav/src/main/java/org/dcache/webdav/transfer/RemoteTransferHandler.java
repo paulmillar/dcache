@@ -81,11 +81,13 @@ import org.dcache.namespace.FileAttribute;
 import org.dcache.namespace.FileType;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.Checksums;
+import org.dcache.util.RemoteTransferMatcher;
 import org.dcache.util.URIs;
 import org.dcache.vehicles.FileAttributes;
 import org.dcache.webdav.transfer.CopyFilter.CredentialSource;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.dcache.namespace.FileAttribute.*;
 import static org.dcache.util.ByteUnit.MiB;
@@ -201,6 +203,7 @@ public class RemoteTransferHandler implements CellMessageReceiver
     private long _performanceMarkerPeriod;
     private CellStub _transferManager;
     private PnfsHandler _pnfs;
+    private RemoteTransferMatcher _debuggedTransfers;
 
     @Required
     public void setTransferManagerStub(CellStub stub)
@@ -223,6 +226,12 @@ public class RemoteTransferHandler implements CellMessageReceiver
     public long getPerformanceMarkerPeroid()
     {
         return _performanceMarkerPeriod;
+    }
+
+    @Required
+    public void setDebuggedTransferMatcher(RemoteTransferMatcher matcher)
+    {
+        _debuggedTransfers = requireNonNull(matcher);
     }
 
     /**
@@ -524,19 +533,23 @@ public class RemoteTransferHandler implements CellMessageReceiver
                 return new RemoteHttpDataTransferProtocolInfo("RemoteHttpDataTransfer",
                         1, 1, address, _destination.toASCIIString(),
                         _flags.contains(TransferFlag.REQUIRE_VERIFICATION),
-                        _transferHeaders, desiredChecksum);
+                        _transferHeaders, desiredChecksum,
+                        _debuggedTransfers.matches(_path.toString(), _destination));
 
             case HTTPS:
                 if (_source == CredentialSource.OIDC) {
                     return new RemoteHttpsDataTransferProtocolInfo("RemoteHttpsDataTransfer",
                             1, 1, address, _destination.toASCIIString(),
                             _flags.contains(TransferFlag.REQUIRE_VERIFICATION),
-                            _transferHeaders, desiredChecksum, _oidCredential);
+                            _transferHeaders, desiredChecksum,
+                            _debuggedTransfers.matches(_path.toString(), _destination),
+                            _oidCredential);
                 } else {
                     return new RemoteHttpsDataTransferProtocolInfo("RemoteHttpsDataTransfer",
                             1, 1, address, _destination.toASCIIString(),
                             _flags.contains(TransferFlag.REQUIRE_VERIFICATION),
                             _transferHeaders, _privateKey, _certificateChain,
+                            _debuggedTransfers.matches(_path.toString(), _destination),
                             desiredChecksum);
                 }
             }
@@ -746,4 +759,4 @@ public class RemoteTransferHandler implements CellMessageReceiver
             _out.flush();
         }
     }
-}
+            }

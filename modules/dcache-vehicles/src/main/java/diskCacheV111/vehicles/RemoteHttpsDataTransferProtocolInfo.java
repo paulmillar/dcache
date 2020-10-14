@@ -25,11 +25,13 @@ public class RemoteHttpsDataTransferProtocolInfo extends RemoteHttpDataTransferP
                                                int minor, InetSocketAddress addr, String url,
                                                boolean isVerificationRequired, ImmutableMap<String,String> headers,
                                                X509Credential credential,
-                                               Optional<ChecksumType> desiredChecksum)
+                                               Optional<ChecksumType> desiredChecksum,
+                                               boolean isDebug)
     {
         this(protocol, major, minor, addr, url, isVerificationRequired,
                 headers, credential == null ? null : credential.getKey(),
                 credential == null ? null : credential.getCertificateChain(),
+                isDebug,
                 desiredChecksum);
     }
 
@@ -37,9 +39,10 @@ public class RemoteHttpsDataTransferProtocolInfo extends RemoteHttpDataTransferP
             int minor, InetSocketAddress addr, String url,
             boolean isVerificationRequired, ImmutableMap<String,String> headers,
             PrivateKey privateKey, X509Certificate[] certificateChain,
+            boolean isDebug,
             Optional<ChecksumType> desiredChecksum)
     {
-        super(protocol, major, minor, addr, url, isVerificationRequired, headers, desiredChecksum);
+        super(protocol, major, minor, addr, url, isVerificationRequired, headers, desiredChecksum, isDebug);
         key = privateKey;
         certChain = certificateChain;
     }
@@ -48,9 +51,10 @@ public class RemoteHttpsDataTransferProtocolInfo extends RemoteHttpDataTransferP
                                                int minor, InetSocketAddress addr, String url,
                                                boolean isVerificationRequired, ImmutableMap<String,String> headers,
                                                Optional<ChecksumType> desiredChecksum,
+                                               boolean isDebug,
                                                OpenIdCredential token)
     {
-        super(protocol, major, minor, addr, url, isVerificationRequired, headers, desiredChecksum, token);
+        super(protocol, major, minor, addr, url, isVerificationRequired, headers, desiredChecksum, isDebug, token);
         key = null;
         certChain = null;
     }

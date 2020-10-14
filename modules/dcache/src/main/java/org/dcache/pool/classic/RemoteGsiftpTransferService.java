@@ -56,7 +56,7 @@ public class RemoteGsiftpTransferService extends SecureRemoteTransferService
     }
 
     @Override
-    protected MoverProtocol createMoverProtocol(ProtocolInfo info) throws Exception
+    protected MoverProtocol createMoverProtocol(String localPath, ProtocolInfo info) throws Exception
     {
         MoverProtocol moverProtocol;
         if (info instanceof RemoteGsiftpTransferProtocolInfo) {

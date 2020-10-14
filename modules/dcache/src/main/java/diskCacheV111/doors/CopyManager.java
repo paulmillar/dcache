@@ -436,7 +436,8 @@ public class CopyManager extends AbstractCellComponent
                     urlRemote,
                     false,
                     ImmutableMap.of(),
-                    Optional.empty());
+                    Optional.empty(),
+                    false);
 
         }
 

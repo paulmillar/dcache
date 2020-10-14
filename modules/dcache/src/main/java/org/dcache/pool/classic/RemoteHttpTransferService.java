@@ -17,13 +17,17 @@
  */
 package org.dcache.pool.classic;
 
+import org.dcache.util.RemoteTransferMatcher;
+
 import eu.emi.security.authn.x509.OCSPParametes;
 import eu.emi.security.authn.x509.ProxySupport;
 import eu.emi.security.authn.x509.RevocationParameters;
 import eu.emi.security.authn.x509.X509CertChainValidator;
 import eu.emi.security.authn.x509.impl.OpensslCertChainValidator;
 import eu.emi.security.authn.x509.impl.ValidatorParams;
+import org.springframework.beans.factory.annotation.Required;
 
+import java.net.URI;
 import java.io.IOException;
 
 import diskCacheV111.util.CacheException;
@@ -35,24 +39,47 @@ import org.dcache.pool.movers.MoverProtocol;
 import org.dcache.pool.movers.RemoteHttpDataTransferProtocol;
 import org.dcache.pool.movers.RemoteHttpsDataTransferProtocol;
 
+import static java.util.Objects.requireNonNull;
 import static org.dcache.util.Files.checkDirectory;
 
 public class RemoteHttpTransferService extends SecureRemoteTransferService
+
 {
     private OpensslCertChainValidator validator;
+    private RemoteTransferMatcher debuggedTransfers;
+
+    @Required
+    public void setDebuggedTransferMatcher(RemoteTransferMatcher matcher)
+    {
+        debuggedTransfers = requireNonNull(matcher);
+    }
 
     @Override
-    protected MoverProtocol createMoverProtocol(ProtocolInfo info) throws Exception
+    protected MoverProtocol createMoverProtocol(String localPath, ProtocolInfo rawInfo) throws Exception
     {
-        MoverProtocol moverProtocol;
-        if (info instanceof RemoteHttpsDataTransferProtocolInfo) {
+        RemoteHttpDataTransferProtocol moverProtocol;
+
+        URI uri;
+        boolean isDebugged;
+        if (rawInfo instanceof RemoteHttpsDataTransferProtocolInfo) {
+            RemoteHttpsDataTransferProtocolInfo info = (RemoteHttpsDataTransferProtocolInfo)rawInfo;
+            uri = info.getUri();
+            isDebugged = info.isDebugged();
             moverProtocol = new RemoteHttpsDataTransferProtocol(getCellEndpoint(), getValidator(), secureRandom);
-        } else if (info instanceof RemoteHttpDataTransferProtocolInfo) {
+        } else if (rawInfo instanceof RemoteHttpDataTransferProtocolInfo) {
+            RemoteHttpsDataTransferProtocolInfo info = (RemoteHttpsDataTransferProtocolInfo)rawInfo;
+            uri = info.getUri();
+            isDebugged = info.isDebugged();
             moverProtocol = new RemoteHttpDataTransferProtocol(getCellEndpoint());
         } else {
             throw new CacheException(CacheException.CANNOT_CREATE_MOVER,
-                    "Could not create third-party HTTP mover for " + info);
+                    "Could not create third-party HTTP mover for " + rawInfo);
         }
+
+        if (isDebugged || debuggedTransfers.matches(localPath, uri)) {
+            moverProtocol.enableTransferLogging();
+        }
+
         return moverProtocol;
     }
 

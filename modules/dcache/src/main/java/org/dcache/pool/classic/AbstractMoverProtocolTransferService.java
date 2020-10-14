@@ -76,7 +76,7 @@ public abstract class AbstractMoverProtocolTransferService
     {
         ProtocolInfo info = message.getProtocolInfo();
         try {
-            MoverProtocol moverProtocol = createMoverProtocol(info);
+            MoverProtocol moverProtocol = createMoverProtocol(message.getTransferPath(), info);
             return new MoverProtocolMover(handle, message, pathToDoor, this, moverProtocol);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getTargetException();
@@ -99,7 +99,7 @@ public abstract class AbstractMoverProtocolTransferService
         }
     }
 
-    protected abstract MoverProtocol createMoverProtocol(ProtocolInfo info) throws Exception;
+    protected abstract MoverProtocol createMoverProtocol(String localPath, ProtocolInfo info) throws Exception;
 
     @Override
     public Cancellable executeMover(MoverProtocolMover mover, CompletionHandler<Void, Void> completionHandler)

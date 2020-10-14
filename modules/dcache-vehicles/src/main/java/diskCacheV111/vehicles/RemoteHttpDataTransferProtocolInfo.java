@@ -27,21 +27,25 @@ public class RemoteHttpDataTransferProtocolInfo implements IpProtocolInfo
     private final ImmutableMap<String,String> headers;
     private final OpenIdCredential openIdCredential;
     private final ChecksumType desiredChecksum;
+    private final boolean isDebugged;
 
     private static final long serialVersionUID = 4482469147378465931L;
 
     public RemoteHttpDataTransferProtocolInfo(String protocol, int major,
                                               int minor, InetSocketAddress addr, String url,
                                               boolean isVerificationRequired, ImmutableMap<String,String> headers,
-                                              Optional<ChecksumType> desiredChecksum)
+                                              Optional<ChecksumType> desiredChecksum,
+                                              boolean isDebugged)
     {
-        this(protocol, minor, major, addr, url, isVerificationRequired, headers, desiredChecksum, null);
+        this(protocol, minor, major, addr, url, isVerificationRequired, headers,
+                desiredChecksum, isDebugged, null);
     }
 
     public RemoteHttpDataTransferProtocolInfo(String protocol, int major,
                                               int minor, InetSocketAddress addr, String url,
                                               boolean isVerificationRequired, ImmutableMap<String,String> headers,
                                               Optional<ChecksumType> desiredChecksum,
+                                              boolean isDebugged,
                                               OpenIdCredential openIdCredential)
     {
         this.name  = protocol ;
@@ -53,6 +57,7 @@ public class RemoteHttpDataTransferProtocolInfo implements IpProtocolInfo
         this.headers = requireNonNull(headers);
         this.openIdCredential = openIdCredential;
         this.desiredChecksum = desiredChecksum.orElse(null);
+        this.isDebugged = isDebugged;
     }
 
     public URI getUri()
@@ -119,5 +124,10 @@ public class RemoteHttpDataTransferProtocolInfo implements IpProtocolInfo
     public Optional<ChecksumType> getDesiredChecksum()
     {
         return Optional.ofNullable(desiredChecksum);
+    }
+
+    public boolean isDebugged()
+    {
+        return isDebugged;
     }
 }
