@@ -4,6 +4,8 @@ import org.slf4j.MDC;
 
 import org.dcache.util.NDC;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * The Cell Diagnostic Context, a utility class for working with the
  * Log4j NDC and MDC.
@@ -43,11 +45,13 @@ public class CDC implements AutoCloseable
     public static final String MDC_DOMAIN = "cells.domain";
     public static final String MDC_CELL = "cells.cell";
     public static final String MDC_SESSION = "cells.session";
+    private static final String MDC_INSPECT = "cells.inspect";
 
     private final NDC _ndc;
     private final String _session;
     private final String _cell;
     private final String _domain;
+    private final String _inspect;
 
     /**
      * Captures the cells diagnostic context of the calling thread.
@@ -57,6 +61,7 @@ public class CDC implements AutoCloseable
         _session = MDC.get(MDC_SESSION);
         _cell = MDC.get(MDC_CELL);
         _domain = MDC.get(MDC_DOMAIN);
+        _inspect = MDC.get(MDC_INSPECT);
         _ndc = NDC.cloneNdc();
     }
 
@@ -79,6 +84,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_DOMAIN, _domain);
         setMdc(MDC_CELL, _cell);
         setMdc(MDC_SESSION, _session);
+        setMdc(MDC_INSPECT, _inspect);
         if (_ndc == null) {
             NDC.clear();
         } else {
@@ -111,6 +117,7 @@ public class CDC implements AutoCloseable
         String session = MDC.get(MDC_SESSION);
         String cell = MDC.get(MDC_CELL);
         String domain = MDC.get(MDC_DOMAIN);
+        String inspect = MDC.get(MDC_INSPECT);
         NDC ndc = NDC.cloneNdc();
         try {
             apply();
@@ -119,6 +126,7 @@ public class CDC implements AutoCloseable
             setMdc(MDC_DOMAIN, domain);
             setMdc(MDC_CELL, cell);
             setMdc(MDC_SESSION, session);
+            setMdc(MDC_INSPECT, inspect);
             NDC.set(ndc);
         }
     }
@@ -158,6 +166,26 @@ public class CDC implements AutoCloseable
     public static void setSession(String session)
     {
         setMdc(MDC_SESSION, session);
+    }
+
+    public static boolean isInspectEnabled()
+    {
+        return MDC.get(MDC_INSPECT) != null;
+    }
+
+    public static String getInspectReason()
+    {
+        return MDC.get(MDC_INSPECT);
+    }
+
+    public static void inspect(String reason)
+    {
+        requireNonNull(reason);
+        String existingReason = MDC.get(MDC_INSPECT);
+        if (existingReason != null) {
+            reason = existingReason + "; " + reason;
+        }
+        setMdc(MDC_INSPECT, reason);
     }
 
     /**
@@ -200,6 +228,7 @@ public class CDC implements AutoCloseable
         setMdc(MDC_CELL, cellName);
         setMdc(MDC_DOMAIN, domainName);
         MDC.remove(MDC_SESSION);
+        MDC.remove(MDC_INSPECT);
         NDC.clear();
         return cdc;
     }
@@ -264,6 +293,7 @@ public class CDC implements AutoCloseable
         MDC.remove(MDC_DOMAIN);
         MDC.remove(MDC_CELL);
         MDC.remove(MDC_SESSION);
+        MDC.remove(MDC_INSPECT);
         NDC.clear();
     }
 }
