@@ -276,6 +276,7 @@ public abstract class Mode extends AbstractMultiplexerListener implements Descri
                 }
                 _buffer.flip();
                 int nw = _file.write(_buffer, pos);
+                Thread.sleep(100);
                 tw += nw;
                 if (nw != nr) {
                     break;
@@ -284,6 +285,8 @@ public abstract class Mode extends AbstractMultiplexerListener implements Descri
                 _buffer.clear();
             }
             return tw;
+        } catch (InterruptedException e) {
+            throw new InterruptedIOException("Interrupted");
         } catch (IOException x) {
             if (tw > 0) {
                 return tw;
