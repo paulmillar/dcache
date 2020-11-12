@@ -42,6 +42,8 @@ import org.dcache.pool.movers.MoverChannelMover;
 import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.vehicles.FileAttributes;
 
+import static org.dcache.util.Describables.inspectionOf;
+
 public class NfsMover extends MoverChannelMover<NFS4ProtocolInfo, NfsMover> {
 
     private static final Logger _log = LoggerFactory.getLogger(NfsTransferService.class);
@@ -103,6 +105,7 @@ public class NfsMover extends MoverChannelMover<NFS4ProtocolInfo, NfsMover> {
     void disable(Throwable error) {
         _nfsIO.remove(NfsMover.this);
         detachSession();
+        inspectionOf(getMoverChannel()).ifPresent(_log::warn);
         try {
             getMoverChannel().close();
         } catch (IOException e) {

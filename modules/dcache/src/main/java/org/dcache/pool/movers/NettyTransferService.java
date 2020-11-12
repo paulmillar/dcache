@@ -40,6 +40,7 @@ import org.springframework.context.SmartLifecycle;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -75,11 +76,13 @@ import org.dcache.util.ChannelCdcSessionHandlerWrapper;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
 import org.dcache.util.FireAndForgetTask;
+import org.dcache.util.Describables;
 import org.dcache.util.NettyPortRange;
 import org.dcache.util.TryCatchTemplate;
 import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Preconditions.checkState;
+import static org.dcache.util.Describables.inspectionOf;
 
 /**
  * Abstract base class for Netty based transfer services. This class provides
@@ -427,6 +430,16 @@ public abstract class NettyTransferService<P extends ProtocolInfo>
                 conditionallyStartServer();
                 setCancellable(channel);
                 sendAddressToDoor(mover, getServerAddress().getPort());
+            }
+
+            @Override
+            protected <C extends Closeable> C autoclose(C closeable)
+            {
+                super.autoclose(() -> {
+                            inspectionOf(mover, closeable).ifPresent(LOGGER::warn);
+                            closeable.close();
+                        });
+                return closeable;
             }
 
             @Override

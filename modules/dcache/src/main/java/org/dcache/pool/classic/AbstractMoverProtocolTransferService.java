@@ -48,8 +48,11 @@ import org.dcache.pool.movers.MoverProtocol;
 import org.dcache.pool.movers.MoverProtocolMover;
 import org.dcache.pool.repository.ReplicaDescriptor;
 import org.dcache.pool.repository.RepositoryChannel;
+import org.dcache.pool.statistics.IoStatisticsChannel;
 import org.dcache.util.CDCExecutorServiceDecorator;
 import org.dcache.util.Exceptions;
+
+import static org.dcache.util.Describables.inspectionOf;
 
 public abstract class AbstractMoverProtocolTransferService
         extends AbstractCellComponent
@@ -150,6 +153,7 @@ public abstract class AbstractMoverProtocolTransferService
                     throw  (InterruptedException)(new InterruptedException(e.getMessage()).initCause(e));
                 } finally {
                     cleanThread();
+                    inspectionOf(_mover.getMover(), fileIoChannel).ifPresent(LOGGER::warn);
                     fileIoChannel.close();
                 }
 
