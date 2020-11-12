@@ -32,6 +32,7 @@ import diskCacheV111.vehicles.GFtpProtocolInfo;
 import diskCacheV111.vehicles.GFtpTransferStartedMessage;
 import diskCacheV111.vehicles.ProtocolInfo;
 
+import dmg.cells.nucleus.CDC;
 import dmg.cells.nucleus.CellArgsAware;
 import dmg.cells.nucleus.CellEndpoint;
 import dmg.cells.nucleus.CellMessage;
@@ -500,6 +501,7 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
             throw e;
         } finally {
             if (_logAbortedTransfer && (!_blockLog.isComplete() || !mode.hasCompletedSuccessfully() || _bytesTransferred < mode.getSize())) {
+                CDC.inspect("Incomplete transfer");
                 StringWriter sw = new StringWriter();
                 PrintWriter pw = new LineIndentingPrintWriter(sw, "    ");
                 error.ifPresent(msg -> pw.println("Cause: " + msg));
