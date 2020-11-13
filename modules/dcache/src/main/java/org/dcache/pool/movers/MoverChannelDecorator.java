@@ -28,6 +28,7 @@ import diskCacheV111.vehicles.ProtocolInfo;
 
 import org.dcache.pool.repository.RepositoryChannel;
 import org.dcache.vehicles.FileAttributes;
+import org.dcache.util.DescriptionReceiver;
 
 public class MoverChannelDecorator<T extends ProtocolInfo> implements RepositoryChannel
 {
@@ -153,5 +154,11 @@ public class MoverChannelDecorator<T extends ProtocolInfo> implements Repository
     public long read(ByteBuffer[] dsts, int offset, int length) throws IOException
     {
         return channel.read(dsts, offset, length);
+    }
+
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
+    {
+        channel.describeTo(receiver);
     }
 }

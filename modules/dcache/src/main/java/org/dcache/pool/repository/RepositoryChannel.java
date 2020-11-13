@@ -11,8 +11,11 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Optional;
 
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
+
 public interface RepositoryChannel
-    extends GatheringByteChannel, ScatteringByteChannel, SeekableByteChannel
+    extends GatheringByteChannel, ScatteringByteChannel, SeekableByteChannel, Describable
 {
     /**
      * Writes a sequence of bytes to this channel from the given buffer, starting at the given file position.
@@ -199,5 +202,10 @@ public interface RepositoryChannel
     {
         T asType = type.isAssignableFrom(getClass()) ? type.cast(this) : null;
         return Optional.ofNullable(asType);
+    }
+
+    default void describeTo(DescriptionReceiver pw)
+    {
+        // By default, there's nothing to report.
     }
 }

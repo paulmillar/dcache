@@ -17,19 +17,20 @@
  */
 package org.dcache.pool.statistics;
 
-import java.io.PrintWriter;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
-import static org.dcache.util.TimeUtils.describe;
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 
+import static org.dcache.util.TimeUtils.describe;
 
 /**
  * An immutable snapshot of statistics describing the channel usage in a
  * particular direction: either read- or write operations.
  */
-public class DirectedIoStatistics
+public class DirectedIoStatistics implements Describable
 {
     private final SnapshotStatistics _statistics;
     private final Duration _idle;
@@ -120,14 +121,15 @@ public class DirectedIoStatistics
        return _postActivityWait;
     }
 
-    public void getInfo(PrintWriter pw)
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
     {
-        pw.println("Pre-activity wait: " + describe(_preActivityWait).orElse("none"));
-        pw.println("First request: " + org.dcache.util.Strings.describe(Optional.ofNullable(_firstAccess)));
-        pw.println("Latest request: " + org.dcache.util.Strings.describe(Optional.ofNullable(_latestAccess)));
-        pw.println("Active: " + describe(_active).orElse("never active"));
-        pw.println("Idle: " + describe(_idle).orElse("never idle"));
-        pw.println("Post-activity wait: " + describe(_postActivityWait).orElse("none"));
-        _statistics.getInfo(pw);
+        receiver.accept("Pre-activity wait", _preActivityWait);
+        receiver.optionallyAccept("First request", _firstAccess, Instant.class);
+        receiver.optionallyAccept("Latest request", _latestAccess, Instant.class);
+        receiver.accept("Time active", _active);
+        receiver.accept("Time idle", _idle);
+        receiver.accept("Post-activity wait", _postActivityWait);
+        _statistics.describeTo(receiver);
     }
 }

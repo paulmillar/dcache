@@ -17,18 +17,17 @@
  */
 package org.dcache.pool.statistics;
 
-import java.io.PrintWriter;
-
-import org.dcache.util.LineIndentingPrintWriter;
-
 import static org.dcache.util.Strings.toThreeSigFig;
+
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 
 /**
  * An immutable snapshot of statistics describing the channel usage since it
  * was created.  Statistics of both read and write activity are provided;
  * although, in many cases, a channel is exclusively used in one direction.
  */
-public class IoStatistics
+public class IoStatistics implements Describable
 {
     private final DirectedIoStatistics reads;
     private final DirectedIoStatistics writes;
@@ -70,35 +69,30 @@ public class IoStatistics
         }
     }
 
-    private static String percent(long n, long total)
-    {
-        return toThreeSigFig(100 * n / (double)total, 1000) + "%";
-    }
-
-    public void getInfo(PrintWriter pw)
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
     {
         long readCount = reads.statistics().requestedBytes().getN();
         long writeCount = writes.statistics().requestedBytes().getN();
 
         if (hasReads() && hasWrites()) {
             long totalCount = readCount + writeCount;
-            PrintWriter indented = new LineIndentingPrintWriter(pw, "    ");
 
-            pw.println("Request ratio: " + ratioDescription(readCount, writeCount));
+            receiver.accept("Request ratio", ratioDescription(readCount, writeCount));
 
-            pw.println("Read statistics:");
-            indented.println("Requests: " + readCount + " (" + percent(readCount, totalCount) + " of all requests)");
-            reads.getInfo(indented);
+            DescriptionReceiver readReceiver = receiver.acceptComplex("Read statistics");
+            readReceiver.accept("Request", readCount, totalCount, "all requests");
+            reads.describeTo(readReceiver);
 
-            pw.println("Write statistics:");
-            indented.println("Requests: " + writeCount + " (" + percent(writeCount, totalCount) + " of all requests)");
-            writes.getInfo(indented);
+            DescriptionReceiver writeReceiver = receiver.acceptComplex("Write statistics");
+            writeReceiver.accept("Requests", writeCount, totalCount, "all requests");
+            writes.describeTo(writeReceiver);
         } else if (hasReads()) {
-            pw.println("Requests: " + readCount);
-            reads.getInfo(pw);
+            receiver.accept("Requests", readCount);
+            reads.describeTo(receiver);
         } else if (hasWrites()) {
-            pw.println("Requests: " + writeCount);
-            writes.getInfo(pw);
+            receiver.accept("Requests", writeCount);
+            writes.describeTo(receiver);
         }
     }
 }

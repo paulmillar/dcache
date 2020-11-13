@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import org.dcache.util.LineIndentingPrintWriter;
+import org.dcache.util.DescriptionReceiver;
 
 /**
  * This class decorates any RepositoryChannel and updates statistics for
@@ -378,19 +379,22 @@ public class IoStatisticsChannel extends ForwardingRepositoryChannel {
         channel.close();
     }
 
-    public void getInfo(PrintWriter pw)
+    @Override
+    protected void doDescriptionTo(DescriptionReceiver receiver)
     {
         IoStatistics stats = getStatistics();
 
+        DescriptionReceiver statsReceiver;
         if (stats.hasReads() && stats.hasWrites()) {
-            pw.println("Disk IO statistics:");
-            stats.getInfo(new LineIndentingPrintWriter(pw, "    "));
+            statsReceiver = receiver.acceptComplex("Disk IO statistics");
         } else if (stats.hasReads()) {
-            pw.println("Disk IO read statistics:");
-            stats.getInfo(new LineIndentingPrintWriter(pw, "    "));
+            statsReceiver = receiver.acceptComplex("Disk IO read statistics");
         } else if (stats.hasWrites()) {
-            pw.println("Disk IO write statistics:");
-            stats.getInfo(new LineIndentingPrintWriter(pw, "    "));
+            statsReceiver = receiver.acceptComplex("Disk IO write statistics");
+        } else {
+            return;
         }
+
+        stats.describeTo(statsReceiver);
     }
 }

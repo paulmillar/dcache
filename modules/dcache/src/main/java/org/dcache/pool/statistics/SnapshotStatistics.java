@@ -20,20 +20,17 @@ package org.dcache.pool.statistics;
 import org.apache.commons.math3.stat.descriptive.StatisticalSummary;
 import org.apache.commons.math3.stat.descriptive.StatisticalSummaryValues;
 
-import java.io.PrintWriter;
-
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
-import static org.dcache.util.Strings.describeBandwidth;
-import static org.dcache.util.Strings.describeInteger;
-import static org.dcache.util.Strings.describeSize;
-import static org.dcache.util.TimeUtils.describeDuration;
+
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 
 /**
  * Provides a snapshot of the information maintained within LiveStatistics.
  * This class makes use of Apache Commons Math StatisticalSummary class to hold
  * statistics on certain metrics.
  */
-public class SnapshotStatistics
+public class SnapshotStatistics implements Describable
 {
     private static final StatisticalSummary NO_RESULTS = new StatisticalSummaryValues(
             Double.NaN, Double.NaN, 0L, Double.NaN, Double.NaN, Double.NaN);
@@ -113,22 +110,23 @@ public class SnapshotStatistics
         return _duration;
     }
 
-    public void getInfo(PrintWriter pw)
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
     {
         if (_instantaneousBandwidth.getN() > 0) {
-            pw.println("Instantaneous bandwidth: " + describeBandwidth(_instantaneousBandwidth));
+            receiver.acceptBandwidth("Instantaneous bandwidth", _instantaneousBandwidth);
         }
         if (_duration.getN() > 0) {
-            pw.println("IO wait time: " + describeDuration(_duration, NANOSECONDS));
+            receiver.acceptDuration("IO wait time", _instantaneousBandwidth, NANOSECONDS);
         }
         if (_requestedBytes.getN() > 0) {
-            pw.println("IO requested size: " + describeSize(_requestedBytes));
+            receiver.acceptSize("IO requested size", _requestedBytes);
         }
         if (_transferredBytes.getN() > 0) {
-            pw.println("IO transferred size: " + describeSize(_transferredBytes));
+            receiver.acceptSize("IO transferred size", _transferredBytes);
         }
         if (_concurrency.getN() > 0) {
-            pw.println("Concurrency: " + describeInteger(_concurrency));
+            receiver.acceptInteger("Concurrency", _concurrency);
         }
     }
 }

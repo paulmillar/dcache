@@ -18,12 +18,15 @@
 package org.dcache.pool.repository;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.SyncFailedException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Optional;
+
+import org.dcache.util.DescriptionReceiver;
 
 /**
  * A {@link RepositoryChannel| implementation which forwards all its
@@ -134,5 +137,18 @@ public abstract class ForwardingRepositoryChannel implements RepositoryChannel {
         } else {
             return delegate().optionallyAs(type);
         }
+    }
+
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
+    {
+        doDescriptionTo(receiver);
+        delegate().describeTo(receiver);
+    }
+
+    /** Provide possibility for subclass to describe its current status. */
+    protected void doDescriptionTo(DescriptionReceiver receiver)
+    {
+        // by default, add nothing.
     }
 }
