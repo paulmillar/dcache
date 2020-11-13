@@ -33,7 +33,9 @@ import dmg.util.command.Option;
 import org.dcache.pool.FaultEvent;
 import org.dcache.pool.FaultListener;
 import org.dcache.pool.classic.MoverRequestScheduler.Order;
+import org.dcache.util.DescriptionBuilder;
 import org.dcache.util.IoPriority;
+import org.dcache.util.LogOutputDescriptionBuilder;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static dmg.util.CommandException.checkCommand;
@@ -397,6 +399,24 @@ public class IoQueueManager
                 queue.setTotal(total * 1000L);
             }
             return "";
+        }
+    }
+
+    @Command(name = "mover info", hint = "detailed information about a mover",
+            description = "Provide detailed information about a specific mover.")
+    public class MoverInfoCommand implements Callable<Serializable>
+    {
+        @Argument(usage = "The job id to show information about.")
+        int id;
+
+        @Override
+        public Serializable call() throws CommandException
+        {
+            MoverRequestScheduler scheduler = getQueueByJobId(id)
+                    .orElseThrow(() -> new CommandException("Id doesn't belong to any known scheduler."));
+            LogOutputDescriptionBuilder builder = new LogOutputDescriptionBuilder("job " + id);
+            scheduler.describeJob(id, builder);
+            return builder.build().orElseThrow(() -> new CommandException("No such job " + id));
         }
     }
 

@@ -24,6 +24,9 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import dmg.cells.nucleus.CDC;
 
 import diskCacheV111.util.CacheException;
@@ -36,8 +39,11 @@ import org.dcache.pool.FaultAction;
 import org.dcache.pool.FaultEvent;
 import org.dcache.pool.FaultListener;
 import org.dcache.pool.movers.Mover;
+import org.dcache.pool.movers.Movers;
 import org.dcache.pool.movers.json.MoverData;
 import org.dcache.util.AdjustableSemaphore;
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 import org.dcache.util.IoPrioritizable;
 import org.dcache.util.IoPriority;
 
@@ -327,6 +333,14 @@ public class MoverRequestScheduler
     {
         PrioritizedRequest request = _jobs.get(id);
         return request == null ? Optional.empty() : Optional.of(request.toJobInfo());
+    }
+
+    public void describeJob(int id, DescriptionReceiver receiver) throws NoSuchElementException
+    {
+        PrioritizedRequest request = _jobs.get(id);
+        if (request != null) {
+            request.describeTo(receiver);
+        }
     }
 
     /**
@@ -634,7 +648,7 @@ public class MoverRequestScheduler
         return _total != DEFAULT_TOTAL;
     }
 
-    static class PrioritizedRequest implements IoPrioritizable, Comparable<PrioritizedRequest>
+    static class PrioritizedRequest implements IoPrioritizable, Comparable<PrioritizedRequest>, Describable
     {
         private final Mover<?> _mover;
         private final IoPriority _priority;
@@ -806,6 +820,23 @@ public class MoverRequestScheduler
         public synchronized void done()
         {
             _state = DONE;
+        }
+
+        @Override
+        public void describeTo(DescriptionReceiver receiver)
+        {
+            receiver.accept("ID", _id);
+            receiver.accept("Priority", _priority);
+            receiver.accept("State", _state);
+            receiver.accept("Submitted", Instant.ofEpochMilli(_submitTime));
+            if (_startTime != 0) {
+                receiver.accept("Started", Instant.ofEpochMilli(_startTime));
+            }
+            if (_mover instanceof Describable) {
+                ((Describable)_mover).describeTo(receiver);
+            } else {
+                Movers.describeMover(receiver, _mover);
+            }
         }
     }
 }

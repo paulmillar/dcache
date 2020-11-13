@@ -24,11 +24,14 @@ import dmg.cells.nucleus.CellPath;
 
 import org.dcache.pool.classic.TransferService;
 import org.dcache.pool.repository.ReplicaDescriptor;
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 
 /**
  * A Mover implementation based on the MoverProtocol interface.
  */
 public class MoverProtocolMover extends AbstractMover<ProtocolInfo, MoverProtocolMover>
+        implements Describable
 {
     /**
      * mover implementation suitable for this transfer
@@ -70,5 +73,15 @@ public class MoverProtocolMover extends AbstractMover<ProtocolInfo, MoverProtoco
     protected String getStatus()
     {
         return _moverProtocol.toString();
+    }
+
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
+    {
+        if (_moverProtocol instanceof Describable) {
+            ((Describable)_moverProtocol).describeTo(receiver);
+        } else {
+            Movers.describeMover(receiver, this);
+        }
     }
 }
