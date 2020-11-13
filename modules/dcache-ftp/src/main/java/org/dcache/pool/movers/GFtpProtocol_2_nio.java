@@ -1,12 +1,11 @@
 package org.dcache.pool.movers;
 
+
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.BindException;
 import java.net.ConnectException;
 import java.net.InetAddress;
@@ -17,9 +16,9 @@ import java.net.ProtocolFamily;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.file.FileSystems;
 import java.nio.file.OpenOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.FileSystems;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Optional;
@@ -49,30 +48,29 @@ import org.dcache.ftp.data.ModeX;
 import org.dcache.ftp.data.Multiplexer;
 import org.dcache.ftp.data.Role;
 import org.dcache.namespace.FileAttribute;
-import org.dcache.pool.repository.FileStore;
 import org.dcache.pool.repository.FileRepositoryChannel;
+import org.dcache.pool.repository.FileStore;
 import org.dcache.pool.repository.OutOfDiskException;
 import org.dcache.pool.repository.RepositoryChannel;
-import org.dcache.pool.statistics.IoStatisticsChannel;
 import org.dcache.util.Args;
 import org.dcache.util.Checksum;
 import org.dcache.util.ChecksumType;
-import org.dcache.util.LineIndentingPrintWriter;
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
 import org.dcache.util.NetworkUtils;
 import org.dcache.util.PortRange;
-import org.dcache.util.TimeUtils;
 import org.dcache.vehicles.FileAttributes;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static org.dcache.util.ByteUnit.*;
-import static org.dcache.util.Strings.*;
+import static org.dcache.util.Strings.describe;
 
 /**
  * FTP mover. Supports both mover protocols GFtp/1 and GFtp/2.
  */
 public class GFtpProtocol_2_nio implements ConnectionMonitor,
-        MoverProtocol, ChecksumMover, CellArgsAware
+        MoverProtocol, ChecksumMover, CellArgsAware, Describable
 {
     private static final Logger _log =
             LoggerFactory.getLogger(GFtpProtocol_2_nio.class);
@@ -181,6 +179,8 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
     protected boolean      _inProgress;
 
     private Mode _mode;
+
+    private Optional<String> _error = Optional.empty();
 
     public GFtpProtocol_2_nio(CellEndpoint cell)
     {
@@ -493,22 +493,15 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
             }
         }
 
-        Optional<String> error = Optional.empty();
+
         try {
             transfer(fileChannel, role, mode);
         } catch (Exception e) {
-            error = Optional.of(Exceptions.getMessageWithCauses(e));
+            _error = Optional.of(Exceptions.getMessageWithCauses(e));
             throw e;
         } finally {
             if (_logAbortedTransfer && (!_blockLog.isComplete() || !mode.hasCompletedSuccessfully() || _bytesTransferred < mode.getSize())) {
                 CDC.inspect("Incomplete transfer");
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new LineIndentingPrintWriter(sw, "    ");
-                error.ifPresent(msg -> pw.println("Cause: " + msg));
-                getInfo(pw);
-                String info = sw.toString();
-                _log.warn("Incomplete transfer; details follow:\n{}",
-                        info.substring(0, info.length()-1)); // Strip final '\n'
             }
 
             /* Log some useful information about the transfer. This
@@ -523,35 +516,33 @@ public class GFtpProtocol_2_nio implements ConnectionMonitor,
         }
     }
 
-    public void getInfo(PrintWriter pw)
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
     {
-        pw.println("Direction: " + (_role == Role.Receiver ? "UPLOAD" : "DOWNLOAD"));
-        pw.println("Mode: " + _mode.name());
-        _mode.getInfo(new LineIndentingPrintWriter(pw, "    "));
+        _error.ifPresent(msg -> receiver.accept("Cause", msg));
+        receiver.accept("Direction", _role == Role.Receiver ? "UPLOAD" : "DOWNLOAD");
+        _mode.describeTo(receiver.acceptComplex("Mode"));
         if (_role == Role.Sender) {
             try {
                 long fileSize = _fileChannel.size();
-                pw.println("File size: " + describeSize(fileSize));
-                String percent = toThreeSigFig(100 * _bytesTransferred / (double)fileSize, 1000);
-                pw.println("Transferred: " + describeSize(_bytesTransferred) + " (" + percent + "% of file)");
+                receiver.acceptSize("File size", fileSize);
+                receiver.acceptSize("Transferred", _bytesTransferred, fileSize, "file");
             } catch (IOException e) {
-                pw.println("Transferred: " + describeSize(_bytesTransferred));
+                receiver.acceptSize("Transferred", _bytesTransferred);
             }
         } else {
-            pw.println("Transferred: " + describeSize(_bytesTransferred));
+            receiver.acceptSize("Transferred", _bytesTransferred);
         }
         Optional<Instant> started = _transferStarted == 0
                 ? Optional.empty()
                 : Optional.of(Instant.ofEpochMilli(_transferStarted));
-        pw.println("Mover started: " + describe(started));
+        receiver.optionallyAccept("Mover started", started, Instant.class);
         Optional<Instant> lastTransferred = _lastTransferred == _transferStarted
                 ? Optional.empty()
                 : Optional.of(Instant.ofEpochMilli(_lastTransferred));
-        pw.println("Last " + (_role == Role.Receiver ? "received" : "sent")
-                + " data: " + describe(lastTransferred));
-        _fileChannel.optionallyAs(IoStatisticsChannel.class)
-                .ifPresent(c -> c.getInfo(pw));
-        _blockLog.getInfo(pw);
+        receiver.optionallyAccept("Last " + (_role == Role.Receiver ? "received" : "sent")
+                + " data", lastTransferred, Instant.class);
+        _blockLog.describeTo(receiver);
     }
 
     /** Part of the MoverProtocol interface. */

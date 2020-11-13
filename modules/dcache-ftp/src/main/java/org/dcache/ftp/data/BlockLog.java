@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
 
 import static org.dcache.util.Strings.humanReadableSize;
 
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
+
 /**
  * A log of transferred blocks. Adjacent blocks are merged, so for a
  * sequential transfer only information about a single block will be
@@ -19,7 +22,7 @@ import static org.dcache.util.Strings.humanReadableSize;
  *
  * The class is thread safe.
  */
-public class BlockLog
+public class BlockLog implements Describable
 {
     private final SortedMap<Long,Long> _blocks = new TreeMap<>();
     private boolean _eof;
@@ -214,13 +217,14 @@ public class BlockLog
         }
     }
 
-    public synchronized void getInfo(PrintWriter pw)
+    @Override
+    public synchronized void describeTo(DescriptionReceiver receiver)
     {
         if (!_blocks.isEmpty()) {
-            pw.println("Transferred blocks: " + _blocks.entrySet().stream()
+            receiver.accept("Transferred blocks", _blocks.entrySet().stream()
                     .map(e -> e.getKey() + "--" + e.getValue())
                     .collect(Collectors.joining(", ")));
-            pw.println("Transferred blocks: " + _blocks.entrySet().stream()
+            receiver.accept("Transferred blocks", _blocks.entrySet().stream()
                     .map(asHumanReadable())
                     .collect(Collectors.joining(", ")));
         }

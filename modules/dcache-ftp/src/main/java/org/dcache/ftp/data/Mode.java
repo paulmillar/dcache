@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -30,6 +31,10 @@ import org.dcache.util.Strings;
 import static org.dcache.util.ByteUnit.KiB;
 import static org.dcache.util.Strings.*;
 
+import org.dcache.util.Describable;
+import org.dcache.util.DescriptionReceiver;
+import org.dcache.util.DescriptionReceiver.ListDescriptionReceiver;
+
 /**
  * Base class for FTP transfer mode implementations.
  *
@@ -38,7 +43,7 @@ import static org.dcache.util.Strings.*;
  * mode object knows about the file to transfer and the direction of
  * the transfer.
  */
-public abstract class Mode extends AbstractMultiplexerListener
+public abstract class Mode extends AbstractMultiplexerListener implements Describable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(Mode.class);
 
@@ -558,47 +563,48 @@ public abstract class Mode extends AbstractMultiplexerListener
         throws IOException;
 
 
-    public void getInfo(PrintWriter pw)
+    @Override
+    public void describeTo(DescriptionReceiver receiver)
     {
+        receiver.accept("Name", name());
         switch (_direction) {
         case Incomming:
-            pw.println("Connection role: PASSIVE");
-            pw.println("Listening on: " + describe(_listeningOn));
+            receiver.accept("Connection role", "PASSIVE");
+            receiver.accept("Listening on", _listeningOn);
             if (_lastFailure != null) {
-                pw.println("Last failure: " + _lastFailure);
+                receiver.accept("Last failure", _lastFailure);
             }
             if (_opened > 0) {
-                pw.println("Accepted connections: " + _opened);
-                pw.println("Connected remote addresses:");
-                _addresses.stream().map(Strings::describe).forEach(a -> pw.println("    " + a));
+                receiver.accept("Accepted connections", _opened);
+                ListDescriptionReceiver addressList = receiver.acceptList("Connected remote addresses");
+                _addresses.forEach(addressList::accept);
             }
             break;
 
         case Outgoing:
-            pw.println("Connection role: ACTIVE");
-            pw.println("Connecting to: " + describe(_address));
-            pw.println("Connections to establish: " + _parallelism);
+            receiver.accept("Connection role", "ACTIVE");
+            receiver.accept("Connecting to", _address);
+            receiver.accept("Connections to establish", _parallelism);
             if (_failed > 0) {
-                pw.println("Failures to establish connection: " + _failed);
+                receiver.accept("Failures to establish connection", _failed);
             }
             if (_lastFailure != null) {
-                pw.println("Last failure: " + _lastFailure);
+                receiver.accept("Last failure", _lastFailure);
             }
             if (_opened > 0) {
-                pw.println("Established connections: " + _opened);
-                pw.println("Connected local addresses:");
-                _addresses.stream().map(Strings::describe).forEach(a -> pw.println("    " + a));
+                receiver.accept("Established connections", _opened);
+                ListDescriptionReceiver addressList = receiver.acceptList("Connected local addresses");
+                _addresses.forEach(addressList::accept);
             }
             break;
         }
-        pw.println("Closed connections: " + _closed);
+        receiver.accept("Closed connections", _closed);
 
         if (_size > 0) {
             if (_fileSize > 0) {
-                String percent = toThreeSigFig(100 * _size / (double)_fileSize, 1000);
-                pw.println("Desired transferred: " + describeSize(_size) + " (" + percent + "% of file)");
+                receiver.acceptSize("Desired transferred", _size, _fileSize, "file");
             } else {
-                pw.println("Desired transferred: " + describeSize(_size));
+                receiver.acceptSize("Desired transferred", _size);
             }
         }
     }

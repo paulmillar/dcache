@@ -18,6 +18,8 @@ import org.dcache.pool.repository.RepositoryChannel;
 
 import static org.dcache.util.Exceptions.messageOrClassName;
 
+import org.dcache.util.DescriptionReceiver;
+
 /**
  * Implementation of MODE X.
  *
@@ -607,12 +609,12 @@ public class ModeX extends Mode
     }
 
     @Override
-    public void getInfo(PrintWriter pw)
+    public void describeTo(DescriptionReceiver receiver)
     {
-        super.getInfo(pw);
+        super.describeTo(receiver);
 
         if (_lastError != null) {
-            pw.println("Last error: " + _lastError);
+            receiver.accept("Last error", _lastError);
         }
     }
 

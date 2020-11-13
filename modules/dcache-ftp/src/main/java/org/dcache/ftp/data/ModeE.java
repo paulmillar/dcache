@@ -14,6 +14,8 @@ import static org.dcache.util.Exceptions.messageOrClassName;
 import static org.dcache.util.Strings.describeSize;
 import static org.dcache.util.Strings.toThreeSigFig;
 
+import org.dcache.util.DescriptionReceiver;
+
 /**
  * Implementation of MODE E.
  *
@@ -431,29 +433,27 @@ public class ModeE extends Mode
     }
 
     @Override
-    public void getInfo(PrintWriter pw)
+    public void describeTo(DescriptionReceiver receiver)
     {
-        super.getInfo(pw);
+        super.describeTo(receiver);
 
         switch (_direction) {
         case Incomming:
-            pw.println("EOF flag: " + (_eodc == 0 ? "not received" : "received"));
+            receiver.accept("EOF flag", (_eodc == 0 ? "not received" : "received"));
             if (_eodc > 0) {
-                pw.println("Expected streams: " + _eodc);
+                receiver.accept("Expected streams", _eodc);
             }
             break;
 
         case Outgoing:
-            String percent = getSize() > 0
-                    ? (" (" + toThreeSigFig(100 * _currentCount / (double)getSize(), 1000) + "% desired transfer)")
-                    : "";
-            pw.println("Bytes still to send: " + describeSize(_currentCount) + percent);
-            pw.println("Offset of next send block: " + describeSize(_currentPosition));
+            receiver.acceptSize("Bytes still to send", _currentCount, getSize(),
+                    "desired transfer");
+            receiver.acceptSize("Offset of next send block", _currentPosition);
             break;
         }
 
         if (_lastError != null) {
-            pw.println("Last error: " + _lastError);
+            receiver.accept("Last error", _lastError);
         }
     }
 
