@@ -1,5 +1,6 @@
 package diskCacheV111.poolManager ;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
@@ -191,6 +192,14 @@ public class RequestContainerV5
         }
         if (_poolPingThread != null) {
             _poolPingThread.interrupt();
+        }
+    }
+
+    @VisibleForTesting
+    void pingAllPools() throws InterruptedException
+    {
+        if (_poolPingThread != null) {
+            _poolPingThread.checkNow();
         }
     }
 
@@ -2111,9 +2120,20 @@ public class RequestContainerV5
 
     private class PoolPingThread extends Thread
     {
+        private volatile boolean oneShot;
+
         private PoolPingThread()
         {
             super("Container-ping");
+        }
+
+        public synchronized void checkNow() throws InterruptedException
+        {
+            oneShot = true;
+            notify();
+            do {
+                wait();
+            } while (oneShot);
         }
 
         public void run()
@@ -2122,7 +2142,9 @@ public class RequestContainerV5
                 while (!Thread.interrupted()) {
                     try {
                         synchronized (this) {
-                            wait(_checkFilePingTimer);
+                            if (!oneShot) {
+                                wait(_checkFilePingTimer);
+                            }
                         }
 
                         long now = System.currentTimeMillis();
@@ -2135,7 +2157,7 @@ public class RequestContainerV5
                         Multimap<CellAddressCore, PoolRequestHandler> p2pRequests = ArrayListMultimap.create();
                         Multimap<CellAddressCore, PoolRequestHandler> stageRequests = ArrayListMultimap.create();
                         for (PoolRequestHandler handler : list) {
-                            if (handler._started < now - _checkFilePingTimer) {
+                            if (oneShot || handler._started < now - _checkFilePingTimer) {
                                 SelectedPool pool;
                                 switch (handler._state) {
                                 case ST_WAITING_FOR_POOL_2_POOL:
@@ -2187,6 +2209,11 @@ public class RequestContainerV5
                     } catch (RuntimeException e) {
                         _log.error("Pool ping failed", e);
                     }
+                    synchronized (this) {
+                        oneShot = false;
+                        notify();
+                    }
+
                 }
             } catch (InterruptedException ignored) {
             }
