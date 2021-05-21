@@ -69,7 +69,7 @@ public class MacaroonContextBuilder
 
     public MacaroonContextBuilder withPath(String path)
     {
-        context.setPath(FsPath.create(path));
+        context.setPath(path);
         return this;
     }
 
