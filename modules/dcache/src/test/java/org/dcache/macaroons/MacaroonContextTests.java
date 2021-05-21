@@ -84,7 +84,7 @@ public class MacaroonContextTests
         _context.updateRoot("/path");
 
         assertThat(_context.getRoot(), is(equalTo(Optional.of(FsPath.create("/path")))));
-        assertThat(_context.getPath(), is(equalTo(Optional.of(FsPath.create("/subdir")))));
+        assertThat(_context.getPath(), is(equalTo(Optional.of("/subdir"))));
         assertThat(_context.getHome(), is(equalTo(Optional.of(FsPath.create("/subdir/home")))));
     }
 
@@ -105,7 +105,7 @@ public class MacaroonContextTests
 
         _context.updatePath("/dir");
 
-        assertThat(_context.getPath(), is(equalTo(Optional.of(FsPath.create("/users/paul/dir")))));
+        assertThat(_context.getPath(), is(equalTo(Optional.of("/users/paul/dir"))));
     }
 
     @Test
@@ -115,7 +115,7 @@ public class MacaroonContextTests
 
         _context.updatePath("dir");
 
-        assertThat(_context.getPath(), is(equalTo(Optional.of(FsPath.create("/users/paul/dir")))));
+        assertThat(_context.getPath(), is(equalTo(Optional.of("/users/paul/dir"))));
     }
 
     @Test
