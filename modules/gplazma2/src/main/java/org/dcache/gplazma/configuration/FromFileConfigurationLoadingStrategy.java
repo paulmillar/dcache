@@ -1,12 +1,13 @@
 package org.dcache.gplazma.configuration;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import java.io.File;
-import java.util.concurrent.TimeUnit;
-import org.dcache.gplazma.configuration.parser.ConfigurationParser;
-import org.dcache.gplazma.configuration.parser.ConfigurationParserFactory;
-import org.dcache.gplazma.configuration.parser.FactoryConfigurationException;
+
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.dcache.gplazma.configuration.parser.ParseException;
+import org.dcache.util.Result;
+import org.dcache.util.files.ParsableFile;
 
 /**
  * This loading strategy loads the configuration from file, if file has been updated. This class is
@@ -17,21 +18,20 @@ import org.dcache.gplazma.configuration.parser.ParseException;
 public class FromFileConfigurationLoadingStrategy
       implements ConfigurationLoadingStrategy {
 
-    private static final long CONFIGURATION_UPDATE_FREQUENCY_MILLIS =
-          TimeUnit.SECONDS.toMillis(1);
-
-    private final File configurationFile;
-    private long configurationFileLastModified;
-    private long configurationFileLastChecked;
+    private final ParsableFile configurationFile;
+    private Result<Configuration,String> lastResult;
 
     public FromFileConfigurationLoadingStrategy(String configurationFileName) {
         checkArgument(configurationFileName != null && !configurationFileName.isBlank(),
                   "configuration file argument wasn't specified correctly");
 
-        configurationFile = new File(configurationFileName);
-
-        checkArgument(configurationFile.exists(),
+        Path path = FileSystems.getDefault().getPath(configurationFileName);
+        checkArgument(Files.exists(path),
                   "configuration file does not exists at %s", configurationFileName);
+
+        configurationFile = new ParsableFile(new ConfigurationParserBackedParser(), path);
+
+        lastResult = configurationFile.get();
     }
 
     /**
@@ -39,30 +39,23 @@ public class FromFileConfigurationLoadingStrategy
      */
     @Override
     public boolean hasUpdated() {
-        if ((System.currentTimeMillis() - configurationFileLastChecked) <
-              CONFIGURATION_UPDATE_FREQUENCY_MILLIS) {
-            /* we checked less then CONFIGURATION_UPDATE_FREQUNCY_MILLIS
-             * milliseconds ago */
-            return false;
-        }
-        if (configurationFileLastModified == configurationFile.lastModified()) {
-            //configuration file has not been updated. no need to reread
-            return false;
-        }
-        return true;
+        var newResult = configurationFile.get();
+
+        boolean isSame = lastResult.map(
+                lastConfig -> newResult.isSuccessful() && newResult.getSuccess().get() == lastConfig,
+                lastError -> newResult.isFailure() && newResult.getFailure().get().equals(lastError));
+
+        lastResult = newResult;
+
+        return !isSame;
     }
 
     /**
      * @return configuration loaded from the configuration file
      */
     @Override
-    public Configuration load() throws ParseException,
-          FactoryConfigurationException {
-        configurationFileLastModified = configurationFile.lastModified();
-        configurationFileLastChecked = System.currentTimeMillis();
-        ConfigurationParserFactory parserFactory =
-              ConfigurationParserFactory.getInstance();
-        ConfigurationParser parser = parserFactory.newConfigurationParser();
-        return parser.parse(configurationFile);
+    public Configuration load() throws ParseException {
+        lastResult = configurationFile.get();
+        return lastResult.orElseThrow(ParseException::new);
     }
 }
