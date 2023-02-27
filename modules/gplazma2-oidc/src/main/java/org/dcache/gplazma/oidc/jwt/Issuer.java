@@ -60,6 +60,7 @@ public class Issuer {
     private final Queue<String> previousJtis;
     private final IdentityProvider provider;
     private final HttpClient client;
+    private final boolean offlineSuppressed;
 
     private final Supplier<Map<String, PublicKey>> keys = MemoizeMapWithExpiry.memorize(this::readJwksDocument)
           .whenEmptyFor(Duration.ofMinutes(1))
@@ -70,6 +71,11 @@ public class Issuer {
         this.provider = requireNonNull(provider);
         this.client = requireNonNull(client);
         previousJtis = tokenHistory > 0 ? EvictingQueue.create(tokenHistory) : null;
+        offlineSuppressed = provider.isSuppressed("offline");
+    }
+
+    public boolean isOfflineSuppressed() {
+        return offlineSuppressed;
     }
 
     public IdentityProvider getIdentityProvider() {
