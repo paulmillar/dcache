@@ -186,7 +186,7 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin {
         try {
             ExtractResult result = tokenProcessor.extract(token);
             checkAuthentication(!result.claims().isEmpty(), "processing token yielded no claims");
-            checkAudience(result.claims());
+            checkAudience(result);
 
             var idp = result.idp();
             identifiedPrincipals.add(new OAuthProviderPrincipal(idp.getName()));
@@ -220,7 +220,13 @@ public class OidcAuthPlugin implements GPlazmaAuthenticationPlugin {
         }
     }
 
-    private void checkAudience(Map<String,JsonNode> claims) throws AuthenticationException {
+    private void checkAudience(ExtractResult result) throws AuthenticationException {
+        var identityProvider = result.idp();
+        if (identityProvider.isSuppressed("audience")) {
+            return;
+        }
+
+        var claims = result.claims();
         var audClaim = claims.get("aud");
 
         if (audClaim == null) {
