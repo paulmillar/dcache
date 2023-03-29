@@ -17,6 +17,16 @@
  */
 package org.dcache.auth.watches;
 
+import java.security.Principal;
+import java.util.Map;
+import java.util.function.Predicate;
+import org.dcache.auth.EmailAddressPrincipal;
+import org.dcache.auth.GidPrincipal;
+import org.dcache.auth.GroupNamePrincipal;
+import org.dcache.auth.OidcSubjectPrincipal;
+import org.dcache.auth.UidPrincipal;
+import org.dcache.auth.UserNamePrincipal;
+import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
 import org.parboiled.BaseParser;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
@@ -25,7 +35,16 @@ import org.parboiled.annotations.BuildParseTree;
  * A class responsible for parsing a watch expression.
  */
 @BuildParseTree
-public class WatchExpressionParser extends BaseParser<Object> {
+public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObservation>> {
+
+    private static final Map<String,Class<? extends Principal>> TYPES_BY_LABEL = Map.of(
+        "dn", GlobusPrincipal.class,
+        "sub", OidcSubjectPrincipal.class,
+        "email", EmailAddressPrincipal.class,
+        "groupname", GroupNamePrincipal.class,
+        "username", UserNamePrincipal.class,
+        "uid", UidPrincipal.class,
+        "gid", GidPrincipal.class);
 
     Rule input() {
         return sequence(orExpression(), EOI);
@@ -73,15 +92,25 @@ public class WatchExpressionParser extends BaseParser<Object> {
     }
 
     Rule predicate() {
+        hasType("dn").and(hasName("/C=DE/O=GermanGrid/OU=DESY/CN=Paul Millar"));
         // Initially limit ourselves to just <principal>:<literal> here.
         return sequence(principalType(), ch(':'), simpleWord(), optionalWhiteSpace());
     }
 
     Rule principalType() {
-        return trie("dn", "sub", "email", "groupname", "username", "uid", "gid");
+        return trie(TYPES_BY_LABEL.keySet());
     }
 
     Rule simpleWord() {
         return oneOrMore(noneOf(" \t"));
+    }
+
+    private static PrincipalPredicate hasType(String label) {
+        Class<? extends Principal> type = TYPES_BY_LABEL.get(label);
+        return PrincipalPredicate.anyPredicateMatches(type::isInstance);
+    }
+
+    private static PrincipalPredicate hasName(String name) {
+        return PrincipalPredicate.anyPredicateMatches(p -> p.getName().equals(name));
     }
 }
