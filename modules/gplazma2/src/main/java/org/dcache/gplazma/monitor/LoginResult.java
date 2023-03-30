@@ -216,7 +216,7 @@ public class LoginResult {
             super("SESSION");
         }
 
-        void setAttributes(Set<Object> attributes) {
+        public void setAttributes(Set<Object> attributes) {
             _attributes.clear();
             _attributes.addAll(attributes);
         }
@@ -279,11 +279,11 @@ public class LoginResult {
             _control = control;
         }
 
-        void setResult(Result result) {
+        public void setResult(Result result) {
             _result = result;
         }
 
-        void setError(String error) {
+        public void setError(String error) {
             _error = error;
         }
 
@@ -318,7 +318,7 @@ public class LoginResult {
         private SetDiff<Object> _publicCredentials;
         private SetDiff<Object> _privateCredentials;
 
-        AuthPluginResult(String name, ConfigurationItemControl control) {
+        public AuthPluginResult(String name, ConfigurationItemControl control) {
             super(name, control);
         }
 
@@ -354,7 +354,7 @@ public class LoginResult {
 
         private SetDiff<Principal> _principals;
 
-        MapPluginResult(String name, ConfigurationItemControl control) {
+        public MapPluginResult(String name, ConfigurationItemControl control) {
             super(name, control);
         }
 
@@ -375,11 +375,11 @@ public class LoginResult {
 
         private SetDiff<Principal> _authorized;
 
-        AccountPluginResult(String name, ConfigurationItemControl control) {
+        public AccountPluginResult(String name, ConfigurationItemControl control) {
             super(name, control);
         }
 
-        void setAuthorized(Set<Principal> before, Set<Principal> after) {
+        public void setAuthorized(Set<Principal> before, Set<Principal> after) {
             _authorized = new SetDiff<>(before, after);
         }
 
@@ -396,7 +396,7 @@ public class LoginResult {
         private SetDiff<Principal> _principals;
         private Set<Object> _attributes;
 
-        SessionPluginResult(String name, ConfigurationItemControl control) {
+        public SessionPluginResult(String name, ConfigurationItemControl control) {
             super(name, control);
         }
 
