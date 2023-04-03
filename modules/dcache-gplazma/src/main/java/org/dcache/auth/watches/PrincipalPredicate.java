@@ -18,112 +18,86 @@
 package org.dcache.auth.watches;
 
 import java.security.Principal;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
+import static java.util.Objects.requireNonNull;
 import java.util.function.Predicate;
-import javax.annotation.Nullable;
+import org.dcache.auth.util.StatefulPredicate;
+import org.dcache.auth.util.StatefulPredicate.Checker;
+import org.dcache.auth.util.StatefulPredicates;
 import org.dcache.gplazma.monitor.LoginResult;
+import org.dcache.gplazma.monitor.LoginResult.AuthPhaseResult;
+import org.dcache.gplazma.monitor.LoginResult.MapPhaseResult;
 
 /**
- * A LoginResultObservation Predicate that tests predicates on each principal of a set of
- * principals.  This is done in three contexts: the door-supplied principals are checked against
- * the door predicate, the principals available after the auth phase are checked against the auth
- * predicate, and those available after the map phase are checked against the map predicate.
+ * A LoginResultObservation Predicate that tests whether the supplied StatefulPredicate is satisfied
+ * by the combination of the principals from the door, from the auth phase, and from the map phase.
  * <p>
- * PrincipalPredicate returns true if at least one of the three sets of principals contains a
- * principals that matches the corresponding predicate.
+ * The default methods for combining two predicates (and, or) are overridden so that, if the
+ * other predicate is also a PrincipalPredicate then the two are combined so that there is only a
+ * single pass over the set of principals.  The negation method is updated to support this even
+ * if a test is negated.
+ * <p>
+ * Note that (currently) this optimisation is lost if the PrincipalPredicate is combined with
+ * another predicate.
  */
 public class PrincipalPredicate implements Predicate<LoginResultObservation> {
-    private final Optional<Predicate<Principal>> fromDoor;
-    private final Optional<Predicate<Principal>> afterAuth;
-    private final Optional<Predicate<Principal>> afterMap;
 
-    public static PrincipalPredicate anyPredicateMatches(Predicate<Principal> predicate) {
-        return new PrincipalPredicate(predicate, predicate, predicate);
-    }
+    private final StatefulPredicate<Principal> predicate;
 
-    public static PrincipalPredicate doorPredicateMatches(Predicate<Principal> predicate) {
-        return new PrincipalPredicate(predicate, null, null);
-    }
-
-    public static PrincipalPredicate authPredicateMatches(Predicate<Principal> predicate) {
-        return new PrincipalPredicate(null, predicate, null);
-    }
-
-    public static PrincipalPredicate mapPredicateMatches(Predicate<Principal> predicate) {
-        return new PrincipalPredicate(null, null, predicate);
-    }
-
-    /**
-     * Check for matching predicates.  This predicate returns true if a principal in the list of
-     * door-supplied principals match the {@literal fromDoor} predicate, or if a principal in the
-     * list of auth-phase-supplied principals match the {@literal afterAuth} predicate, or if a
-     * principal in the list of map-phase-supplied principals match the {@literal afterMap}
-     * predicate.  A {@literal null} argument is a special case that is equivalent to the
-     * {@literal p -> Boolean.FALSE} predicate.
-     */
-    private PrincipalPredicate(@Nullable Predicate<Principal> fromDoor,
-            @Nullable Predicate<Principal> afterAuth,
-            @Nullable Predicate<Principal> afterMap) {
-        this.fromDoor = Optional.ofNullable(fromDoor);
-        this.afterAuth = Optional.ofNullable(afterAuth);
-        this.afterMap = Optional.ofNullable(afterMap);
+    private PrincipalPredicate(StatefulPredicate<Principal> predicate) {
+        this.predicate = requireNonNull(predicate);
     }
 
     @Override
     public Predicate<LoginResultObservation> and(Predicate<? super LoginResultObservation> other) {
+        requireNonNull(other);
+
         if (other instanceof PrincipalPredicate) {
-            PrincipalPredicate o = (PrincipalPredicate) other;
-            Predicate<Principal> combinedFromDoor = fromDoor
-                .map(p1 -> o.fromDoor.map(p2 -> p1.and(p2)).orElse(null))
-                .orElse(null);
-            Predicate<Principal> combinedAfterAuth = afterAuth
-                .map(p1 -> o.afterAuth.map(p2 -> p1.and(p2)).orElse(null))
-                .orElse(null);
-            Predicate<Principal> combinedAfterMap = afterMap
-                .map(p1 -> o.afterMap.map(p2 -> p1.and(p2)).orElse(null))
-                .orElse(null);
-            return new PrincipalPredicate(combinedFromDoor, combinedAfterAuth, combinedAfterMap);
+            PrincipalPredicate otherPredicate = (PrincipalPredicate) other;
+            StatefulPredicate<Principal> combined = StatefulPredicates.and(this.predicate, otherPredicate.predicate);
+            return new PrincipalPredicate(combined);
         }
 
         return o -> this.test(o) && other.test(o);
     }
 
     @Override
+    public Predicate<LoginResultObservation> negate() {
+        StatefulPredicate<Principal> negated = StatefulPredicates.negate(predicate);
+        return new PrincipalPredicate(negated);
+    }
+
+    @Override
     public Predicate<LoginResultObservation> or(Predicate<? super LoginResultObservation> other) {
-        if (!(other instanceof PrincipalPredicate)) {
-            return o -> this.test(o) || other.test(o);
+        requireNonNull(other);
+
+        if (other instanceof PrincipalPredicate) {
+            PrincipalPredicate otherPredicate = (PrincipalPredicate) other;
+            StatefulPredicate<Principal> combined = StatefulPredicates.or(this.predicate, otherPredicate.predicate);
+            return new PrincipalPredicate(combined);
         }
 
-        PrincipalPredicate o = (PrincipalPredicate) other;
-        Predicate<Principal> combinedFromDoor = fromDoor
-            .map(p1 -> o.fromDoor.map(p2 -> p1.or(p2)).orElse(p1))
-            .orElse(o.fromDoor.orElse(null));
-        Predicate<Principal> combinedAfterAuth = afterAuth
-            .map(p1 -> o.afterAuth.map(p2 -> p1.or(p2)).orElse(p1))
-            .orElse(o.afterAuth.orElse(null));
-        Predicate<Principal> combinedAfterMap = afterMap
-            .map(p1 -> o.afterMap.map(p2 -> p1.or(p2)).orElse(p1))
-            .orElse(o.afterMap.orElse(null));
-        return new PrincipalPredicate(combinedFromDoor, combinedAfterAuth, combinedAfterMap);
+        return o -> this.test(o) || other.test(o);
     }
 
     @Override
     public boolean test(LoginResultObservation observation) {
         LoginResult result = observation.getResult();
 
-        return matching(result.getAuthPhase(), LoginResult.SetDiff::getBefore, fromDoor) ||
-                matching(result.getAuthPhase(), LoginResult.SetDiff::getAfter, afterAuth) ||
-                matching(result.getMapPhase(), LoginResult.SetDiff::getAfter, afterMap);
-    }
+        Checker<Principal> checker = predicate.start();
 
-    private boolean matching(LoginResult.PhaseResult phase, Function<LoginResult.SetDiff<Principal>,Set> selection,
-            Optional<Predicate<Principal>> predicate) {
-        return phase.hasHappened() && predicate.map(p -> {
-                var principalsDiff = phase.getPrincipals();
-                var principals = selection.apply(principalsDiff);
-                return principals.stream().anyMatch(p);
-            }).orElse(Boolean.FALSE);
+        AuthPhaseResult auth = result.getAuthPhase();
+        if (auth.hasHappened()) {
+            auth.getPrincipals().getBefore().stream().forEach(checker::accept);
+            if (!checker.isFinal()) {
+                auth.getPrincipals().getAfter().stream().forEach(checker::accept);
+            }
+        }
+
+        MapPhaseResult map = result.getMapPhase();
+        if (map.hasHappened() && !checker.isFinal()) {
+            map.getPrincipals().getAfter().stream().forEach(checker::accept);
+        }
+
+        return checker.result();
     }
 }
