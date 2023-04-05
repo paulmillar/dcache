@@ -43,7 +43,7 @@ public class PrincipalPredicate implements Predicate<LoginResultObservation> {
 
     private final StatefulPredicate<Principal> predicate;
 
-    private PrincipalPredicate(StatefulPredicate<Principal> predicate) {
+    public PrincipalPredicate(StatefulPredicate<Principal> predicate) {
         this.predicate = requireNonNull(predicate);
     }
 

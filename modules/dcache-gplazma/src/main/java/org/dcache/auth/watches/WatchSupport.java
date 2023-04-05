@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.dcache.gplazma.LoginObserver;
 import org.dcache.gplazma.monitor.LoginResult;
@@ -69,6 +68,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             checkCommand(watch != null, "Unknown watch with ID %s", id);
 
             return watch.list().stream()
+                .map(LoginResultObservation::getResult)
                 .map(LoginResultPrinter::new)
                 .map(LoginResultPrinter::print)
                 .collect(Collectors.joining("\n"));

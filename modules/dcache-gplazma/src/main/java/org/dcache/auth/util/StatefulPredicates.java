@@ -17,11 +17,12 @@
  */
 package org.dcache.auth.util;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Arrays.asList;
-import java.util.List;
 import static java.util.Objects.requireNonNull;
-import java.util.stream.Collectors;
 
 /**
  * A collection of useful methods for operating with StatefulePredicates.
@@ -33,34 +34,23 @@ public class StatefulPredicates {
      * StatefulPredicate objects.
      */
     public static abstract class Combined<T> implements StatefulPredicate<T> {
-        protected abstract class CombinedChecker<T> implements Checker<T> {
-            protected final List<Checker<T>> checkers = innerPredicates.stream()
+        protected static abstract class CombinedChecker<T> implements Checker<T> {
+            protected final List<Checker<T>> checkers;
+
+            protected CombinedChecker(List<StatefulPredicate<T>> predicates) {
+                checkers = predicates.stream()
                       .map(StatefulPredicate::start)
                       .collect(Collectors.toList());
-            private boolean cachedResult;
-            private boolean cachedResultValid;
+            }
 
             @Override
             public void accept(T item) {
-                cachedResultValid = false;
                 checkers.forEach(p -> p.accept(item));
             }
 
             @Override
-            public boolean result() {
-                if (cachedResultValid) {
-                    return cachedResult;
-                }
-                cachedResult = calculateResult();
-                cachedResultValid = true;
-                return cachedResult;
-            }
-
-            protected abstract boolean calculateResult();
-
-            @Override
             public boolean isFinal() {
-                return result() == true;
+                return checkers.stream().allMatch(Checker::isFinal);
             }
         }
 
@@ -72,12 +62,24 @@ public class StatefulPredicates {
         }
     }
 
-    // Provide the logical OR of supplied arguments.
+    /**
+     * Provide the logical OR of the supplied StatefulPredicate arguments.
+     */
     public static class Disjunction<T> extends Combined<T> {
-        private class DisjunctionChecker<T> extends CombinedChecker<T> {
+        public static class DisjunctionChecker<T> extends CombinedChecker<T> {
             @Override
-            protected boolean calculateResult() {
-                return checkers.stream().anyMatch(StatefulPredicate.Checker::result);
+            public boolean result() {
+                return checkers.stream().anyMatch(Checker<T>::result);
+            }
+
+            protected DisjunctionChecker(List<StatefulPredicate<T>> predicates) {
+                super(predicates);
+            }
+
+            @Override
+            public boolean isFinal() {
+                return checkers.stream().anyMatch(c -> c.result() && c.isFinal())
+                    || super.isFinal();
             }
         }
 
@@ -86,18 +88,29 @@ public class StatefulPredicates {
         }
 
         public DisjunctionChecker start() {
-            return new DisjunctionChecker();
+            return new DisjunctionChecker(innerPredicates);
         }
     }
 
     /**
-     * Provide the logical AND of the supplied arguments.
+     * Provide the logical AND of the supplied StatefulPredicate arguments.
      */
     public static class Conjunction<T> extends Combined<T> {
-        private class ConjunctionChecker<T> extends CombinedChecker<T> {
+        public static class ConjunctionChecker<T> extends CombinedChecker<T> {
             @Override
-            protected boolean calculateResult() {
-                return checkers.stream().allMatch(StatefulPredicate.Checker::result);
+            public boolean result() {
+                return checkers.stream().allMatch(Checker<T>::result);
+            }
+
+            protected ConjunctionChecker(List<StatefulPredicate<T>> predicates) {
+                super(predicates);
+            }
+
+
+            @Override
+            public boolean isFinal() {
+                return checkers.stream().anyMatch(c -> !c.result() && c.isFinal())
+                    || super.isFinal();
             }
         }
 
@@ -107,15 +120,18 @@ public class StatefulPredicates {
 
         @Override
         public ConjunctionChecker<T> start() {
-            return new ConjunctionChecker();
+            return new ConjunctionChecker(innerPredicates);
         }
     }
 
+    /**
+     * Return the logical NOT of the supplied StatefulPredicate argument.
+     */
     public static class Negation<T> implements StatefulPredicate<T> {
-        private class NegationChecker<T> implements StatefulPredicate.Checker<T> {
-            private final StatefulPredicate.Checker<T> innerChecker;
+        private class NegationChecker<T> implements Checker<T> {
+            private final Checker<T> innerChecker;
 
-            NegationChecker(StatefulPredicate.Checker<T> checker) {
+            NegationChecker(Checker<T> checker) {
                 innerChecker = requireNonNull(checker);
             }
 
@@ -141,27 +157,31 @@ public class StatefulPredicates {
             this.predicate = requireNonNull(predicate);
         }
 
+        @Override
         public NegationChecker<T> start() {
             return new NegationChecker(predicate.start());
         }
     }
 
     /**
-     * The logical NOT of a predicate.
+     * A simple utility method that returns the logical NOT of the supplied StatefulPredicate
+     * argument.
      */
     public static <T> StatefulPredicate<T> negate(StatefulPredicate<T> predicate) {
         return new Negation<>(predicate);
     }
 
     /**
-     * The logical AND of the supplied predicates.
+     * A simple utility method that returns the logical AND of the supplied StatefulPredicate
+     * arguments.
      */
     public static <T> StatefulPredicate<T> and(StatefulPredicate<T>... predicates) {
         return new Conjunction<>(predicates);
     }
 
     /**
-     * The logical OR of the supplied predicates.
+     * A simple utility method that returns the logical OR of the supplied StatefulPredicate
+     * arguments.
      */
     public static <T> StatefulPredicate<T> or(StatefulPredicate<T>... predicates) {
         return new Disjunction<>(predicates);

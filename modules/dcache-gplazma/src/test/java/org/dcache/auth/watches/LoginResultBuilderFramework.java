@@ -153,7 +153,7 @@ public class LoginResultBuilderFramework {
         }
     }
 
-    private class PAMPluginResultBuilder<B extends PAMPluginResultBuilder> {
+    private static class PAMPluginResultBuilder<B extends PAMPluginResultBuilder> {
         protected String name;
         protected ConfigurationItemControl control;
         private LoginMonitor.Result result;

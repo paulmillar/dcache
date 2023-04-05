@@ -26,6 +26,7 @@ import org.dcache.auth.GroupNamePrincipal;
 import org.dcache.auth.OidcSubjectPrincipal;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
+import org.dcache.auth.util.MatchingPrincipalPresent;
 import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
 import org.parboiled.BaseParser;
 import org.parboiled.Rule;
@@ -37,7 +38,7 @@ import org.parboiled.annotations.BuildParseTree;
 @BuildParseTree
 public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObservation>> {
 
-    private static final Map<String,Class<? extends Principal>> TYPES_BY_LABEL = Map.of(
+    protected static final Map<String,Class<? extends Principal>> TYPES_BY_LABEL = Map.of(
         "dn", GlobusPrincipal.class,
         "sub", OidcSubjectPrincipal.class,
         "email", EmailAddressPrincipal.class,
@@ -51,7 +52,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule orExpression() {
-        return sequence(andExpression(), zeroOrMore(orLiteral(), andExpression()));
+        return sequence(andExpression(), zeroOrMore(orLiteral(), andExpression(), push(pop().or(pop()))));
     }
 
     Rule orLiteral() {
@@ -70,7 +71,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule andExpression() {
-        return sequence(term(), zeroOrMore(andLiteral(), term()));
+        return sequence(term(), zeroOrMore(andLiteral(), term(), push(pop().and(pop()))));
     }
 
     Rule andLiteral() {
@@ -81,7 +82,9 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule term() {
-        return sequence(optional(notLiteral()), predicate());
+        return firstOf(
+            sequence(notLiteral(), predicate(), push(pop().negate())),
+            predicate());
     }
 
     Rule notLiteral() {
@@ -92,25 +95,31 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule predicate() {
-        hasType("dn").and(hasName("/C=DE/O=GermanGrid/OU=DESY/CN=Paul Millar"));
         // Initially limit ourselves to just <principal>:<literal> here.
-        return sequence(principalType(), ch(':'), simpleWord(), optionalWhiteSpace());
+        return sequence(principalType(), ch(':'), principalName(), optionalWhiteSpace(),
+            push(pop().and(pop())));
     }
 
     Rule principalType() {
-        return trie(TYPES_BY_LABEL.keySet());
+        return sequence(trie(TYPES_BY_LABEL.keySet()), push(hasType(match())));
+    }
+
+    Rule principalName() {
+        return sequence(simpleWord(), push(hasName(match())));
     }
 
     Rule simpleWord() {
         return oneOrMore(noneOf(" \t"));
     }
 
-    private static PrincipalPredicate hasType(String label) {
+    static PrincipalPredicate hasType(String label) {
         Class<? extends Principal> type = TYPES_BY_LABEL.get(label);
-        return PrincipalPredicate.anyPredicateMatches(type::isInstance);
+        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(type::isInstance);
+        return new PrincipalPredicate(hasPrincipalOfType);
     }
 
-    private static PrincipalPredicate hasName(String name) {
-        return PrincipalPredicate.anyPredicateMatches(p -> p.getName().equals(name));
+    static PrincipalPredicate hasName(String name) {
+        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> p.getName().equals(name));
+        return new PrincipalPredicate(hasPrincipalWithName);
     }
 }
