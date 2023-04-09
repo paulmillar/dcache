@@ -17,8 +17,22 @@
  */
 package org.dcache.auth.watches;
 
+import java.util.Collections;
+import java.util.Set;
+import java.util.function.Predicate;
+import org.dcache.auth.UserNamePrincipal;
+import static org.dcache.auth.watches.LoginResultBuilderFramework.aLoginResult;
+import static org.dcache.auth.watches.LoginResultBuilderFramework.aMapPlugin;
+import static org.dcache.auth.watches.LoginResultBuilderFramework.anAuthPlugin;
+import static org.dcache.auth.watches.LoginResultObservationBuilder.aLoginResultObservation;
+import static org.dcache.gplazma.configuration.ConfigurationItemControl.OPTIONAL;
+import static org.dcache.gplazma.configuration.ConfigurationItemControl.REQUISITE;
+import static org.dcache.gplazma.monitor.LoginMonitor.Result.FAIL;
+import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
-import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.parboiled.Parboiled;
@@ -29,7 +43,8 @@ public class WatchExpressionParserTest {
 
     private static WatchExpressionParser parser;
 
-    private ReportingParseRunner runner;
+    private ReportingParseRunner<Predicate<LoginResultObservation>> runner;
+    private LoginResultObservation observation;
 
     @BeforeClass
     public static void setupOnce() {
@@ -39,6 +54,7 @@ public class WatchExpressionParserTest {
     @Before
     public void setup() {
         runner = new ReportingParseRunner(parser.input());
+        observation = null;
     }
 
     @Test
@@ -83,5 +99,44 @@ public class WatchExpressionParserTest {
         assertTrue(runner.run("username:paul&&!groupname:it").isSuccess());
 
         assertFalse(runner.run("OR groupname:it").isSuccess());
+    }
+
+    @Test
+    public void shouldMatchSimpleUsername() {
+        var predicate = runner.run("username:paul").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withResult(SUCCESS))
+                .withPrincipals(Collections.EMPTY_SET, Set.of(new UserNamePrincipal("paul")))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", REQUISITE).withError("No mapping possible").withResult(FAIL))
+                .withPrincipals(Collections.EMPTY_SET, Collections.EMPTY_SET)
+                .withResult(FAIL)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchDifferentSimpleUsername() {
+        var predicate = runner.run("username:paul").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withResult(SUCCESS))
+                .withPrincipals(Collections.EMPTY_SET, Set.of(new UserNamePrincipal("tigran")))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", REQUISITE).withError("No mapping possible").withResult(FAIL))
+                .withPrincipals(Collections.EMPTY_SET, Collections.EMPTY_SET)
+                .withResult(FAIL)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+
+    private void given(LoginResultObservationBuilder builder) {
+        observation = builder.build();
     }
 }
