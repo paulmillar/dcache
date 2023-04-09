@@ -139,6 +139,50 @@ public class WatchExpressionParserTest {
         assertFalse(predicate.test(observation));
     }
 
+    @Test
+    public void shouldMatchSimpleDn() {
+        var predicate = runner.run("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("x509", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withDn("/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul").withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleDnMissingPrincipal() {
+        var predicate = runner.run("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
 
     private void given(LoginResultObservationBuilder builder) {
         observation = builder.build();

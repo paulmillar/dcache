@@ -105,11 +105,10 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule principalName() {
-        return sequence(simpleWord(), push(hasName(match())));
-    }
-
-    Rule simpleWord() {
-        return oneOrMore(noneOf(" \t"));
+        return firstOf(
+            sequence(ch('"'), sequence(zeroOrMore(testNot(ch('"')), ANY), push(hasName(match()))), ch('"')), // FIXME allow \" escape
+            sequence(oneOrMore(noneOf(" \t")), push(hasName(match())))
+        );
     }
 
     static PrincipalPredicate hasType(String label) {
