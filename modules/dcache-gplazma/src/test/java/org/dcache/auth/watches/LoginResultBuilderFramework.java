@@ -112,7 +112,7 @@ public class LoginResultBuilderFramework {
         }
     }
 
-    public class MapPhaseBuilder extends PhaseBuilder<AuthPhaseBuilder> {
+    public class MapPhaseBuilder extends PhaseBuilder<MapPhaseBuilder> {
         @Override
         protected MapPhaseResult phaseResult() {
             return LoginResultBuilderFramework.this.result.getMapPhase();
@@ -124,7 +124,7 @@ public class LoginResultBuilderFramework {
         }
     }
 
-    public class AccountPhaseBuilder extends PhaseBuilder<AuthPhaseBuilder> {
+    public class AccountPhaseBuilder extends PhaseBuilder<AccountPhaseBuilder> {
         @Override
         protected AccountPhaseResult phaseResult() {
             return LoginResultBuilderFramework.this.result.getAccountPhase();
@@ -136,7 +136,7 @@ public class LoginResultBuilderFramework {
         }
     }
 
-    public class SessionPhaseBuilder extends PhaseBuilder<AuthPhaseBuilder> {
+    public class SessionPhaseBuilder extends PhaseBuilder<SessionPhaseBuilder> {
         @Override
         protected SessionPhaseResult phaseResult() {
             return LoginResultBuilderFramework.this.result.getSessionPhase();
