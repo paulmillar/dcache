@@ -18,6 +18,8 @@
 package org.dcache.auth.watches;
 
 import java.security.Principal;
+import java.util.Collections;
+import java.util.HashSet;
 import static java.util.Objects.requireNonNull;
 import java.util.Set;
 import org.dcache.gplazma.configuration.ConfigurationItemControl;
@@ -33,6 +35,7 @@ import org.dcache.gplazma.monitor.LoginResult.PAMPluginResult;
 import org.dcache.gplazma.monitor.LoginResult.PhaseResult;
 import org.dcache.gplazma.monitor.LoginResult.SessionPhaseResult;
 import org.dcache.gplazma.monitor.LoginResult.SessionPluginResult;
+import org.dcache.util.PrincipalSetMaker;
 
 
 /**
@@ -42,7 +45,30 @@ public class LoginResultBuilderFramework {
 
     private final LoginResult result = new LoginResult();
 
+    private static void setAddedPrincipals(PhaseResult result, Set<Principal> defaultBefore,
+            Set<Principal> added) {
+        var diff = result.getPrincipals();
+        var before = diff == null ? defaultBefore : diff.getBefore();
+        Set<Principal> after = new HashSet<>(before);
+        after.addAll(added);
+        result.setPrincipals(before, after);
+    }
+
     public class LoginResultBaseBuilder {
+        public LoginResultBaseBuilder withDoorSupplying(PrincipalSetMaker principals) {
+
+            var authPhase = result.getAuthPhase();
+            var diff = authPhase.getPrincipals();
+            Set<Principal> added = diff == null ? Collections.emptySet() : diff.getAdded();
+
+            var before = principals.build();
+            var after = new HashSet<Principal>(before);
+            after.addAll(added);
+            authPhase.setPrincipals(before, after);
+
+            return this;
+        }
+
         public AuthPhaseBuilder withAuthPhase() {
             return new AuthPhaseBuilder();
         }
@@ -101,6 +127,12 @@ public class LoginResultBuilderFramework {
             return this;
         }
 
+        public AuthPhaseBuilder thatAdds(PrincipalSetMaker added) {
+            var authPhase = result.getAuthPhase();
+            setAddedPrincipals(authPhase, Collections.emptySet(), added.build());
+            return this;
+        }
+
         public AuthPhaseBuilder withPrivateCredentials(Set<Object> credentials) {
             phaseResult().setPrivateCredentials(credentials);
             return this;
@@ -118,6 +150,14 @@ public class LoginResultBuilderFramework {
             return LoginResultBuilderFramework.this.result.getMapPhase();
         }
 
+        public MapPhaseBuilder thatAdds(PrincipalSetMaker added) {
+            var authPhase = result.getAuthPhase();
+            var defaultBefore = authPhase.getPrincipals().getAfter(); // Just assume this is set.
+            var mapPhase = result.getMapPhase();
+            setAddedPrincipals(mapPhase, defaultBefore, added.build());
+            return this;
+        }
+
         public MapPhaseBuilder with(MapPluginResultBuilder builder) {
             phaseResult().addPluginResult(builder.build());
             return this;
@@ -128,6 +168,14 @@ public class LoginResultBuilderFramework {
         @Override
         protected AccountPhaseResult phaseResult() {
             return LoginResultBuilderFramework.this.result.getAccountPhase();
+        }
+
+        public AccountPhaseBuilder thatAdds(PrincipalSetMaker added) {
+            var mapPhase = result.getMapPhase();
+            var defaultBefore = mapPhase.getPrincipals().getAfter(); // Just assume this is set.
+            var accountPhase = result.getAccountPhase();
+            setAddedPrincipals(accountPhase, defaultBefore, added.build());
+            return this;
         }
 
         public AccountPhaseBuilder withPluginResult(AccountPluginResultBuilder builder) {
@@ -144,6 +192,14 @@ public class LoginResultBuilderFramework {
 
         public SessionPhaseBuilder withAttributes(Set<Object> attributes) {
             phaseResult().setAttributes(attributes);
+            return this;
+        }
+
+        public SessionPhaseBuilder thatAdds(PrincipalSetMaker added) {
+            var accountPhase = result.getAccountPhase();
+            var defaultBefore = accountPhase.getPrincipals().getAfter(); // Just assume this is set.
+            var sessionPhase = result.getSessionPhase();
+            setAddedPrincipals(sessionPhase, defaultBefore, added.build());
             return this;
         }
 
@@ -167,6 +223,10 @@ public class LoginResultBuilderFramework {
         public B withResult(LoginMonitor.Result result) {
             this.result = requireNonNull(result);
             return (B)this;
+        }
+
+        public B withSuccess() {
+            return withResult(LoginMonitor.Result.SUCCESS);
         }
 
         public B withError(String error) {

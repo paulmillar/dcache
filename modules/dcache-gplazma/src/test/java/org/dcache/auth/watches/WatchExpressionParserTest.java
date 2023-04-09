@@ -17,19 +17,14 @@
  */
 package org.dcache.auth.watches;
 
-import java.util.Collections;
-import java.util.Set;
 import java.util.function.Predicate;
-import org.dcache.auth.UserNamePrincipal;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.aLoginResult;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.aMapPlugin;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.anAuthPlugin;
 import static org.dcache.auth.watches.LoginResultObservationBuilder.aLoginResultObservation;
 import static org.dcache.gplazma.configuration.ConfigurationItemControl.OPTIONAL;
-import static org.dcache.gplazma.configuration.ConfigurationItemControl.REQUISITE;
-import static org.dcache.gplazma.monitor.LoginMonitor.Result.FAIL;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
-import static org.hamcrest.Matchers.equalTo;
+import static org.dcache.util.PrincipalSetMaker.aSetOfPrincipals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -37,7 +32,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
-import org.parboiled.support.ParsingResult;
 
 public class WatchExpressionParserTest {
 
@@ -106,14 +100,19 @@ public class WatchExpressionParserTest {
         var predicate = runner.run("username:paul").getTopStackValue();
 
         given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
             .withAuthPhase()
-                .with(anAuthPlugin("oidc", OPTIONAL).withResult(SUCCESS))
-                .withPrincipals(Collections.EMPTY_SET, Set.of(new UserNamePrincipal("paul")))
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
                 .withResult(SUCCESS)
             .withMapPhase()
-                .with(aMapPlugin("multimap", REQUISITE).withError("No mapping possible").withResult(FAIL))
-                .withPrincipals(Collections.EMPTY_SET, Collections.EMPTY_SET)
-                .withResult(FAIL)));
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
 
         assertTrue(predicate.test(observation));
     }
@@ -123,14 +122,19 @@ public class WatchExpressionParserTest {
         var predicate = runner.run("username:paul").getTopStackValue();
 
         given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
             .withAuthPhase()
-                .with(anAuthPlugin("oidc", OPTIONAL).withResult(SUCCESS))
-                .withPrincipals(Collections.EMPTY_SET, Set.of(new UserNamePrincipal("tigran")))
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("tigran"))
                 .withResult(SUCCESS)
             .withMapPhase()
-                .with(aMapPlugin("multimap", REQUISITE).withError("No mapping possible").withResult(FAIL))
-                .withPrincipals(Collections.EMPTY_SET, Collections.EMPTY_SET)
-                .withResult(FAIL)));
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1001).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
 
         assertFalse(predicate.test(observation));
     }
