@@ -118,6 +118,50 @@ public class WatchExpressionParserTest {
     }
 
     @Test
+    public void shouldMatchSingleQuotedUsername() {
+        var predicate = runner.run("username:'paul'").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchDoubleQuotedUsername() {
+        var predicate = runner.run("username:\"paul\"").getTopStackValue();
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
     public void shouldNotMatchDifferentSimpleUsername() {
         var predicate = runner.run("username:paul").getTopStackValue();
 

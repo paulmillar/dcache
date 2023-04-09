@@ -106,6 +106,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     Rule principalName() {
         return firstOf(
+            sequence(ch('\''), sequence(zeroOrMore(testNot(ch('\'')), ANY), push(hasName(match()))), ch('\'')),
             sequence(ch('"'), sequence(zeroOrMore(testNot(ch('"')), ANY), push(hasName(match()))), ch('"')), // FIXME allow \" escape
             sequence(oneOrMore(noneOf(" \t")), push(hasName(match())))
         );
