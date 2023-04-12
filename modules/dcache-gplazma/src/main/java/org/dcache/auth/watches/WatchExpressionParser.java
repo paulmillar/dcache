@@ -17,7 +17,10 @@
  */
 package org.dcache.auth.watches;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.security.Principal;
+import java.text.CharacterIterator;
+import java.text.StringCharacterIterator;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.dcache.auth.EmailAddressPrincipal;
@@ -31,6 +34,7 @@ import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
 import org.parboiled.BaseParser;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
+import org.parboiled.errors.ParserRuntimeException;
 
 /**
  * A class responsible for parsing a watch expression.
@@ -106,18 +110,86 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     Rule principalName() {
         return firstOf(
-            sequence(ch('\''), sequence(zeroOrMore(testNot(ch('\'')), ANY), push(hasName(match()))), ch('\'')),
-            sequence(ch('"'), sequence(zeroOrMore(testNot(ch('"')), ANY), push(hasName(match()))), ch('"')), // FIXME allow \" escape
-            sequence(oneOrMore(noneOf(" \t")), push(hasName(match())))
+            sequence(
+                ch('\''),
+                zeroOrMore(noneOf("\'")),
+                push(hasName(match())),
+                ch('\'')
+            ),
+            sequence(
+                ch('"'),
+                zeroOrMore(firstOf(
+                    sequence(ch('\\'), ANY),
+                    noneOf("\"")
+                )),
+                push(hasName(unescape(match()))),
+                ch('"')
+            ),
+            sequence(
+                oneOrMore(noneOf(" \t")),
+                push(hasName(match()))
+            )
         );
     }
 
+    @VisibleForTesting
+    static String unescape(String input) {
+        StringBuilder sb = new StringBuilder();
+        CharacterIterator ci = new StringCharacterIterator(input);
+        char c = ci.first();
+        boolean slash = false;
+        while (c != CharacterIterator.DONE) {
+            if (slash) {
+                slash = false;
+                switch (c) {
+                case 't':
+                    sb.append('\t'); // tab
+                    break;
+                case 'b':
+                    sb.append('\b'); // backspace
+                    break;
+                case 'n':
+                    sb.append('\n'); // new line
+                    break;
+                case 'r':
+                    sb.append('\r'); // carriage return
+                    break;
+                case 'f':
+                    sb.append('\f'); // form feed
+                    break;
+                case '\'':
+                    sb.append('\''); // single quote
+                    break;
+                case '\"':
+                    sb.append('\"'); // double quote
+                    break;
+                case '\\':
+                    sb.append('\\'); // double quote
+                    break;
+                default:
+                    throw new ParserRuntimeException("Bad escape sequence \"\\" + c + "\" inside double-quote text");
+                }
+            } else {
+                if (c == '\\') {
+                    slash = true;
+                } else {
+                    sb.append(c);
+                }
+            }
+            c = ci.next();
+
+        }
+        return sb.toString();
+    }
+
+    @VisibleForTesting
     static PrincipalPredicate hasType(String label) {
         Class<? extends Principal> type = TYPES_BY_LABEL.get(label);
         MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(type::isInstance);
         return new PrincipalPredicate(hasPrincipalOfType);
     }
 
+    @VisibleForTesting
     static PrincipalPredicate hasName(String name) {
         MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> p.getName().equals(name));
         return new PrincipalPredicate(hasPrincipalWithName);

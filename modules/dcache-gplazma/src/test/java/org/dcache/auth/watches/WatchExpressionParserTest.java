@@ -18,6 +18,7 @@
 package org.dcache.auth.watches;
 
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.aLoginResult;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.aMapPlugin;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.anAuthPlugin;
@@ -25,12 +26,18 @@ import static org.dcache.auth.watches.LoginResultObservationBuilder.aLoginResult
 import static org.dcache.gplazma.configuration.ConfigurationItemControl.OPTIONAL;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
 import static org.dcache.util.PrincipalSetMaker.aSetOfPrincipals;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.parboiled.Parboiled;
+import org.parboiled.errors.ParseError;
+import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
 
 public class WatchExpressionParserTest {
@@ -95,9 +102,43 @@ public class WatchExpressionParserTest {
         assertFalse(runner.run("OR groupname:it").isSuccess());
     }
 
+    @Test(expected=NullPointerException.class)
+    public void shouldThrowNPEWhenUnescapeNull() {
+        WatchExpressionParser.unescape(null);
+    }
+
+    @Test
+    public void shouldUnescapeEmptyString() {
+        var result = WatchExpressionParser.unescape("");
+        assertThat(result, equalTo(""));
+    }
+
+    @Test
+    public void shouldUnescapeSimpleText() {
+        var result = WatchExpressionParser.unescape("This is a test");
+        assertThat(result, equalTo("This is a test"));
+    }
+
+    @Test
+    public void shouldUnescapeTextWithBlackslashQuote() {
+        var result = WatchExpressionParser.unescape("He said \\\"this is a test\\\".");
+        assertThat(result, equalTo("He said \"this is a test\"."));
+    }
+
+    @Test
+    public void shouldUnescapeTextWithBlackslashN() {
+        var result = WatchExpressionParser.unescape("Line 1,\\nLine2.");
+        assertThat(result, equalTo("Line 1,\nLine2."));
+    }
+
+    @Test(expected=ParserRuntimeException.class)
+    public void shouldThrowParserErrorOnBadEscape() {
+        WatchExpressionParser.unescape("The following escape sequence is unknown\\a");
+    }
+
     @Test
     public void shouldMatchSimpleUsername() {
-        var predicate = runner.run("username:paul").getTopStackValue();
+        var predicate = whenParsing("username:paul");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -119,7 +160,7 @@ public class WatchExpressionParserTest {
 
     @Test
     public void shouldMatchSingleQuotedUsername() {
-        var predicate = runner.run("username:'paul'").getTopStackValue();
+        var predicate = whenParsing("username:'paul'");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -141,7 +182,7 @@ public class WatchExpressionParserTest {
 
     @Test
     public void shouldMatchDoubleQuotedUsername() {
-        var predicate = runner.run("username:\"paul\"").getTopStackValue();
+        var predicate = whenParsing("username:\"paul\"");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -162,8 +203,30 @@ public class WatchExpressionParserTest {
     }
 
     @Test
+    public void shouldMatchDoubleQuotedUsernameWithDoubleQuotes() {
+        var predicate = whenParsing("username:\"pa\\\"ul\"");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("pa\"ul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
     public void shouldNotMatchDifferentSimpleUsername() {
-        var predicate = runner.run("username:paul").getTopStackValue();
+        var predicate = whenParsing("username:paul");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -185,7 +248,7 @@ public class WatchExpressionParserTest {
 
     @Test
     public void shouldMatchSimpleDn() {
-        var predicate = runner.run("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"").getTopStackValue();
+        var predicate = whenParsing("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -207,7 +270,7 @@ public class WatchExpressionParserTest {
 
     @Test
     public void shouldNotMatchSimpleDnMissingPrincipal() {
-        var predicate = runner.run("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"").getTopStackValue();
+        var predicate = whenParsing("dn:\"/DC=org/DC=terena/DC=tcs/C=DE/O=Deutsches Elektronen-Synchrotron DESY/CN=Alexander Paul Millar paul@desy.de\"");
 
         given(aLoginResultObservation().withResult(aLoginResult()
             .withValidationResult(SUCCESS)
@@ -227,8 +290,25 @@ public class WatchExpressionParserTest {
         assertFalse(predicate.test(observation));
     }
 
-
     private void given(LoginResultObservationBuilder builder) {
         observation = builder.build();
+    }
+
+    private Predicate<LoginResultObservation> whenParsing(String argument) {
+        var result = runner.run(argument);
+
+        if (!result.isSuccess()) {
+            var errors = result.getParseErrors().stream()
+                .map(ParseError::getErrorMessage)
+                .collect(Collectors.joining("\n"));
+            throw new AssertionError("Parsing of \"" + argument + "\" failed with errors:\n"
+                + errors);
+        }
+
+        var predicate = result.getTopStackValue();
+
+        assertThat(predicate, not(nullValue()));
+
+        return predicate;
     }
 }
