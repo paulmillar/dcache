@@ -23,6 +23,7 @@ import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import org.dcache.auth.EmailAddressPrincipal;
 import org.dcache.auth.GidPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
@@ -30,6 +31,7 @@ import org.dcache.auth.OidcSubjectPrincipal;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.auth.util.MatchingPrincipalPresent;
+import org.dcache.util.Glob;
 import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
 import org.parboiled.BaseParser;
 import org.parboiled.Rule;
@@ -114,9 +116,30 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule predicate() {
-        // Initially limit ourselves to just <principal>:<literal> here.
-        return sequence(principalType(), ch(':'), principalName(), optionalWhiteSpace(),
-            push(pop().and(pop())));
+        return firstOf(
+            sequence(
+                principalType(),
+                ch(':'),
+                principalName(),
+                optionalWhiteSpace(),
+                push(pop().and(pop()))
+            ),
+            sequence(
+                principalType(),
+                ch('~'),
+                globPrincipalName(),
+                optionalWhiteSpace(),
+                push(pop().and(pop()))
+            ),
+            sequence(
+                principalType(),
+                ch('/'),
+                zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
+                push(pop().and(hasRegExpMatchingName(match()))),
+                ch('/'),
+                optionalWhiteSpace()
+            )
+        );
     }
 
     Rule principalType() {
@@ -143,6 +166,30 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
             sequence(
                 oneOrMore(noneOf(" \t")),
                 push(hasName(match()))
+            )
+        );
+    }
+
+    Rule globPrincipalName() {
+        return firstOf(
+            sequence(
+                ch('\''),
+                zeroOrMore(noneOf("\'")),
+                push(hasGlobMatchingName(match())),
+                ch('\'')
+            ),
+            sequence(
+                ch('"'),
+                zeroOrMore(firstOf(
+                    sequence(ch('\\'), ANY),
+                    noneOf("\"")
+                )),
+                push(hasGlobMatchingName(unescape(match()))),
+                ch('"')
+            ),
+            sequence(
+                oneOrMore(noneOf(" \t")),
+                push(hasGlobMatchingName(match()))
             )
         );
     }
@@ -181,6 +228,9 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 case '\\':
                     sb.append('\\'); // double quote
                     break;
+                case '/':
+                    sb.append('/'); // forward slash
+                    break;
                 default:
                     throw new ParserRuntimeException("Bad escape sequence \"\\" + c + "\" inside double-quote text");
                 }
@@ -207,6 +257,22 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     @VisibleForTesting
     static PrincipalPredicate hasName(String name) {
         MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> p.getName().equals(name));
+        return new PrincipalPredicate(hasPrincipalWithName);
+    }
+
+    @VisibleForTesting
+    static PrincipalPredicate hasGlobMatchingName(String pattern) {
+        return hasMatchingName(new Glob(pattern).toPattern());
+    }
+
+    @VisibleForTesting
+    static PrincipalPredicate hasRegExpMatchingName(String pattern) {
+        return hasMatchingName(Pattern.compile(pattern));
+    }
+
+    @VisibleForTesting
+    static PrincipalPredicate hasMatchingName(Pattern pattern) {
+        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> pattern.matcher(p.getName()).matches());
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 }

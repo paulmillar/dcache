@@ -74,6 +74,27 @@ public class WatchExpressionParserTest {
         assertFalse(runner.run("").isSuccess()); // No predicate
     }
 
+    @Test
+    public void shouldRecogniseGlobPredicates() {
+        assertTrue(runner.run("dn~/C=DE*").isSuccess());
+        assertTrue(runner.run("sub~*@OP").isSuccess());
+        assertTrue(runner.run("email~*@desy.de").isSuccess());
+        assertTrue(runner.run("groupname~it-*").isSuccess());
+        assertTrue(runner.run("username~p??l").isSuccess());
+        assertTrue(runner.run("uid~100?").isSuccess());
+        assertTrue(runner.run("gid~?000").isSuccess());
+    }
+
+    @Test
+    public void shouldRecogniseRegularExpressionPredicates() {
+        assertTrue(runner.run("dn/.*O=Organisation.*/").isSuccess());
+        assertTrue(runner.run("sub/.*@OP/").isSuccess());
+        assertTrue(runner.run("email/[a-z.]*@desy\\.de/").isSuccess());
+        assertTrue(runner.run("groupname/(it|other)-foo/").isSuccess());
+        assertTrue(runner.run("username/p.*/").isSuccess());
+        assertTrue(runner.run("uid/[0-9]{4}/").isSuccess());
+        assertTrue(runner.run("gid/[3-9][2-4]/").isSuccess());
+    }
 
     @Test
     public void shouldRecogniseCombined() {
@@ -1023,6 +1044,62 @@ public class WatchExpressionParserTest {
             .withMapPhase()
                 .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
                 .thatAdds(aSetOfPrincipals().withUid(2000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchGlobUsername() {
+        var predicate = whenParsing("username~p*");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("patrick"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("tigran"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
                 .withResult(SUCCESS)
             .withAccountPhase()
                 .withResult(SUCCESS)
