@@ -61,9 +61,9 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     Rule orLiteral() {
         return firstOf(
-                    sequence(trie("or", "OR"), whiteSpace()),
-                    sequence("||", optionalWhiteSpace())
-                );
+            sequence(trie("or", "OR"), whiteSpace()),
+            sequence("||", optionalWhiteSpace())
+        );
     }
 
     Rule optionalWhiteSpace() {
@@ -80,22 +80,23 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     Rule andLiteral() {
         return firstOf(
-                    sequence(trie("and", "AND"), whiteSpace()),
-                    sequence("&&", optionalWhiteSpace())
-                );
+            sequence(trie("and", "AND"), whiteSpace()),
+            sequence("&&", optionalWhiteSpace())
+        );
     }
 
     Rule term() {
         return firstOf(
             sequence(notLiteral(), predicate(), push(pop().negate())),
-            predicate());
+            predicate()
+        );
     }
 
     Rule notLiteral() {
         return firstOf(
-                sequence(trie("not", "NOT"), whiteSpace()),
-                sequence(ch('!'), optionalWhiteSpace())
-            );
+            sequence(trie("not", "NOT"), whiteSpace()),
+            sequence(ch('!'), optionalWhiteSpace())
+        );
     }
 
     Rule predicate() {
