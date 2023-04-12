@@ -159,6 +159,248 @@ public class WatchExpressionParserTest {
     }
 
     @Test
+    public void shouldMatchSimpleGroupname() {
+        var predicate = whenParsing("groupname:it");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul").withGroupname("it"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchWrongSimpleGroupname() {
+        var predicate = whenParsing("groupname:atlas");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul").withGroupname("it"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchSimpleUid() {
+        var predicate = whenParsing("uid:1000");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleWrongUid() {
+        var predicate = whenParsing("uid:2000");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchSimpleGid() {
+        var predicate = whenParsing("gid:1000");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul").withGroupname("it"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleWrongGid() {
+        var predicate = whenParsing("gid:2000");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul").withGroupname("it"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchSimpleEmail() {
+        var predicate = whenParsing("email:paul.millar@desy.de");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withEmail("paul.millar@desy.de").withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleWrongEmail() {
+        var predicate = whenParsing("email:fred.bloggs@example.org");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withEmail("paul.millar@desy.de").withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchSimpleOidcSub() {
+        var predicate = whenParsing("sub:paul@OP");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withOidc("paul", "OP").withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleWrongByClaimOidcSub() {
+        var predicate = whenParsing("sub:an.other@OP");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withOidc("paul", "OP").withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleWrongByOpOidcSub() {
+        var predicate = whenParsing("sub:paul@OTHER-OP");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withOidc("paul", "OP").withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
     public void shouldMatchSingleQuotedUsername() {
         var predicate = whenParsing("username:'paul'");
 
@@ -288,6 +530,50 @@ public class WatchExpressionParserTest {
                 .withResult(SUCCESS)));
 
         assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldNotMatchSimpleUsernameWithExclaimationNegationIfPresent() {
+        var predicate = whenParsing("!username:paul");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1001).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchSimpleUsernameWithExclaimationNegationIfAbsent() {
+        var predicate = whenParsing("!username:paul");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("tigran"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1001).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
     }
 
     private void given(LoginResultObservationBuilder builder) {
