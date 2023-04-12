@@ -56,7 +56,14 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule orExpression() {
-        return sequence(andExpression(), zeroOrMore(orLiteral(), andExpression(), push(pop().or(pop()))));
+        return sequence(
+            andExpression(),
+            zeroOrMore(
+                orLiteral(),
+                andExpression(),
+                push(pop().or(pop()))
+            )
+        );
     }
 
     Rule orLiteral() {
@@ -75,7 +82,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule andExpression() {
-        return sequence(term(), zeroOrMore(andLiteral(), term(), push(pop().and(pop()))));
+        return sequence(negatable(), zeroOrMore(andLiteral(), negatable(), push(pop().and(pop()))));
     }
 
     Rule andLiteral() {
@@ -85,9 +92,16 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         );
     }
 
+    Rule negatable() {
+        return firstOf(
+            sequence(notLiteral(), term(), push(pop().negate())),
+            term()
+        );
+    }
+
     Rule term() {
         return firstOf(
-            sequence(notLiteral(), predicate(), push(pop().negate())),
+            sequence(ch('('), optionalWhiteSpace(), orExpression(), ch(')'), optionalWhiteSpace()),
             predicate()
         );
     }
