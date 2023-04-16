@@ -27,16 +27,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.dcache.gplazma.LoginObserver;
 import org.dcache.gplazma.monitor.LoginResult;
 import org.dcache.gplazma.monitor.LoginResultPrinter;
 import org.dcache.util.ColumnWriter;
+import org.parboiled.Parboiled;
+import org.parboiled.parserunners.ReportingParseRunner;
 
 /**
  * Support for watching login results.
  */
 public class WatchSupport implements LoginObserver, CellCommandListener{
+
+    private static final WatchExpressionParser PARSER = Parboiled.createParser(WatchExpressionParser.class);
 
     private final Map<String,Watch> watches = new ConcurrentHashMap<>(); // REVISIT, should Map's key be Integer ?
 
@@ -56,9 +61,10 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
                     .header("Description").left("description");
             for (Map.Entry<String,Watch> entry : watches.entrySet()) {
                 Watch thisWatch = entry.getValue();
-                writer.row().value("id", entry.getKey());
-                writer.row().value("count", thisWatch.resultCount());
-                writer.row().value("description", thisWatch.describe());
+                writer.row()
+                    .value("id", entry.getKey())
+                    .value("count", thisWatch.resultCount())
+                    .value("description", thisWatch.describe());
             }
             return writer.toString();
         }
@@ -80,14 +86,12 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         }
     }
 
-
-
     @Command(name = "watch add", hint = "create a new watch",
           description = "Instruct gPlazma to watch for logins that match specific criteria.")
     public class WatchAddCommand implements Callable<String> {
 
         @Argument(usage="Describe which login results are of interest.")
-        private LoginResultMatcher predicate;
+        private String predicate;
 
         /*  TODO
         @Option(name="log", usage="Whether to record interesting logins in the log file.")
@@ -99,11 +103,27 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
 
         @Override
         public String call() throws Exception {
+            Predicate<LoginResultObservation> p = parseExpression();
             String id = Integer.toString(nextId++);
-            String description = Optional.ofNullable(userDescription).orElseGet(predicate::toString);
-            Watch watch = new LoginResultPredicateWatch(predicate, description);
+            String description = Optional.ofNullable(userDescription).orElse(predicate);
+            Watch watch = new LoginResultPredicateWatch(p, description);
             watches.put(id, watch);
             return "Watch " + id + " added.";
+        }
+
+        private Predicate<LoginResultObservation> parseExpression() throws CommandException {
+            ReportingParseRunner<Predicate<LoginResultObservation>> runner = new ReportingParseRunner(PARSER.input());
+            var result = runner.run(predicate);
+
+            if (!result.isSuccess()) {
+                var errors = result.getParseErrors().stream()
+                    .map(Object::toString)
+                    .collect(Collectors.joining("\n\n"));
+                throw new CommandException("Parsing of \"" + predicate + "\" failed with errors:\n"
+                    + errors);
+            }
+
+            return result.getTopStackValue();
         }
     }
 

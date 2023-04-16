@@ -67,6 +67,7 @@
     <property name="observers">
       <util:list>
 	<bean class="org.dcache.gplazma.RecordFailedLogins"/>
+	<bean class="org.dcache.auth.watches.WatchSupport"/>
       </util:list>
     </property>
   </bean>
