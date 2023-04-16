@@ -168,7 +168,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 ch('"')
             ),
             sequence(
-                oneOrMore(noneOf(" \t)")),
+                oneOrMore(noneOf(" \t)&|")),
                 push(hasName(match()))
             )
         );
