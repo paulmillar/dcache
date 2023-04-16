@@ -121,6 +121,29 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule predicate() {
+        return firstOf(
+            principalTypeAndNamePredicate(),
+            principalTypePredicate()
+            /* TODO Add predicates for:
+                door-supplied input (type and type-specific-aspects),
+                login-attributes,
+                login result (success/failure)
+                whether a phase ran (and with what result).
+                whether a plugin ran (and with what results).
+            */
+        );
+    }
+
+    Rule principalTypePredicate() {
+        StringVar principalType = new StringVar();
+        return sequence(
+            principalType(principalType),
+            optionalWhiteSpace(),
+            push(hasType(principalType.get()))
+        );
+    }
+
+    Rule principalTypeAndNamePredicate() {
         StringVar principalType = new StringVar();
         StringVar principalName = new StringVar();
 
@@ -229,6 +252,18 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
         }
         return sb.toString();
+    }
+
+    @VisibleForTesting
+    static PrincipalPredicate hasType(String typeLabel) {
+        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        if (type == null) {
+            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
+        }
+        var predicate = decorate((Principal p) -> type.isInstance(p))
+                .withDescription("is " + typeLabel);
+        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(predicate);
+        return new PrincipalPredicate(hasPrincipalOfType);
     }
 
     @VisibleForTesting

@@ -24,6 +24,9 @@ import static org.dcache.auth.watches.LoginResultBuilderFramework.aMapPlugin;
 import static org.dcache.auth.watches.LoginResultBuilderFramework.anAuthPlugin;
 import static org.dcache.auth.watches.LoginResultObservationBuilder.aLoginResultObservation;
 import static org.dcache.gplazma.configuration.ConfigurationItemControl.OPTIONAL;
+import static org.dcache.gplazma.configuration.ConfigurationItemControl.REQUISITE;
+import org.dcache.gplazma.monitor.LoginMonitor;
+import static org.dcache.gplazma.monitor.LoginMonitor.Result.FAIL;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
 import org.dcache.util.ColumnWriter;
 import static org.dcache.util.PrincipalSetMaker.aSetOfPrincipals;
@@ -63,6 +66,7 @@ public class WatchExpressionParserTest {
 
     @Test
     public void shouldRecogniseSimplePredicates() {
+        // Principal type and name
         assertTrue(runner.run("dn:/C=DE/O=GermanGrid/OU=DESY/CN=Paul").isSuccess());
         assertTrue(runner.run("sub:0123456").isSuccess());
         assertTrue(runner.run("email:paul.millar@desy.de").isSuccess());
@@ -71,9 +75,12 @@ public class WatchExpressionParserTest {
         assertTrue(runner.run("uid:1000").isSuccess());
         assertTrue(runner.run("gid:1000").isSuccess());
 
+        // Principal type
+        assertTrue(runner.run("username").isSuccess());
+
+        // Invalid
         assertFalse(runner.run("user:paul").isSuccess()); // Unknown principal type
         assertFalse(runner.run("username:").isSuccess()); // Missing value
-        assertFalse(runner.run("username").isSuccess()); // Missing operation
         assertFalse(runner.run("").isSuccess()); // No predicate
     }
 
@@ -1108,6 +1115,35 @@ public class WatchExpressionParserTest {
                 .withResult(SUCCESS)
             .withSessionPhase()
                 .withResult(SUCCESS)));
+
+        assertFalse(predicate.test(observation));
+    }
+
+    @Test
+    public void shouldMatchUsernameType() {
+        var predicate = whenParsing("username");
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withValidationResult(SUCCESS)
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUsername("paul"))
+                .withResult(SUCCESS)
+            .withMapPhase()
+                .with(aMapPlugin("multimap", OPTIONAL).withSuccess())
+                .thatAdds(aSetOfPrincipals().withUid(1000).withPrimaryGid(1000))
+                .withResult(SUCCESS)
+            .withAccountPhase()
+                .withResult(SUCCESS)
+            .withSessionPhase()
+                .withResult(SUCCESS)));
+
+        assertTrue(predicate.test(observation));
+
+        given(aLoginResultObservation().withResult(aLoginResult()
+            .withAuthPhase()
+                .with(anAuthPlugin("oidc", REQUISITE).withError("No access token"))
+                .withResult(FAIL)));
 
         assertFalse(predicate.test(observation));
     }
