@@ -123,28 +123,29 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     Rule predicate() {
         StringVar principalType = new StringVar();
         StringVar principalName = new StringVar();
-        return firstOf(
-            sequence(
-                principalType(principalType),
-                ch(':'),
-                principalName(principalName),
-                optionalWhiteSpace(),
-                push(hasTypeAndExactName(principalType.get(), principalName.get()))
-            ),
-            sequence(
-                principalType(principalType),
-                ch('~'),
-                principalName(principalName),
-                optionalWhiteSpace(),
-                push(hasTypeAndGlobMatchingName(principalType.get(), principalName.get()))
-            ),
-            sequence(
-                principalType(principalType),
-                ch('/'),
-                zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
-                push(hasTypeAndRegExpMatchingName(principalType.get(), match())),
-                ch('/'),
-                optionalWhiteSpace()
+
+        return sequence(
+            principalType(principalType),
+            firstOf(
+                sequence(
+                    ch(':'),
+                    principalName(principalName),
+                    optionalWhiteSpace(),
+                    push(hasTypeAndExactName(principalType.get(), principalName.get()))
+                ),
+                sequence(
+                    ch('~'),
+                    principalName(principalName),
+                    optionalWhiteSpace(),
+                    push(hasTypeAndGlobMatchingName(principalType.get(), principalName.get()))
+                ),
+                sequence(
+                    ch('/'),
+                    zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
+                    push(hasTypeAndRegExpMatchingName(principalType.get(), match())),
+                    ch('/'),
+                    optionalWhiteSpace()
+                )
             )
         );
     }
