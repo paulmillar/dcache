@@ -112,6 +112,9 @@ public class LoginResultBuilderFramework {
 
         public T withResult(LoginMonitor.Result result) {
             phaseResult().setResult(result);
+            if (phaseResult().getPrincipals() == null) {
+                phaseResult().setPrincipals(Collections.emptySet(), Collections.emptySet()); // REVISIT
+            }
             return (T)this;
         }
     }
