@@ -41,6 +41,7 @@ import org.parboiled.BaseParser;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.errors.ParserRuntimeException;
+import org.parboiled.support.StringVar;
 
 /**
  * A class responsible for parsing a watch expression.
@@ -120,42 +121,44 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule predicate() {
+        StringVar principalType = new StringVar();
+        StringVar principalName = new StringVar();
         return firstOf(
             sequence(
-                principalType(),
+                principalType(principalType),
                 ch(':'),
-                principalName(),
+                principalName(principalName),
                 optionalWhiteSpace(),
-                push(pop().and(pop()))
+                push(hasTypeAndExactName(principalType.get(), principalName.get()))
             ),
             sequence(
-                principalType(),
+                principalType(principalType),
                 ch('~'),
-                globPrincipalName(),
+                principalName(principalName),
                 optionalWhiteSpace(),
-                push(pop().and(pop()))
+                push(hasTypeAndGlobMatchingName(principalType.get(), principalName.get()))
             ),
             sequence(
-                principalType(),
+                principalType(principalType),
                 ch('/'),
                 zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
-                push(pop().and(hasRegExpMatchingName(match()))),
+                push(hasTypeAndRegExpMatchingName(principalType.get(), match())),
                 ch('/'),
                 optionalWhiteSpace()
             )
         );
     }
 
-    Rule principalType() {
-        return sequence(trie(TYPES_BY_LABEL.keySet()), push(hasType(match())));
+    Rule principalType(StringVar principalType) {
+        return sequence(trie(TYPES_BY_LABEL.keySet()), principalType.set(match()));
     }
 
-    Rule principalName() {
+    Rule principalName(StringVar principalName) {
         return firstOf(
             sequence(
                 ch('\''),
                 zeroOrMore(noneOf("\'")),
-                push(hasName(match())),
+                principalName.set(match()),
                 ch('\'')
             ),
             sequence(
@@ -164,36 +167,12 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                     sequence(ch('\\'), ANY),
                     noneOf("\"")
                 )),
-                push(hasName(unescape(match()))),
+                principalName.set(unescape(match())),
                 ch('"')
             ),
             sequence(
                 oneOrMore(noneOf(" \t)&|")),
-                push(hasName(match()))
-            )
-        );
-    }
-
-    Rule globPrincipalName() {
-        return firstOf(
-            sequence(
-                ch('\''),
-                zeroOrMore(noneOf("\'")),
-                push(hasGlobMatchingName(match())),
-                ch('\'')
-            ),
-            sequence(
-                ch('"'),
-                zeroOrMore(firstOf(
-                    sequence(ch('\\'), ANY),
-                    noneOf("\"")
-                )),
-                push(hasGlobMatchingName(unescape(match()))),
-                ch('"')
-            ),
-            sequence(
-                oneOrMore(noneOf(" \t")),
-                push(hasGlobMatchingName(match()))
+                principalName.set(match())
             )
         );
     }
@@ -252,38 +231,39 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasType(String label) {
-        Class<? extends Principal> type = TYPES_BY_LABEL.get(label);
+    static PrincipalPredicate hasTypeAndExactName(String typeLabel, String name) {
+        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
-            throw new ParserRuntimeException("Unknown principal type \"" + label + "\"");
+            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
         }
-        var predicate = decorate((Principal p) -> type.isInstance(p))
-                .withDescription("type \"" + label + "\"");
-        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(predicate);
-        return new PrincipalPredicate(hasPrincipalOfType);
-    }
-
-    @VisibleForTesting
-    static PrincipalPredicate hasName(String name) {
         requireNonNull(name, "hasName with null argument");
-        var predicate = decorate((Principal p) -> p.getName().equals(name))
-                .withDescription("name \"" + name + "\"");
+        var predicate = decorate((Principal p) -> type.isInstance(p) && p.getName().equals(name))
+                .withDescription("is " + typeLabel + " and name is \"" + name + "\"");
         MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasGlobMatchingName(String globPattern) {
+    static PrincipalPredicate hasTypeAndGlobMatchingName(String typeLabel, String globPattern) {
+        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        if (type == null) {
+            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
+        }
         requireNonNull(globPattern, "hasGlobMatchingName with null argument");
-        return hasMatchingName("name matching glob \"" + globPattern + "\"", new Glob(globPattern).toPattern());
+        return hasTypeAndMatchingName("is " + typeLabel + " and name matching glob \""
+            + globPattern + "\"", type, new Glob(globPattern).toPattern());
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasRegExpMatchingName(String pattern) {
+    static PrincipalPredicate hasTypeAndRegExpMatchingName(String typeLabel, String pattern) {
+        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        if (type == null) {
+            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
+        }
         requireNonNull(pattern, "hasRegExpMatchingName with null argument");
         try {
-            return hasMatchingName("name matching regular expression \"" + pattern + "\"",
-                Pattern.compile(pattern));
+            return hasTypeAndMatchingName("is " + typeLabel + " and name matching regular"
+                + " expression \"" + pattern + "\"", type, Pattern.compile(pattern));
         } catch (PatternSyntaxException e) {
             throw new ParserRuntimeException("Bad regular expression \"" + pattern + "\": "
                 + e.getMessage());
@@ -291,8 +271,8 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasMatchingName(String description, Pattern pattern) {
-        var predicate = decorate((Principal p) -> pattern.matcher(p.getName()).matches())
+    static PrincipalPredicate hasTypeAndMatchingName(String description, Class<? extends Principal> type, Pattern pattern) {
+        var predicate = decorate((Principal p) -> type.isInstance(p) && pattern.matcher(p.getName()).matches())
                 .withDescription(description);
         MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
