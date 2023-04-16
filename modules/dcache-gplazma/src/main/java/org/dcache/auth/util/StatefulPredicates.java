@@ -22,7 +22,10 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Arrays.asList;
+import java.util.Collection;
+import java.util.Collections;
 import static java.util.Objects.requireNonNull;
+import java.util.function.Predicate;
 
 /**
  * A collection of useful methods for operating with StatefulePredicates.
@@ -55,10 +58,27 @@ public class StatefulPredicates {
         }
 
         protected final List<StatefulPredicate<T>> innerPredicates;
+        private final String description;
 
         public Combined(StatefulPredicate<T>... predicate) {
             checkArgument(predicate.length > 0);
             this.innerPredicates = asList(predicate);
+            description = buildDescription();
+        }
+
+        protected String describeInner() {
+            return "("
+                + innerPredicates.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining("; "))
+                + ")";
+        }
+
+        protected abstract String buildDescription();
+
+        @Override
+        public String toString() {
+            return description;
         }
     }
 
@@ -85,6 +105,11 @@ public class StatefulPredicates {
 
         public Disjunction(StatefulPredicate<T>... predicate) {
             super(predicate);
+        }
+
+        @Override
+        protected String buildDescription() {
+            return "OR of " + describeInner();
         }
 
         public DisjunctionChecker start() {
@@ -119,6 +144,11 @@ public class StatefulPredicates {
         }
 
         @Override
+        protected String buildDescription() {
+            return "AND of " + describeInner();
+        }
+
+        @Override
         public ConjunctionChecker<T> start() {
             return new ConjunctionChecker(innerPredicates);
         }
@@ -128,7 +158,7 @@ public class StatefulPredicates {
      * Return the logical NOT of the supplied StatefulPredicate argument.
      */
     public static class Negation<T> implements StatefulPredicate<T> {
-        private class NegationChecker<T> implements Checker<T> {
+        public class NegationChecker<T> implements Checker<T> {
             private final Checker<T> innerChecker;
 
             NegationChecker(Checker<T> checker) {
@@ -160,6 +190,11 @@ public class StatefulPredicates {
         @Override
         public NegationChecker<T> start() {
             return new NegationChecker(predicate.start());
+        }
+
+        @Override
+        public String toString() {
+            return "NOT " + predicate;
         }
     }
 

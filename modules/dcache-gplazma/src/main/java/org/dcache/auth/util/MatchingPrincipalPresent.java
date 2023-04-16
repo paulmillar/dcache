@@ -56,4 +56,8 @@ public class MatchingPrincipalPresent implements StatefulPredicate<Principal> {
     public StatefulPredicate.Checker<Principal> start() {
         return new MatchingPrincipalPresentChecker();
     }
+
+    public String toString() {
+        return "Test ∃ principal with " + predicate.toString();
+    }
 }

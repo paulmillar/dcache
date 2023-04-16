@@ -22,14 +22,18 @@ import java.security.Principal;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.dcache.auth.EmailAddressPrincipal;
 import org.dcache.auth.GidPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
 import org.dcache.auth.OidcSubjectPrincipal;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
+import org.dcache.auth.util.DescriptivePredicate;
+import static org.dcache.auth.util.DescriptivePredicate.decorate;
 import org.dcache.auth.util.MatchingPrincipalPresent;
 import org.dcache.util.Glob;
 import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
@@ -37,8 +41,6 @@ import org.parboiled.BaseParser;
 import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.errors.ParserRuntimeException;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * A class responsible for parsing a watch expression.
@@ -255,32 +257,45 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         if (type == null) {
             throw new ParserRuntimeException("Unknown principal type \"" + label + "\"");
         }
-        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(type::isInstance);
+        var predicate = decorate((Principal p) -> type.isInstance(p))
+                .withDescription("type \"" + label + "\"");
+        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(predicate);
         return new PrincipalPredicate(hasPrincipalOfType);
     }
 
     @VisibleForTesting
     static PrincipalPredicate hasName(String name) {
         requireNonNull(name, "hasName with null argument");
-        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> p.getName().equals(name));
+        var predicate = decorate((Principal p) -> p.getName().equals(name))
+                .withDescription("name \"" + name + "\"");
+        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasGlobMatchingName(String pattern) {
-        requireNonNull(pattern, "hasGlobMatchingName with null argument");
-        return hasMatchingName(new Glob(pattern).toPattern());
+    static PrincipalPredicate hasGlobMatchingName(String globPattern) {
+        requireNonNull(globPattern, "hasGlobMatchingName with null argument");
+        return hasMatchingName("name matching glob \"" + globPattern + "\"", new Glob(globPattern).toPattern());
     }
 
     @VisibleForTesting
     static PrincipalPredicate hasRegExpMatchingName(String pattern) {
         requireNonNull(pattern, "hasRegExpMatchingName with null argument");
-        return hasMatchingName(Pattern.compile(pattern));
+        try {
+            return hasMatchingName("name matching regular expression \"" + pattern + "\"",
+                Pattern.compile(pattern));
+        } catch (PatternSyntaxException e) {
+            throw new ParserRuntimeException("Bad regular expression \"" + pattern + "\": "
+                + e.getMessage());
+        }
     }
 
     @VisibleForTesting
-    static PrincipalPredicate hasMatchingName(Pattern pattern) {
-        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> pattern.matcher(p.getName()).matches());
+    static PrincipalPredicate hasMatchingName(String description, Pattern pattern) {
+        var predicate = decorate((Principal p) -> pattern.matcher(p.getName()).matches())
+                .withDescription(description);
+        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
     }
+
 }
