@@ -38,6 +38,8 @@ import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.errors.ParserRuntimeException;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A class responsible for parsing a watch expression.
  */
@@ -164,7 +166,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 ch('"')
             ),
             sequence(
-                oneOrMore(noneOf(" \t")),
+                oneOrMore(noneOf(" \t)")),
                 push(hasName(match()))
             )
         );
@@ -250,23 +252,29 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     @VisibleForTesting
     static PrincipalPredicate hasType(String label) {
         Class<? extends Principal> type = TYPES_BY_LABEL.get(label);
+        if (type == null) {
+            throw new ParserRuntimeException("Unknown principal type \"" + label + "\"");
+        }
         MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(type::isInstance);
         return new PrincipalPredicate(hasPrincipalOfType);
     }
 
     @VisibleForTesting
     static PrincipalPredicate hasName(String name) {
+        requireNonNull(name, "hasName with null argument");
         MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(p -> p.getName().equals(name));
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 
     @VisibleForTesting
     static PrincipalPredicate hasGlobMatchingName(String pattern) {
+        requireNonNull(pattern, "hasGlobMatchingName with null argument");
         return hasMatchingName(new Glob(pattern).toPattern());
     }
 
     @VisibleForTesting
     static PrincipalPredicate hasRegExpMatchingName(String pattern) {
+        requireNonNull(pattern, "hasRegExpMatchingName with null argument");
         return hasMatchingName(Pattern.compile(pattern));
     }
 
