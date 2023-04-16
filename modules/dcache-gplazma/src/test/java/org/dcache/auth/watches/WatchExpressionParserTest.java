@@ -25,6 +25,7 @@ import static org.dcache.auth.watches.LoginResultBuilderFramework.anAuthPlugin;
 import static org.dcache.auth.watches.LoginResultObservationBuilder.aLoginResultObservation;
 import static org.dcache.gplazma.configuration.ConfigurationItemControl.OPTIONAL;
 import static org.dcache.gplazma.monitor.LoginMonitor.Result.SUCCESS;
+import org.dcache.util.ColumnWriter;
 import static org.dcache.util.PrincipalSetMaker.aSetOfPrincipals;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -36,9 +37,11 @@ import org.junit.Test;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.parboiled.Parboiled;
+import org.parboiled.errors.InvalidInputError;
 import org.parboiled.errors.ParseError;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.parserunners.ReportingParseRunner;
+import org.parboiled.support.MatcherPath;
 
 public class WatchExpressionParserTest {
 
@@ -1118,8 +1121,8 @@ public class WatchExpressionParserTest {
 
         if (!result.isSuccess()) {
             var errors = result.getParseErrors().stream()
-                .map(ParseError::getErrorMessage)
-                .collect(Collectors.joining("\n"));
+                .map(e -> describe(e, argument))
+                .collect(Collectors.joining("\n\n"));
             throw new AssertionError("Parsing of \"" + argument + "\" failed with errors:\n"
                 + errors);
         }
@@ -1129,5 +1132,71 @@ public class WatchExpressionParserTest {
         assertThat(predicate, not(nullValue()));
 
         return predicate;
+    }
+
+    private static String describe(ParseError e, String argument) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('[').append(e.getStartIndex()).append(":").append(e.getEndIndex()).append(']');
+        sb.append(" --> ").append(e.getErrorMessage());
+        if (e instanceof InvalidInputError) {
+            InvalidInputError iie = (InvalidInputError) e;
+            sb.append(iie.getFailedMatchers().stream()
+                .map(mp -> describe(mp, argument))
+                .collect(Collectors.joining("\n", "\nFailed-matchers:", "\n")));
+        }
+        return sb.toString();
+    }
+
+    private static String describe(MatcherPath mp, String argument) {
+        ColumnWriter writer = new ColumnWriter();
+        writer
+            .header("Count").right("LEVEL")
+            .space()
+            .header("Label").left("LABEL")
+            .space()
+            .header("Input").left("INPUT");
+        return "\n" + describeRecursive(writer, mp, argument).toString();
+    }
+
+    private static ColumnWriter describeRecursive(ColumnWriter writer, MatcherPath mp, String argument) {
+        if (mp.hasParent()) {
+            describeRecursive(writer, mp.getParent(), argument);
+        }
+        MatcherPath.Element e = mp.getElement();
+        writer.row()
+            .value("LEVEL", e.getLevel()+1)
+            .value("LABEL", e.getMatcher())
+            .value("INPUT", appendStringIndex(e.getStartIndex(), argument));
+
+        return writer;
+    }
+
+    private static String appendStringIndex(int index, String argument) {
+        StringBuilder sb = new StringBuilder();
+        int start = Math.max(0, index-8);
+
+        if (start < index) {
+            sb.append("[");
+            if (start > 0) {
+                sb.append("...");
+            }
+            int preStart = Math.min(start, argument.length()-1);
+            int preEnd = Math.min(index, argument.length()-1);
+            sb.append(argument.substring(preStart, preEnd));
+            sb.append("]");
+        }
+
+        if (index < argument.length()-1) {
+            if (start < index) {
+                sb.append(' ');
+            }
+            int end = Math.min(index+8, argument.length()-1);
+            sb.append(argument.substring(index, end));
+            if (end < argument.length()-1) {
+                sb.append("...");
+            }
+        }
+
+        return sb.toString();
     }
 }
