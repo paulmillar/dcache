@@ -17,9 +17,11 @@
  */
 package org.dcache.auth.watches;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
@@ -27,39 +29,51 @@ import java.util.function.Predicate;
  */
 public class LoginResultPredicateWatch implements Watch {
 
-  private final List<LoginResultObservation> results = new ArrayList<>();
-  private final String description;
-  private final Predicate<LoginResultObservation> predicate;
+    private final List<LoginResultObservation> results = new ArrayList<>();
+    private final String description;
+    private final Predicate<LoginResultObservation> predicate;
 
-  public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description) {
-    this.description = Objects.requireNonNull(description);
-    this.predicate = Objects.requireNonNull(predicate);
-  }
-
-  @Override
-  public List<LoginResultObservation> list() {
-    return List.copyOf(results);
-  }
-
-  @Override
-  public String describe() {
-    return description;
-  }
-
-  @Override
-  public int resultCount() {
-    return results.size();
-  }
-
-  @Override
-  public void accept(LoginResultObservation observation) {
-    if (predicate.test(observation)) {
-      results.add(observation);
+    public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description) {
+        this.description = Objects.requireNonNull(description);
+        this.predicate = Objects.requireNonNull(predicate);
     }
-  }
 
-  @Override
-  public void reset() {
-    results.clear();
-  }
+    @Override
+    public List<LoginResultObservation> list() {
+        return List.copyOf(results);
+    }
+
+    @Override
+    public String describe() {
+        return description;
+    }
+
+    @Override
+    public WatchSummary summarise() {
+        Instant oldest = null;
+        Instant newest = null;
+        for (LoginResultObservation result : results) {
+            Instant whenObserved = result.getWhenObserved();
+            if (oldest == null || whenObserved.isBefore(oldest)) {
+                oldest = whenObserved;
+            }
+            if (newest == null || whenObserved.isAfter(newest)) {
+                newest = whenObserved;
+            }
+        }
+        return new WatchSummary(Optional.ofNullable(oldest), Optional.ofNullable(newest),
+            results.size());
+    }
+
+    @Override
+    public void accept(LoginResultObservation observation) {
+        if (predicate.test(observation)) {
+            results.add(observation);
+        }
+    }
+
+    @Override
+    public void reset() {
+        results.clear();
+    }
 }

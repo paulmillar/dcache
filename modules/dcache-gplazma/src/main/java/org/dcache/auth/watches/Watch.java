@@ -40,11 +40,9 @@ public interface Watch extends Consumer<LoginResultObservation> {
     String describe();
 
     /**
-     * The number of LoginResult objects currently stored in this Watch.  The value should be the
-     * same as {@literal list().size()}, but without creating the list.
-     * @return The number of available LoginResult entries.
+     * Provide a summary description of the current status of this watch.
      */
-    int resultCount();
+    WatchSummary summarise();
 
     /**
      * Clear the stored results.

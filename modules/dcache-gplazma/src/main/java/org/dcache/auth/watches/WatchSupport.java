@@ -23,6 +23,7 @@ import static dmg.util.CommandException.checkCommand;
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.Option;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -33,6 +34,7 @@ import org.dcache.gplazma.LoginObserver;
 import org.dcache.gplazma.monitor.LoginResult;
 import org.dcache.gplazma.monitor.LoginResultPrinter;
 import org.dcache.util.ColumnWriter;
+import org.dcache.util.TimeUtils;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
 
@@ -55,16 +57,22 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         private String id;
 
         private String listWatches() {
-            ColumnWriter writer = new ColumnWriter()
+            ColumnWriter writer = new ColumnWriter().headersInColumns()
                     .header("ID").left("id").space()
                     .header("Count").right("count").space()
+                    .header("Oldest").left("oldest").space()
+                    .header("Newest").left("newest").space()
                     .header("Description").left("description");
             for (Map.Entry<String,Watch> entry : watches.entrySet()) {
                 Watch thisWatch = entry.getValue();
-                writer.row()
-                    .value("id", entry.getKey())
-                    .value("count", thisWatch.resultCount())
-                    .value("description", thisWatch.describe());
+                WatchSummary summary = thisWatch.summarise();
+        writer
+            .row()
+            .value("id", entry.getKey())
+            .value("count", summary.observationCount())
+            .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
+            .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
+            .value("description", thisWatch.describe());
             }
             return writer.toString();
         }
