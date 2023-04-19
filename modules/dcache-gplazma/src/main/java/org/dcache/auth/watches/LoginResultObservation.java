@@ -20,6 +20,8 @@ package org.dcache.auth.watches;
 import java.time.Instant;
 import java.util.Objects;
 import org.dcache.gplazma.monitor.LoginResult;
+import org.dcache.gplazma.monitor.LoginResultPrinter;
+import org.dcache.util.TimeUtils;
 
 /**
  * Information about a specific login result.  This class includes both the login result itself
@@ -41,4 +43,14 @@ public class LoginResultObservation {
   public Instant getWhenObserved() {
     return whenObserved;
   }
+
+    public String print() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Observed: ");
+        TimeUtils.appendRelativeTimestamp(sb, whenObserved.toEpochMilli(),
+              System.currentTimeMillis(), TimeUtils.TimeUnitFormat.SHORT).append('\n');
+
+        sb.append(new LoginResultPrinter(result).print());
+        return sb.toString();
+    }
 }

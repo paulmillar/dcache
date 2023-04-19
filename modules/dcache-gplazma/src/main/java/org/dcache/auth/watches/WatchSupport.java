@@ -82,9 +82,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             checkCommand(watch != null, "Unknown watch with ID %s", id);
 
             return watch.list().stream()
-                .map(LoginResultObservation::getResult)
-                .map(LoginResultPrinter::new)
-                .map(LoginResultPrinter::print)
+                .map(LoginResultObservation::print)
                 .collect(Collectors.joining("\n"));
         }
 
