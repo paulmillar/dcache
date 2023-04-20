@@ -17,8 +17,8 @@
  */
 package org.dcache.auth.watches;
 
+import com.google.common.collect.EvictingQueue;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,17 +29,21 @@ import java.util.function.Predicate;
  */
 public class LoginResultPredicateWatch implements Watch {
 
-    private final List<LoginResultObservation> results = new ArrayList<>();
+    private final EvictingQueue<LoginResultObservation> results;
     private final String description;
     private final Predicate<LoginResultObservation> predicate;
 
-    public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description) {
+    private Instant newestObservation;
+
+    public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description,
+            int capacity) {
         this.description = Objects.requireNonNull(description);
         this.predicate = Objects.requireNonNull(predicate);
+        results = EvictingQueue.create(capacity);
     }
 
     @Override
-    public List<LoginResultObservation> list() {
+    public synchronized List<LoginResultObservation> list() {
         return List.copyOf(results);
     }
 
@@ -49,31 +53,23 @@ public class LoginResultPredicateWatch implements Watch {
     }
 
     @Override
-    public WatchSummary summarise() {
-        Instant oldest = null;
-        Instant newest = null;
-        for (LoginResultObservation result : results) {
-            Instant whenObserved = result.getWhenObserved();
-            if (oldest == null || whenObserved.isBefore(oldest)) {
-                oldest = whenObserved;
-            }
-            if (newest == null || whenObserved.isAfter(newest)) {
-                newest = whenObserved;
-            }
-        }
-        return new WatchSummary(Optional.ofNullable(oldest), Optional.ofNullable(newest),
-            results.size());
+    public synchronized WatchSummary summarise() {
+        Optional<Instant> oldest = Optional.ofNullable(results.peek())
+            .map(LoginResultObservation::getWhenObserved);
+        return new WatchSummary(oldest, Optional.ofNullable(newestObservation), results.size(),
+            results.size() + results.remainingCapacity());
     }
 
     @Override
-    public void accept(LoginResultObservation observation) {
+    public synchronized void accept(LoginResultObservation observation) {
         if (predicate.test(observation)) {
             results.add(observation);
+            newestObservation = observation.getWhenObserved();
         }
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
         results.clear();
     }
 }

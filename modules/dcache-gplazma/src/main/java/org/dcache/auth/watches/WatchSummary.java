@@ -28,12 +28,14 @@ public class WatchSummary {
     private final Optional<Instant> oldestObservation;
     private final Optional<Instant> newestObservation;
     private final int observationCount;
+    private final int capacity;
 
     public WatchSummary(Optional<Instant> oldestObservation, Optional<Instant> newestObservation,
-            int observationCount) {
+            int observationCount, int capacity) {
         this.oldestObservation = requireNonNull(oldestObservation);
         this.newestObservation = requireNonNull(newestObservation);
         this.observationCount = observationCount;
+        this.capacity = capacity;
     }
 
     public Optional<Instant> oldestObservation() {
@@ -46,5 +48,9 @@ public class WatchSummary {
 
     public int observationCount() {
         return observationCount;
+    }
+
+    public int capacity() {
+        return capacity;
     }
 }

@@ -68,7 +68,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
                 WatchSummary summary = thisWatch.summarise();
                 writer.row()
                     .value("id", entry.getKey())
-                    .value("count", summary.observationCount())
+                    .value("count", summary.observationCount() + "/" + summary.capacity())
                     .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("description", thisWatch.describe());
@@ -98,12 +98,14 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         @Argument(usage="Describe which login results are of interest.")
         private String predicate;
 
-        /*  TODO
-        @Option(name="log", usage="Whether to record interesting logins in the log file.")
-        private boolean logMatching;
-        */
+        @Option(name="capacity", usage="The maximum number of observations retained for later"
+            + " examination.", metaVar="COUNT")
+        private int capacity=5;
 
-        @Option(name="description", usage="A description of this watch")
+        @Option(name="target", usage="Where to send reports.")
+        private String[] targets;
+
+        @Option(name="description", usage="Some meaningful label used to describe this watch.")
         private String userDescription;
 
         @Override
@@ -111,7 +113,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             Predicate<LoginResultObservation> p = parseExpression();
             String id = Integer.toString(nextId++);
             String description = Optional.ofNullable(userDescription).orElse(predicate);
-            Watch watch = new LoginResultPredicateWatch(p, description);
+            Watch watch = new LoginResultPredicateWatch(p, description, capacity);
             watches.put(id, watch);
             return "Watch " + id + " added.";
         }
