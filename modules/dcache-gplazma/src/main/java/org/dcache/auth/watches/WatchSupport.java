@@ -66,13 +66,12 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             for (Map.Entry<String,Watch> entry : watches.entrySet()) {
                 Watch thisWatch = entry.getValue();
                 WatchSummary summary = thisWatch.summarise();
-        writer
-            .row()
-            .value("id", entry.getKey())
-            .value("count", summary.observationCount())
-            .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
-            .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
-            .value("description", thisWatch.describe());
+                writer.row()
+                    .value("id", entry.getKey())
+                    .value("count", summary.observationCount())
+                    .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
+                    .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
+                    .value("description", thisWatch.describe());
             }
             return writer.toString();
         }
