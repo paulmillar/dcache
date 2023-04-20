@@ -111,11 +111,11 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         @Override
         public String call() throws Exception {
             Predicate<LoginResultObservation> p = parseExpression();
-            String id = Integer.toString(nextId++);
+            String id = "WATCH-" + nextId++;
             String description = Optional.ofNullable(userDescription).orElse(predicate);
             Watch watch = new LoginResultPredicateWatch(p, description, capacity);
             watches.put(id, watch);
-            return "Watch " + id + " added.";
+            return id + " added.";
         }
 
         private Predicate<LoginResultObservation> parseExpression() throws CommandException {
