@@ -32,15 +32,17 @@ public class LoginResultPredicateWatch implements Watch {
     private final EvictingQueue<LoginResultObservation> results;
     private final String description;
     private final Predicate<LoginResultObservation> predicate;
+    private final boolean pauseWhenFull;
 
     private boolean isPaused;
     private Instant newestObservation;
 
     public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description,
-            int capacity) {
+            int capacity, boolean pauseWhenFull) {
         this.description = Objects.requireNonNull(description);
         this.predicate = Objects.requireNonNull(predicate);
         results = EvictingQueue.create(capacity);
+        this.pauseWhenFull = pauseWhenFull;
     }
 
     @Override
@@ -64,6 +66,9 @@ public class LoginResultPredicateWatch implements Watch {
     @Override
     public synchronized void accept(LoginResultObservation observation) {
         if (!isPaused && predicate.test(observation)) {
+            if (pauseWhenFull && results.remainingCapacity() == 1) {
+                isPaused = true;
+            }
             results.add(observation);
             newestObservation = observation.getWhenObserved();
         }
@@ -71,6 +76,10 @@ public class LoginResultPredicateWatch implements Watch {
 
     @Override
     public synchronized void reset() {
+        if (results.remainingCapacity() == 0 && pauseWhenFull) {
+            isPaused = false;
+        }
+        newestObservation = null;
         results.clear();
     }
 

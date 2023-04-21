@@ -60,7 +60,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             ColumnWriter writer = new ColumnWriter().headersInColumns()
                     .header("ID").left("id").space()
                     .header("Count").right("count").space()
-                    .header("Status").right("status").space()
+                    .header("State").right("state").space()
                     .header("Oldest").left("oldest").space()
                     .header("Newest").left("newest").space()
                     .header("Description").left("description");
@@ -70,7 +70,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
                 writer.row()
                     .value("id", entry.getKey())
                     .value("count", summary.observationCount() + "/" + summary.capacity())
-                    .value("status", summary.isPaused() ? "PAUSED" : "ACTIVE")
+                    .value("state", summary.isPaused() ? "PAUSED" : "ACTIVE")
                     .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("description", thisWatch.describe());
@@ -107,15 +107,23 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         @Option(name="target", usage="Where to send reports.")
         private String[] targets;
 
-        @Option(name="description", usage="Some meaningful label used to describe this watch.")
+        @Option(name="description", usage="Some meaningful label used to describe this watch.  If"
+            + " not specified then the predicate is used.")
         private String userDescription;
+
+        @Option(name="pause-when-full", usage="When specified, the watch will automatically become"
+            + " paused once it becomes full, preventing the loss of information.  A pause-when-full"
+            + " watch that is full may be manually resumed; if so, then any subsequent matches"
+            + " will result in the oldest observation being evicted.  If the watch is reset then"
+            + " the watch will pause if it becomes full again.")
+        private boolean pauseWhenFull;
 
         @Override
         public String call() throws Exception {
             Predicate<LoginResultObservation> p = parseExpression();
             String id = "WATCH-" + nextId++;
             String description = Optional.ofNullable(userDescription).orElse(predicate);
-            Watch watch = new LoginResultPredicateWatch(p, description, capacity);
+            Watch watch = new LoginResultPredicateWatch(p, description, capacity, pauseWhenFull);
             watches.put(id, watch);
             return id + " added.";
         }
@@ -180,6 +188,23 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         @Override
         public String call() throws CommandException {
             checkCommand(watches.remove(id) != null, "Unknown watch with ID %s", id);
+            return "";
+        }
+    }
+
+    @Command(name = "watch reset", hint = "clear a watch's results",
+          description = "Remove the history associated with a watch.  If the watch will "
+              + " pause-when-full and is full then the reset command will return the watch to"
+              + " an unpaused state, otherwise the watch's state is not affected.")
+    public class WatchResetCommand implements Callable<String> {
+        @Argument(usage="Watch ID")
+        private String id;
+
+        @Override
+        public String call() throws CommandException {
+            Watch watch = watches.get(id);
+            checkCommand(watch != null, "Unknown watch with ID %s", id);
+            watch.reset();
             return "";
         }
     }
