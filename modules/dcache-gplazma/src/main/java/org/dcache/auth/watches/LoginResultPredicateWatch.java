@@ -33,6 +33,7 @@ public class LoginResultPredicateWatch implements Watch {
     private final String description;
     private final Predicate<LoginResultObservation> predicate;
 
+    private boolean isPaused;
     private Instant newestObservation;
 
     public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description,
@@ -57,12 +58,12 @@ public class LoginResultPredicateWatch implements Watch {
         Optional<Instant> oldest = Optional.ofNullable(results.peek())
             .map(LoginResultObservation::getWhenObserved);
         return new WatchSummary(oldest, Optional.ofNullable(newestObservation), results.size(),
-            results.size() + results.remainingCapacity());
+            results.size() + results.remainingCapacity(), isPaused);
     }
 
     @Override
     public synchronized void accept(LoginResultObservation observation) {
-        if (predicate.test(observation)) {
+        if (!isPaused && predicate.test(observation)) {
             results.add(observation);
             newestObservation = observation.getWhenObserved();
         }
@@ -71,5 +72,15 @@ public class LoginResultPredicateWatch implements Watch {
     @Override
     public synchronized void reset() {
         results.clear();
+    }
+
+    @Override
+    public synchronized void pause() {
+        isPaused = true;
+    }
+
+    @Override
+    public synchronized void resume() {
+        isPaused = false;
     }
 }

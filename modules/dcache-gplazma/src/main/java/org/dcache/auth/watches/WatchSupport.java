@@ -60,6 +60,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             ColumnWriter writer = new ColumnWriter().headersInColumns()
                     .header("ID").left("id").space()
                     .header("Count").right("count").space()
+                    .header("Status").right("status").space()
                     .header("Oldest").left("oldest").space()
                     .header("Newest").left("newest").space()
                     .header("Description").left("description");
@@ -69,6 +70,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
                 writer.row()
                     .value("id", entry.getKey())
                     .value("count", summary.observationCount() + "/" + summary.capacity())
+                    .value("status", summary.isPaused() ? "PAUSED" : "ACTIVE")
                     .value("oldest", summary.oldestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("newest", summary.newestObservation().map(TimeUtils::relativeTimestamp).orElse("-"))
                     .value("description", thisWatch.describe());
@@ -131,6 +133,41 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             }
 
             return result.getTopStackValue();
+        }
+    }
+
+    @Command(name="watch pause", hint = "watch is no longer triggered",
+        description="Temporarily stop a watch from matching login activity.  The watch will no"
+            + " longer record login activity, even if a login request matches the watch's"
+            + " predicate.  This block may be reversed using the \"watch resume\" command.  This"
+            + " command is idempotent: pausing a watch that is already paused has no effect.")
+    public class WatchPauseCommand implements Callable<String> {
+        @Argument(usage="Watch ID")
+        private String id;
+
+        @Override
+        public String call() throws CommandException {
+            Watch watch = watches.get(id);
+            checkCommand(watch != null, "Unknown watch with ID %s", id);
+            watch.pause();
+            return "";
+        }
+    }
+
+    @Command(name="watch resume", hint = "allow a watch to be triggered",
+        description="A watch that was previously paused is now allowed to record matching login"
+            + " activity.  This command is idempotent: resuming a watch that is not paused has no"
+            + " effect.")
+    public class WatchResumeCommand implements Callable<String> {
+        @Argument(usage="Watch ID")
+        private String id;
+
+        @Override
+        public String call() throws CommandException {
+            Watch watch = watches.get(id);
+            checkCommand(watch != null, "Unknown watch with ID %s", id);
+            watch.resume();
+            return "";
         }
     }
 

@@ -29,13 +29,15 @@ public class WatchSummary {
     private final Optional<Instant> newestObservation;
     private final int observationCount;
     private final int capacity;
+    private final boolean isPaused;
 
     public WatchSummary(Optional<Instant> oldestObservation, Optional<Instant> newestObservation,
-            int observationCount, int capacity) {
+            int observationCount, int capacity, boolean isPaused) {
         this.oldestObservation = requireNonNull(oldestObservation);
         this.newestObservation = requireNonNull(newestObservation);
         this.observationCount = observationCount;
         this.capacity = capacity;
+        this.isPaused = isPaused;
     }
 
     public Optional<Instant> oldestObservation() {
@@ -52,5 +54,9 @@ public class WatchSummary {
 
     public int capacity() {
         return capacity;
+    }
+
+    public boolean isPaused() {
+        return isPaused;
     }
 }

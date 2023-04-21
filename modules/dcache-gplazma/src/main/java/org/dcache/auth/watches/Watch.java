@@ -48,4 +48,14 @@ public interface Watch extends Consumer<LoginResultObservation> {
      * Clear the stored results.
      */
     void reset();
+
+    /**
+     * Stop matching login observations.
+     */
+    void pause();
+
+    /**
+     * Resume matching login observations.
+     */
+    void resume();
 }
