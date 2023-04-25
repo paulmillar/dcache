@@ -84,6 +84,7 @@ import javax.annotation.Nullable;
 import javax.security.auth.Subject;
 import org.dcache.acl.ACE;
 import org.dcache.acl.ACL;
+import org.dcache.auth.ExemptFromNamespaceChecks;
 import org.dcache.auth.Subjects;
 import org.dcache.chimera.ChimeraDirectoryEntry;
 import org.dcache.chimera.ChimeraFsException;
@@ -230,6 +231,20 @@ public class ChimeraNameSpaceProvider
 
     private void checkLookupPermissions(Subject subject, List<FsInode> inodes, String path)
           throws ChimeraFsException, CacheException {
+
+        var exemption = Subjects.getExemption(subject);
+
+        if (exemption != null) {
+            checkNonDirectoriesAgainstExemption(exemption, inodes, path);
+        } else {
+            List<FsInode> inodesWithOutLast = inodes.subList(0, inodes.size() - 1);
+            checkLookupPermissionsWithSubject(subject, inodesWithOutLast, path);
+        }
+    }
+
+    private void checkLookupPermissionsWithSubject(Subject subject, List<FsInode> inodes,
+          String path) throws ChimeraFsException, CacheException {
+
         for (FsInode inode : inodes) {
             if (inode.isDirectory()) {
                 FileAttributes attributes = getFileAttributesForPermissionHandler(inode);
@@ -237,6 +252,36 @@ public class ChimeraNameSpaceProvider
                     throw new PermissionDeniedCacheException("Access denied: " + path);
                 }
             }
+        }
+    }
+
+    private void checkNonDirectoriesAgainstExemption(ExemptFromNamespaceChecks exemption,
+          List<FsInode> inodes, String path) throws ChimeraFsException, CacheException {
+
+        List<String> pathElements = new ArrayList<>();
+
+        for (FsInode inode : inodes) {
+            if (!inode.isRoot()) {
+                pathElements.add(inode.getName());
+            }
+
+            if (inode.isLink()) {
+                checkExemption(exemption, pathElements);
+                pathElements.clear();
+            }
+        }
+
+        if (!pathElements.isEmpty()) {
+            checkExemption(exemption, pathElements);
+        }
+    }
+
+    private void checkExemption(ExemptFromNamespaceChecks exemption, List<String> elements)
+            throws PermissionDeniedCacheException {
+        FsPath target = elements.stream()
+            .reduce(FsPath.ROOT, (a,b) -> a.child(b), (a,b) -> a.chroot(b.toString()));
+        if (!exemption.isAllowed(target)) {
+            throw new PermissionDeniedCacheException("Access denied: " + target);
         }
     }
 
@@ -257,7 +302,7 @@ public class ChimeraNameSpaceProvider
 
     private ExtendedInode pathToInode(Subject subject, String path)
           throws ChimeraFsException, CacheException {
-        if (Subjects.isExemptFromNamespaceChecks(subject)) {
+        if (Subjects.isRoot(subject)) {
             return new ExtendedInode(_fs, _fs.path2inode(path));
         }
 
@@ -274,6 +319,11 @@ public class ChimeraNameSpaceProvider
         if (_verifyAllLookups) {
             checkLookupPermissions(subject, inodes.subList(0, inodes.size() - 1), path);
         } else {
+            var exemption = Subjects.getExemption(subject);
+            if (exemption != null) {
+                checkNonDirectoriesAgainstExemption(exemption, inodes, path);
+                return new ExtendedInode(_fs, _fs.path2inode(path));
+            }
             for (FsInode inode : Iterables.skip(Lists.reverse(inodes), 1)) {
                 if (inode.isDirectory()) {
                     FileAttributes attributes =
