@@ -71,6 +71,15 @@ public class Subjects {
     }
 
     /**
+     * Return the namespace Exemption.
+     * @param subject The identity from which to extract the exemption.
+     * @return The Exemption if present or null if there is no such exemption.
+     */
+    public static ExemptFromNamespaceChecks getExemption(Subject subject) {
+        return getUniquePrincipal(subject, ExemptFromNamespaceChecks.class);
+    }
+
+    /**
      * Return true if the subject is root or has the special ExemptFromNamespaceChecks principal.
      *
      * @param subject The identity of the user.

@@ -148,10 +148,49 @@ public class Gplazma2LoginStrategy implements LoginStrategy, CellCommandListener
             handleMultiTargetedRestrictions(userRoots, mtRestrictions, loginAttributes);
         }
 
-        Subject replyUser = filterPrincipals(gPlazmaLoginReply.getSubject(),
-              AUTHENTICATION_OUTPUT, "LoginReply");
+        Subject updated = allowUploadPath(gPlazmaLoginReply);
+
+        Subject replyUser = filterPrincipals(updated, AUTHENTICATION_OUTPUT,
+                "LoginReply");
 
         return new LoginReply(replyUser, loginAttributes);
+    }
+
+    private Subject allowUploadPath(org.dcache.gplazma.LoginReply gPlazmaLoginReply) {
+        Subject in = gPlazmaLoginReply.getSubject();
+
+        if (_uploadPath.isEmpty()) {
+            return in;
+        }
+
+        ExemptFromNamespaceChecks exemption = Subjects.getExemption(in);
+        if (exemption == null) {
+            return in;
+        }
+
+        Set<Principal> outPrincipals = in.getPrincipals().stream()
+                .filter(p -> !(p instanceof ExemptFromNamespaceChecks))
+                .collect(Collectors.toSet());
+
+        String uploadPath = _uploadPath.get();
+
+        ExemptFromNamespaceChecks updatedExemption;
+        if (uploadPath.startsWith("/")) {
+            updatedExemption = exemption.alsoAllowing(FsPath.create(uploadPath));
+        } else {
+            List<FsPath> extraPaths = gPlazmaLoginReply.getSessionAttributes().stream()
+                    .filter(RootDirectory.class::isInstance)
+                    .map(RootDirectory.class::cast)
+                    .map(RootDirectory::getRoot)
+                    .map(FsPath::create)
+                    .map(r -> r.resolve(uploadPath))
+                    .collect(Collectors.toList());
+            updatedExemption = exemption.alsoAllowing(extraPaths);
+        }
+        outPrincipals.add(updatedExemption);
+
+        return new Subject(false, outPrincipals, in.getPublicCredentials(),
+              in.getPrivateCredentials());
     }
 
     private Subject filterPrincipals(Subject in, Collection<Class<?>> allowed,

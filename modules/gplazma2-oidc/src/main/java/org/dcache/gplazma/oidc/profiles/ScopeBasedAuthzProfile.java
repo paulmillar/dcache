@@ -40,15 +40,14 @@ import org.dcache.gplazma.oidc.IdentityProvider;
 import org.dcache.gplazma.oidc.ProfileResult;
 
 import static java.util.Objects.requireNonNull;
+import java.util.stream.Stream;
+import org.dcache.auth.attributes.MultiTargetedRestriction.Authorisation;
 import static org.dcache.gplazma.util.Preconditions.checkAuthentication;
 
 /**
  * This class provides a basis for AuthZ profiles that use the scope claim.
  */
 abstract class ScopeBasedAuthzProfile extends BaseProfile {
-
-    private static final Principal EXEMPT_FROM_NAMESPACE = new ExemptFromNamespaceChecks();
-    private static final List<Principal> AUTHZ_IDENTITY = Collections.singletonList(EXEMPT_FROM_NAMESPACE);
 
     private final FsPath prefix;
     private final Set<Principal> authzIdentity;
@@ -92,7 +91,8 @@ abstract class ScopeBasedAuthzProfile extends BaseProfile {
 
         if (!authorisationStatements.isEmpty()) {
             var newRestriction = buildRestriction(authorisationStatements);
-            var newPrincipals = Streams.concat(authzIdentity.stream(), AUTHZ_IDENTITY.stream())
+            var exemption = buildExemption(authorisationStatements);
+            var newPrincipals = Streams.concat(authzIdentity.stream(), Stream.of(exemption))
                     .collect(Collectors.toList());
             result = result.withPrincipals(newPrincipals).withRestriction(newRestriction);
         } else {
@@ -104,6 +104,16 @@ abstract class ScopeBasedAuthzProfile extends BaseProfile {
 
     abstract protected List<AuthorisationSupplier> parseScope(String scope)
             throws AuthenticationException;
+
+    private Principal buildExemption(List<AuthorisationSupplier> scopes) {
+        List<FsPath> paths = scopes.stream()
+                .map(s -> s.authorisation(prefix))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(Authorisation::getPath)
+                .collect(Collectors.toList());
+        return new ExemptFromNamespaceChecks(paths);
+    }
 
     private Restriction buildRestriction(List<AuthorisationSupplier> scopes) {
         Map<FsPath, MultiTargetedRestriction.Authorisation> authorisations = new HashMap<>();

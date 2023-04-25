@@ -18,8 +18,14 @@
  */
 package org.dcache.auth;
 
+import diskCacheV111.util.FsPath;
 import java.io.Serializable;
 import java.security.Principal;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The presence of this principal indicates that the user is exempt from the normal namespace
@@ -30,6 +36,25 @@ import java.security.Principal;
 @AuthenticationOutput
 public class ExemptFromNamespaceChecks implements Principal, Serializable {
 
+    private final List<FsPath> allowedPrefixes;
+
+    // FIXME: only exists for legacy unit-testing.  Remove after updating the unit-tests.
+    @Deprecated
+    public ExemptFromNamespaceChecks() {
+        allowedPrefixes = Collections.emptyList();
+    }
+
+    public ExemptFromNamespaceChecks(List<FsPath> prefixes) {
+        allowedPrefixes = List.copyOf(prefixes);
+    }
+
+    public boolean isAllowed(FsPath path) {
+        if (allowedPrefixes == null) {
+            return false; // old principal: deny.
+        }
+        return allowedPrefixes.stream().anyMatch(path::hasPrefix);
+    }
+
     @Override
     public String getName() {
         return "full"; // all namespace checks are by-passed.
@@ -38,5 +63,15 @@ public class ExemptFromNamespaceChecks implements Principal, Serializable {
     @Override
     public String toString() {
         return "ExemptFromNamespaceChecks";
+    }
+
+    public ExemptFromNamespaceChecks alsoAllowing(FsPath path) {
+        return alsoAllowing(Collections.singletonList(path));
+    }
+
+    public ExemptFromNamespaceChecks alsoAllowing(Collection<FsPath> paths) {
+        var combined = Stream.concat(allowedPrefixes.stream(), paths.stream())
+                .collect(Collectors.toList());
+        return new ExemptFromNamespaceChecks(combined);
     }
 }
