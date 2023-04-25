@@ -266,8 +266,9 @@ public class FsSqlDriver {
                             Stat stat = toStat(rs);
                             FsInode inode = new FsInode(dir.getFs(), rs.getLong("inumber"),
                                   FsInodeType.INODE, 0, stat);
-                            inode.setParent(dir);
-                            return new ChimeraDirectoryEntry(rs.getString("iname"), inode, stat);
+                            String name = rs.getString("iname");
+                            inode.setParent(dir, name);
+                            return new ChimeraDirectoryEntry(name, inode, stat);
                         } catch (SQLException e) {
                             LOGGER.error("failed to fetch next entry: {}", e.getMessage());
                             return null;

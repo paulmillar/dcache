@@ -1010,7 +1010,7 @@ public class JdbcFs implements FileSystemProvider, LeaderLatchListener {
             throw FileNotFoundChimeraFsException.ofFileInDirectory(parent, name);
         }
         fillIdCaches(inode);
-        inode.setParent(parent);
+        inode.setParent(parent, name);
         return inode;
     }
 

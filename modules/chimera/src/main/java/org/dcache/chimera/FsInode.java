@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.dcache.acl.ACE;
 import org.dcache.chimera.posix.Stat;
 
@@ -49,6 +50,11 @@ public class FsInode {
      * parent inode. In case of hard links, one of the possible parents.
      */
     private FsInode _parent;
+
+    /**
+     * Name of this inode under _parent.
+     */
+    private String _name;
 
     /**
      * Copy constructor.
@@ -360,20 +366,46 @@ public class FsInode {
         return _fs;
     }
 
-    public FsInode getParent() {
-        if (_parent == null) {
-            try {
-                Collection<Link> locations = _fs.find(this);
-                _parent = locations.isEmpty() ? null : locations.iterator().next().getParent();
-            } catch (ChimeraFsException e) {
+    private void identifyParent() {
+        try {
+            Collection<Link> locations = _fs.find(this);
+            if (!locations.isEmpty()) {
+                Link firstLink = locations.iterator().next();
+                _parent = firstLink.getParent();
+                _name = firstLink.getName();
             }
+        } catch (ChimeraFsException e) {
+        }
+    }
+
+    @Nullable
+    public FsInode getParent() {
+        if (isRoot()) {
+            return null;
+        }
+
+        if (_parent == null) {
+            identifyParent();
         }
 
         return _parent;
     }
 
-    public void setParent(FsInode parent) {
+    @Nullable
+    public String getName() {
+        if (isRoot()) {
+            return null;
+        }
+
+        if (_name == null) {
+            identifyParent();
+        }
+        return _name;
+    }
+
+    public void setParent(FsInode parent, String name) {
         _parent = parent;
+        _name = name;
     }
 
     public void setStat(Stat predefinedStat) throws ChimeraFsException {
