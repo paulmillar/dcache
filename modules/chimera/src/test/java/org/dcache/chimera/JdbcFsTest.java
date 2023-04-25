@@ -57,6 +57,11 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcFsTest.class);
 
     @Test
+    public void testRootInodeIsRoot() throws Exception {
+        assertTrue(_rootInode.isRoot());
+    }
+
+    @Test
     public void testLevelRemoveOnDelete() throws Exception {
         final int level = 1;
         FsInode inode = _rootInode.create("testLevelRemoveOnDelete", 0, 0, 0644);
@@ -89,6 +94,7 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
         assertEquals("new dir should have link count equal to two", newDir.stat().getNlink(), 2);
         assertTrue("change count is not updated",
               stat.getGeneration() != _rootInode.stat().getGeneration());
+        assertFalse("new directory is root", newDir.isRoot());
     }
 
     @Test
@@ -104,6 +110,7 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
         assertEquals("new dir should have link count equal to two", 2, newDir.stat().getNlink());
         assertTrue("change count is not updated",
               stat.getGeneration() != _rootInode.stat().getGeneration());
+        assertFalse("new directory is root", newDir.isRoot());
     }
 
     @Test
@@ -116,6 +123,8 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
         assertEquals("setgid is not respected", dir2.stat().getGid(), 2);
         assertEquals("setgid is not respected",
               dir2.stat().getMode() & UnixPermission.S_PERMS, 02755);
+        assertFalse("dir1 is root", dir1.isRoot());
+        assertFalse("dir2 is root", dir2.isRoot());
     }
 
     @Test
@@ -124,6 +133,7 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
         FsInode dir1 = _fs.mkdir(_rootInode, "junit", 1, 2, 02755, Collections.emptyList(),
               ImmutableMap.of("tag", bytes));
         assertThat(_fs.getAllTags(dir1), hasEntry("tag", bytes));
+        assertFalse("dir1 is root", dir1.isRoot());
     }
 
     @Test
@@ -799,13 +809,14 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
 
         FsInode inode = _fs.path2inode("aLink", _rootInode);
         assertEquals("Link resolution did not work", dirInode, inode);
-
+        assertFalse("aLink is root", inode.isRoot());
     }
 
     @Test
     public void testResolveLinkOnPathToIds() throws Exception {
         FsInode dirInode = _rootInode.mkdir("testDir", 0, 0, 0755);
         FsInode linkInode = _rootInode.createLink("aLink", 0, 0, 055, "testDir".getBytes());
+        assertFalse("aLink is root", linkInode.isRoot());
 
         List<FsInode> inodes = _fs.path2inodes("aLink", _rootInode);
         assertEquals("Link resolution did not work",
@@ -1748,4 +1759,20 @@ public class JdbcFsTest extends ChimeraTestCaseHelper {
         }
     }
 
+    @Test
+    public void testRootIsRoot() throws Exception {
+        assertTrue(_fs.isRoot(_rootInode));
+    }
+
+    @Test
+    public void testNonRootDirNotIsRoot() throws Exception {
+        FsInode dir = _fs.mkdir("/test");
+        assertFalse(_fs.isRoot(dir));
+    }
+
+    @Test
+    public void testFileNotIsRoot() throws Exception {
+        FsInode inode = _fs.createFile(_rootInode, "aFile");
+        assertFalse(_fs.isRoot(inode));
+    }
 }

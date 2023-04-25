@@ -577,4 +577,13 @@ public interface FileSystemProvider extends Closeable {
      * @return resolved path.
      */
     String resolvePath(String path) throws ChimeraFsException;
+
+    /**
+     * Check whether the supplied inode is a directory and that directory is
+     * the root of the filesystem
+     * @param inode The inode to check
+     * @return true if the supplied inode is the root of the filesystem, false
+     * otherwise.
+     */
+    boolean isRoot(FsInode inode);
 }

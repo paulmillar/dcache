@@ -100,11 +100,6 @@ public class FsInode_SURI extends FsInode {
         }
     }
 
-    private static boolean isRoot() {
-        return Subjects.isRoot(
-              Subject.getSubject(AccessController.getContext()));
-    }
-
     private List<StorageLocatable> locations;
 
     public FsInode_SURI(FileSystemProvider fs, long ino) {

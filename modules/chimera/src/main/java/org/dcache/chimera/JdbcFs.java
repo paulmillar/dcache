@@ -1624,6 +1624,11 @@ public class JdbcFs implements FileSystemProvider, LeaderLatchListener {
         public FsInode getParent() {
             return null;
         }
+
+        @Override
+        public boolean isRoot() {
+            return true;
+        }
     }
 
     // REVISIT: this method violates DRY by duplicating functionality from
@@ -1690,4 +1695,8 @@ public class JdbcFs implements FileSystemProvider, LeaderLatchListener {
         disableMaintenanceTask();
     }
 
+    @Override
+    public boolean isRoot(FsInode inode) {
+        return _sqlDriver.getRootInumber() == inode.ino();
+    }
 }

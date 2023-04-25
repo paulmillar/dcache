@@ -142,6 +142,15 @@ public class FsInode {
     }
 
     /**
+     * Whether this FsInode is a directory and that directory is the root of
+     * the filesystem.
+     * @return true if this FsInode is the root directory, false otherwise.
+     */
+    public boolean isRoot() {
+        return _fs.isRoot(this);
+    }
+
+    /**
      * A helper method to generate the base part of identifier.
      *
      * @param opaque inode specific data
