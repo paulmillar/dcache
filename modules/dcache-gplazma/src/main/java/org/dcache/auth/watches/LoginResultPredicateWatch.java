@@ -32,17 +32,17 @@ public class LoginResultPredicateWatch implements Watch {
     private final EvictingQueue<LoginResultObservation> results;
     private final String description;
     private final Predicate<LoginResultObservation> predicate;
-    private final boolean pauseWhenFull;
+    private final DiscardWhenFull discardWhenFull;
 
     private boolean isPaused;
-    private Instant newestObservation;
+    private Instant latestObservation;
 
     public LoginResultPredicateWatch(Predicate<LoginResultObservation> predicate, String description,
-            int capacity, boolean pauseWhenFull) {
+            int capacity, DiscardWhenFull discardWhenFull) {
         this.description = Objects.requireNonNull(description);
         this.predicate = Objects.requireNonNull(predicate);
         results = EvictingQueue.create(capacity);
-        this.pauseWhenFull = pauseWhenFull;
+        this.discardWhenFull = Objects.requireNonNull(discardWhenFull);
     }
 
     @Override
@@ -59,27 +59,25 @@ public class LoginResultPredicateWatch implements Watch {
     public synchronized WatchSummary summarise() {
         Optional<Instant> oldest = Optional.ofNullable(results.peek())
             .map(LoginResultObservation::getWhenObserved);
-        return new WatchSummary(oldest, Optional.ofNullable(newestObservation), results.size(),
+        return new WatchSummary(oldest, Optional.ofNullable(latestObservation), results.size(),
             results.size() + results.remainingCapacity(), isPaused);
     }
 
     @Override
     public synchronized void accept(LoginResultObservation observation) {
         if (!isPaused && predicate.test(observation)) {
-            if (pauseWhenFull && results.remainingCapacity() == 1) {
-                isPaused = true;
+            if (discardWhenFull == DiscardWhenFull.INCOMING && results.remainingCapacity() == 0) {
+                return;
             }
             results.add(observation);
-            newestObservation = observation.getWhenObserved();
+            latestObservation = observation.getWhenObserved();
         }
     }
 
     @Override
     public synchronized void reset() {
-        if (results.remainingCapacity() == 0 && pauseWhenFull) {
-            isPaused = false;
-        }
-        newestObservation = null;
+        isPaused = false;
+        latestObservation = null;
         results.clear();
     }
 

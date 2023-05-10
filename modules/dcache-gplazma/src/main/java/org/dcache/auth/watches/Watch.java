@@ -27,6 +27,14 @@ import java.util.function.Consumer;
 public interface Watch extends Consumer<LoginResultObservation> {
 
     /**
+     * Which login result to discard when a watch is full and there is another matching login.
+     */
+    public enum DiscardWhenFull {
+        INCOMING,
+        OLDEST
+    }
+
+    /**
      * Provide a snapshot of the list of LoginResult observations.  Subsequent calls to
      * {@link #accept} should not affect the returned List.
      * @return the retained LoginResults.

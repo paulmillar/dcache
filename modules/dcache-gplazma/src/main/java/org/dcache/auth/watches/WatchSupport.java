@@ -30,6 +30,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import static org.dcache.auth.watches.WatchExpressionParser.TYPES_BY_LABEL;
 import org.dcache.gplazma.LoginObserver;
 import org.dcache.gplazma.monitor.LoginResult;
 import org.dcache.gplazma.monitor.LoginResultPrinter;
@@ -97,46 +98,142 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
           description = "Instruct gPlazma to watch for logins that match specific criteria.")
     public class WatchAddCommand implements Callable<String> {
 
-        @Argument(usage="Describe which login results are of interest.")
-        private String predicate;
+        @Argument(usage="An expression that describes which login results are of interest.  A login "
+            + "result that matches the expression is considered interesting, while those that do "
+            + "not match are ignored by the watch.\n"
+            + "\n"
+            + "The expression is one or more predicates combined with simple logic: conjunction "
+            + "(\"AND\" or \"&&\") or disjunction (\"OR\" or \"||\"), with optional negation "
+            + "(\"NOT\" or \"!\").  Parentheses may be used to control priority.\n"
+            + "\n"
+            + "Example of expressions:\n"
+            + "\n"
+            + "    dn      Match logins with any X.509 distinguished name\n"
+            + "            principal.\n"
+            + "    NOT dn  Match logins with no X.509 distinguished name\n"
+            + "            principal.\n"
+            + "    !dn     Same as previous example, but using symbols.\n"
+            + "    dn AND email\n"
+            + "            Match logins with both an X.509 distinguished\n"
+            + "            name principal and an email address principal.\n"
+            + "    dn && email\n"
+            + "            Same as previous example, but using symbols.\n"
+            + "    groupname~foo-* OR groupname~bar-*\n"
+            + "            Match logins with either a groupname that\n"
+            + "            starts \"foo-\" or a groupname that starts\n"
+            + "            \"bar-\".\n"
+            + "    groupname~foo-* || groupname~bar-*\n"
+            + "            Same as previous example, but using symbols.\n"
+            + "    username:paul && !(groupname~foo-* || groupname~bar-*)\n"
+            + "            Match logins with a username principal \"paul\"\n"
+            + "            and without a groupname starting \"foo-\" or a\n"
+            + "            groupname starting \"bar-\".\n"
+            + "\n"
+            + "Predicates are either principal predicates or ...\n"
+            + "\n"
+            + "PRINCIPAL PREDICATES\n"
+            + "\n"
+            + "A principal predicate matches if there is a matching principal supplied by the door, "
+            + "or in the set of principals after the Auth phase completes, or in the set of "
+            + "principals after the mapping phase completes.\n"
+            + "\n"
+            + "Principal predicates have the form \"<type>\" or \"<type><pattern>\".  The first "
+            + "form matches any principal of the given type; the second form matches a predicate "
+            + "of the given type with a value that matches the <pattern>.\n"
+            + "\n"
+            + "<type> is one of \"dn\" (X.509 Distinguished Name), \"sub\" (OIDC 'sub' claim), "
+            + "\"email\" (email address), \"groupname\" (group name), \"username\" (username), "
+            + "\"uid\" (numeric uid), \"gid\" (numeric gid).  NB. \"username\" matches the user's "
+            + "actual username; it does not match the client-supplied username when authenticating "
+            + "via username and password.\n"
+            + "\n"
+            + "<pattern> is \":VALUE\" to check the predicate's value completely matches VALUE, "
+            + "\"~GLOB\" to check the predicate's value matches the glob pattern GLOB, "
+            + "\"/REGEXP/\" to check the predicate's value matches the regular expression REGEXP.\n"
+            + "\n"
+            + "Glob patterns must match the entire predicate value.  Certain characters have "
+            + "special meaning: a \"*\" matches zero-or-more arbitrary characters, \"?\" matches "
+            + "exactly one arbitrary character, \"{A,B}\" curly braces contain a comma-separated "
+            + "list of glob sub-patterns where (at least) one of the sub-patterns must match.\n"
+            + "\n"
+            + "Regular expressions use Java's built-in support, which is largely PCRE but with "
+            + "some additional features.  The following URL provides details:\n"
+            + "\n"
+            + "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/regex/Pattern.html\n"
+            + "\n"
+            + "For exact match and glob patterns, the value may be unquoted (e.g., username:paul, "
+            + "username~paul*), single-quoted (e.g., username:'paul', username~'paul*') or "
+            + "double-quoted (e.g., username:\"paul\", username~\"paul*\").  Unquoted values cannot "
+            + "contain spaces.  Single-quoted values cannot contain single-quote characters.  "
+            + "Double-quote values may contain any characters; however, backslash and double-quote "
+            + "characters must be backslash-escaped.  The following escape sequences match "
+            + "single characters: \\t tab, \\b backspace, \\n new line, \\r carriage return, "
+            + "\\f form feed, \\' single quotemark, \\\" double quotemark, \\\\ a backslash.\n"
+            + "\n"
+            + "Example principal predicates:\n"
+            + "\n"
+            + "    dn      Test for the presence of an X.509\n"
+            + "            distinguished name principal.\n"
+            + "    dn~'*/CN=Paul Millar'\n"
+            + "            Test for the presence of an X.509\n"
+            + "            distinguished name principal that ends \"/CN=Paul Millar\".\n"
+            + "    username:paul\n"
+            + "            Test for a username matching \"paul\".\n"
+            + "    groupname~it-*\n"
+            + "            Test for a groupname that starts with \"it-\"\n"
+            + "    email/^[pn]\\d*@.*\\.(net|org)$/\n"
+            + "            Test for an email address with a local-part\n"
+            + "            starting with p or n and has zero-or-more digits,\n"
+            + "            and the domain name ending \".net\" or \".org\".\n"
+        )
+        private String expression;
 
-        @Option(name="capacity", usage="The maximum number of observations retained for later"
-            + " examination.", metaVar="COUNT")
+        @Option(name="capacity", usage="The maximum number of observations retained in-memory for"
+            + " later examination.  See the -when-full-discard option.", metaVar="COUNT")
         private int capacity=5;
 
-        @Option(name="target", usage="Where to send reports.")
-        private String[] targets;
+        // TODO: add support for sending reports to a destination; e.g., log file, Kafka, ...
 
         @Option(name="description", usage="Some meaningful label used to describe this watch.  If"
             + " not specified then the predicate is used.")
         private String userDescription;
 
-        @Option(name="pause-when-full", usage="When specified, the watch will automatically become"
-            + " paused once it becomes full, preventing the loss of information.  A pause-when-full"
-            + " watch that is full may be manually resumed; if so, then any subsequent matches"
-            + " will result in the oldest observation being evicted.  If the watch is reset then"
-            + " the watch will pause if it becomes full again.")
-        private boolean pauseWhenFull;
+        @Option(name="when-full-discard", values={"INCOMING", "OLDEST"},
+            usage="Describe which login result to discard when the watch's in-memory capacity is "
+                + "full.\n"
+                + "\n"
+                + "OLDEST    The watch will continue to record new matching\n"
+                + "          logins even when full.  The oldest login is\n"
+                + "          discarded to make sufficient space.  The watch\n"
+                + "          will always show the most recent matching\n"
+                + "          logins.  This is sometimes called a circular\n"
+                + "          buffer.\n"
+                + "\n"
+                + "INCOMING  The watch will record new logins only if there\n"
+                + "          is available capacity.  Once the watch's\n"
+                + "          in-memory storage is exhaused then all new\n"
+                + "          matching logins are discarded.\n")
+        private Watch.DiscardWhenFull whenFull = Watch.DiscardWhenFull.OLDEST;
 
         @Override
         public String call() throws Exception {
             Predicate<LoginResultObservation> p = parseExpression();
             String id = "WATCH-" + nextId++;
-            String description = Optional.ofNullable(userDescription).orElse(predicate);
-            Watch watch = new LoginResultPredicateWatch(p, description, capacity, pauseWhenFull);
+            String description = Optional.ofNullable(userDescription).orElse(expression);
+            Watch watch = new LoginResultPredicateWatch(p, description, capacity, whenFull);
             watches.put(id, watch);
             return id + " added.";
         }
 
         private Predicate<LoginResultObservation> parseExpression() throws CommandException {
             ReportingParseRunner<Predicate<LoginResultObservation>> runner = new ReportingParseRunner(PARSER.input());
-            var result = runner.run(predicate);
+            var result = runner.run(expression);
 
             if (!result.isSuccess()) {
                 var errors = result.getParseErrors().stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n\n"));
-                throw new CommandException("Parsing of \"" + predicate + "\" failed with errors:\n"
+                throw new CommandException("Parsing of \"" + expression + "\" failed with errors:\n"
                     + errors);
             }
 
@@ -144,10 +241,10 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
         }
     }
 
-    @Command(name="watch pause", hint = "watch is no longer triggered",
+    @Command(name="watch pause", hint = "stop accepting new logins",
         description="Temporarily stop a watch from matching login activity.  The watch will no"
             + " longer record login activity, even if a login request matches the watch's"
-            + " predicate.  This block may be reversed using the \"watch resume\" command.  This"
+            + " predicate.  The watch may be reactivated using the \"watch resume\" command.  This"
             + " command is idempotent: pausing a watch that is already paused has no effect.")
     public class WatchPauseCommand implements Callable<String> {
         @Argument(usage="Watch ID")
@@ -193,9 +290,8 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
     }
 
     @Command(name = "watch reset", hint = "clear a watch's results",
-          description = "Remove the history associated with a watch.  If the watch will "
-              + " pause-when-full and is full then the reset command will return the watch to"
-              + " an unpaused state, otherwise the watch's state is not affected.")
+          description = "Remove the history associated with a watch.  If the watch was paused then"
+              + " it is also be restarted.")
     public class WatchResetCommand implements Callable<String> {
         @Argument(usage="Watch ID")
         private String id;
