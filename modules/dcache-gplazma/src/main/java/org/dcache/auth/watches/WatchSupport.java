@@ -25,9 +25,15 @@ import dmg.util.command.Command;
 import dmg.util.command.Option;
 import java.time.Instant;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import static org.dcache.auth.watches.WatchExpressionParser.TYPES_BY_LABEL;
@@ -38,17 +44,29 @@ import org.dcache.util.ColumnWriter;
 import org.dcache.util.TimeUtils;
 import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Support for watching login results.
  */
 public class WatchSupport implements LoginObserver, CellCommandListener{
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(WatchSupport.class);
     private static final WatchExpressionParser PARSER = Parboiled.createParser(WatchExpressionParser.class);
 
     private final Map<String,Watch> watches = new ConcurrentHashMap<>(); // REVISIT, should Map's key be Integer ?
+    private final BlockingQueue<Runnable> workQueue;
+    private final Executor executor;
+
+    private volatile boolean isWatchingSuspended;
 
     private int nextId = 1;
+
+    public WatchSupport(int maxQueue) {
+        workQueue = new ArrayBlockingQueue(maxQueue);
+        executor = new ThreadPoolExecutor(1,1,5, TimeUnit.MINUTES, workQueue);
+    }
 
     @Command(name = "watch ls", hint = "list watches",
           description = "Provide information about the currently configured login watches.")
@@ -192,7 +210,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             + " later examination.  See the -when-full-discard option.", metaVar="COUNT")
         private int capacity=5;
 
-        // TODO: add support for sending reports to a destination; e.g., log file, Kafka, ...
+        // TODO: add support for sending reports to destinations; e.g., log file, Kafka, ...
 
         @Option(name="description", usage="Some meaningful label used to describe this watch.  If"
             + " not specified then the predicate is used.")
@@ -306,8 +324,19 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
     }
 
     @Override
-    public void accept(LoginResult result) {
+    public synchronized void accept(LoginResult result) {
         LoginResultObservation o = new LoginResultObservation(result);
-        watches.forEach((id,w) -> w.accept(o));
+        if (workQueue.offer(() -> watches.forEach((id, w) -> w.accept(o)))) {
+            if (isWatchingSuspended) {
+                isWatchingSuspended = false;
+                LOGGER.warn("Reactivating login watching.");
+            }
+        } else {
+            if (!isWatchingSuspended) {
+                isWatchingSuspended = true;
+                LOGGER.warn("Temporarily suspending login watching: too much concurrent activity.  "
+                    + "Watches may have incomplete information.");
+            }
+        }
     }
 }
