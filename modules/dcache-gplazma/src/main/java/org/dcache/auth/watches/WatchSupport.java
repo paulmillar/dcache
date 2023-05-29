@@ -23,23 +23,20 @@ import static dmg.util.CommandException.checkCommand;
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.Option;
-import java.time.Instant;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import static org.dcache.auth.watches.WatchExpressionParser.TYPES_BY_LABEL;
 import org.dcache.gplazma.LoginObserver;
 import org.dcache.gplazma.monitor.LoginResult;
-import org.dcache.gplazma.monitor.LoginResultPrinter;
 import org.dcache.util.ColumnWriter;
 import org.dcache.util.TimeUtils;
 import org.parboiled.Parboiled;
@@ -56,7 +53,6 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
     private static final WatchExpressionParser PARSER = Parboiled.createParser(WatchExpressionParser.class);
 
     private final Map<String,Watch> watches = new ConcurrentHashMap<>(); // REVISIT, should Map's key be Integer ?
-    private final BlockingQueue<Runnable> workQueue;
     private final Executor executor;
 
     private volatile boolean isWatchingSuspended;
@@ -64,7 +60,7 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
     private int nextId = 1;
 
     public WatchSupport(int maxQueue) {
-        workQueue = new ArrayBlockingQueue(maxQueue);
+        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue(maxQueue);
         executor = new ThreadPoolExecutor(1,1,5, TimeUnit.MINUTES, workQueue);
     }
 
@@ -326,15 +322,19 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
     @Override
     public synchronized void accept(LoginResult result) {
         LoginResultObservation o = new LoginResultObservation(result);
-        if (workQueue.offer(() -> watches.forEach((id, w) -> w.accept(o)))) {
+        try {
+            for (Watch watch : watches.values()) {
+                executor.execute(() -> watch.accept(o));
+            }
+
             if (isWatchingSuspended) {
                 isWatchingSuspended = false;
-                LOGGER.warn("Reactivating login watching.");
+                LOGGER.warn("Resuming login watching.");
             }
-        } else {
+        } catch (RejectedExecutionException e) {
             if (!isWatchingSuspended) {
                 isWatchingSuspended = true;
-                LOGGER.warn("Temporarily suspending login watching: too much concurrent activity.  "
+                LOGGER.warn("Suspending login watching: excessive login activity.  "
                     + "Watches may have incomplete information.");
             }
         }
