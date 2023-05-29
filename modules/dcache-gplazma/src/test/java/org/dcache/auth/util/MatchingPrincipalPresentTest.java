@@ -27,7 +27,7 @@ public class MatchingPrincipalPresentTest {
 
     @Test
     public void shouldInitiallyAllFalse() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
 
         var checker = pred.start();
 
@@ -37,7 +37,7 @@ public class MatchingPrincipalPresentTest {
 
     @Test
     public void shouldAllFalseAfterNonMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var checker = pred.start();
 
         checker.accept(new UserNamePrincipal("paul"));
@@ -48,7 +48,7 @@ public class MatchingPrincipalPresentTest {
 
     @Test
     public void shouldAllTrueAfterMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var checker = pred.start();
 
         checker.accept(new UidPrincipal(1000));
@@ -59,7 +59,7 @@ public class MatchingPrincipalPresentTest {
 
     @Test
     public void shouldAllTrueAfterNonMatchingThenMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var checker = pred.start();
 
         checker.accept(new UserNamePrincipal("paul"));
@@ -71,7 +71,7 @@ public class MatchingPrincipalPresentTest {
 
     @Test
     public void shouldAllTrueAfterMatchingThenNonMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var checker = pred.start();
 
         checker.accept(new UidPrincipal(1000));

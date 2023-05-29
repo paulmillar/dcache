@@ -26,15 +26,19 @@ import static java.util.Objects.requireNonNull;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import org.dcache.auth.BearerTokenCredential;
 import org.dcache.auth.EmailAddressPrincipal;
 import org.dcache.auth.GidPrincipal;
 import org.dcache.auth.GroupNamePrincipal;
 import org.dcache.auth.OidcSubjectPrincipal;
+import org.dcache.auth.PasswordCredential;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
 import org.dcache.auth.util.DescriptivePredicate;
 import static org.dcache.auth.util.DescriptivePredicate.decorate;
-import org.dcache.auth.util.MatchingPrincipalPresent;
+import org.dcache.auth.util.HasMatching;
+import org.dcache.gplazma.util.CertPaths;
+import org.dcache.gplazma.util.JsonWebToken;
 import org.dcache.util.Glob;
 import org.globus.gsi.gssapi.jaas.GlobusPrincipal;
 import org.parboiled.BaseParser;
@@ -57,6 +61,13 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         "username", UserNamePrincipal.class,
         "uid", UidPrincipal.class,
         "gid", GidPrincipal.class);
+
+    protected static final Map<String,Predicate<Object>> CREDENTIAL_TYPE_PREDICATE_BY_LABEL = Map.of(
+        "in.jwt", c -> c instanceof BearerTokenCredential
+                && JsonWebToken.isCompatibleFormat(((BearerTokenCredential)c).getToken()),
+        "in.password", c -> c instanceof PasswordCredential,
+        "in.x509", CertPaths::isX509CertPath
+    );
 
     Rule input() {
         return sequence(orExpression(), EOI);
@@ -123,15 +134,29 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     Rule predicate() {
         return firstOf(
             principalTypeAndNamePredicate(),
-            principalTypePredicate()
+            principalTypePredicate(),
+            // TODO add credentialTypeAndIntrospection
+            credentialTypePredicate()
             /* TODO Add predicates for:
-                door-supplied input (type and type-specific-aspects),
                 login-attributes,
-                login result (success/failure)
+                overall login result (success/failure)
                 whether a phase ran (and with what result).
                 whether a plugin ran (and with what results).
             */
         );
+    }
+
+    Rule credentialTypePredicate() {
+        StringVar credentialType = new StringVar();
+        return sequence(
+            credentialType(credentialType),
+            optionalWhiteSpace(),
+            push(hasCredentialOfType(credentialType.get()))
+        );
+    }
+
+    Rule credentialType(StringVar type) {
+        return sequence(trie(CREDENTIAL_TYPE_PREDICATE_BY_LABEL.keySet()), type.set(match()));
     }
 
     Rule principalTypePredicate() {
@@ -255,6 +280,18 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     @VisibleForTesting
+    static CredentialPredicate hasCredentialOfType(String typeLabel) {
+        Predicate<Object> check = CREDENTIAL_TYPE_PREDICATE_BY_LABEL.get(typeLabel);
+        if (check == null) {
+            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
+        }
+        var predicate = decorate(check)
+                .withDescription("door supplied a " + typeLabel);
+        var hasPrincipalOfType = new HasMatching(predicate);
+        return new CredentialPredicate(hasPrincipalOfType);
+    }
+
+    @VisibleForTesting
     static PrincipalPredicate hasType(String typeLabel) {
         Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
@@ -262,7 +299,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         }
         var predicate = decorate((Principal p) -> type.isInstance(p))
                 .withDescription("is " + typeLabel);
-        MatchingPrincipalPresent hasPrincipalOfType = new MatchingPrincipalPresent(predicate);
+        var hasPrincipalOfType = new HasMatching(predicate);
         return new PrincipalPredicate(hasPrincipalOfType);
     }
 
@@ -275,7 +312,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         requireNonNull(name, "hasName with null argument");
         var predicate = decorate((Principal p) -> type.isInstance(p) && p.getName().equals(name))
                 .withDescription("is " + typeLabel + " and name is \"" + name + "\"");
-        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
+        var hasPrincipalWithName = new HasMatching(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 
@@ -310,7 +347,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     static PrincipalPredicate hasTypeAndMatchingName(String description, Class<? extends Principal> type, Pattern pattern) {
         var predicate = decorate((Principal p) -> type.isInstance(p) && pattern.matcher(p.getName()).matches())
                 .withDescription(description);
-        MatchingPrincipalPresent hasPrincipalWithName = new MatchingPrincipalPresent(predicate);
+        var hasPrincipalWithName = new HasMatching(predicate);
         return new PrincipalPredicate(hasPrincipalWithName);
     }
 

@@ -28,7 +28,7 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldInitialiseNegate() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var neg = StatefulPredicates.negate(pred);
 
         var checker = neg.start();
@@ -39,7 +39,7 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldTrueFalseForNegateWithNonMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var neg = StatefulPredicates.negate(pred);
         var checker = neg.start();
 
@@ -51,7 +51,7 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldFalseTrueForNegateWithMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var neg = StatefulPredicates.negate(pred);
         var checker = neg.start();
 
@@ -62,7 +62,7 @@ public class StatefulPredicatesTest {
     }
 
     public void shouldFalseTrueForNegateWithNonMatchingMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var neg = StatefulPredicates.negate(pred);
         var checker = neg.start();
         checker.accept(new UserNamePrincipal("paul"));
@@ -75,7 +75,7 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldFalseTrueForNegateWithMatchingNonMatching() {
-        var pred = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
+        var pred = new HasMatching(p -> p instanceof UidPrincipal);
         var neg = StatefulPredicates.negate(pred);
         var checker = neg.start();
 
@@ -88,8 +88,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForAndInitial() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var and = StatefulPredicates.and(pred1, pred2);
         var checker = and.start();
 
@@ -99,8 +99,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForAndAfterFirstNonMatch() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var and = StatefulPredicates.and(pred1, pred2);
         var checker = and.start();
 
@@ -112,8 +112,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForAndAfterFirstMatch() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var and = StatefulPredicates.and(pred1, pred2);
         var checker = and.start();
 
@@ -125,8 +125,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForAndAfterSecondMatch() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var and = StatefulPredicates.and(pred1, pred2);
         var checker = and.start();
 
@@ -138,8 +138,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForAndAfterBothMatch() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var and = StatefulPredicates.and(pred1, pred2);
         var checker = and.start();
 
@@ -152,8 +152,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForOrInitial() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var or = StatefulPredicates.or(pred1, pred2);
         var checker = or.start();
 
@@ -163,8 +163,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForOrAfterNonMatch() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var or = StatefulPredicates.or(pred1, pred2);
         var checker = or.start();
 
@@ -176,8 +176,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForOrFirstInnerMatches() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var or = StatefulPredicates.or(pred1, pred2);
         var checker = or.start();
         checker.accept(new UserNamePrincipal("paul"));
@@ -190,8 +190,8 @@ public class StatefulPredicatesTest {
 
     @Test
     public void shouldWorkForOrSecondInnerMatches() {
-        var pred1 = new MatchingPrincipalPresent(p -> p instanceof UidPrincipal);
-        var pred2 = new MatchingPrincipalPresent(p -> p instanceof GidPrincipal);
+        var pred1 = new HasMatching(p -> p instanceof UidPrincipal);
+        var pred2 = new HasMatching(p -> p instanceof GidPrincipal);
         var or = StatefulPredicates.or(pred1, pred2);
         var checker = or.start();
         checker.accept(new UserNamePrincipal("paul"));

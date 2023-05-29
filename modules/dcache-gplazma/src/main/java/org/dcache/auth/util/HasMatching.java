@@ -17,20 +17,19 @@
  */
 package org.dcache.auth.util;
 
-import java.security.Principal;
 import static java.util.Objects.requireNonNull;
 import java.util.function.Predicate;
 
 /**
- * A simple StatefulPredicate that checks whether there is any principal that matches the supplied
+ * A simple StatefulPredicate that checks whether there is any of the items match the supplied
  * predicate.
  */
-public class MatchingPrincipalPresent implements StatefulPredicate<Principal> {
-    private class MatchingPrincipalPresentChecker implements StatefulPredicate.Checker<Principal> {
+public class HasMatching<T> implements StatefulPredicate<T> {
+    private class HasMatchingChecker implements StatefulPredicate.Checker<T> {
         private boolean matchFound;
 
         @Override
-        public void accept(Principal item) {
+        public void accept(T item) {
             if (!matchFound && predicate.test(item)) {
                 matchFound = true;
             }
@@ -47,17 +46,17 @@ public class MatchingPrincipalPresent implements StatefulPredicate<Principal> {
         }
     }
 
-    private final Predicate<Principal> predicate;
+    private final Predicate<T> predicate;
 
-    public MatchingPrincipalPresent(Predicate<Principal> predicate) {
+    public HasMatching(Predicate<T> predicate) {
         this.predicate = requireNonNull(predicate);
     }
 
-    public StatefulPredicate.Checker<Principal> start() {
-        return new MatchingPrincipalPresentChecker();
+    public StatefulPredicate.Checker<T> start() {
+        return new HasMatchingChecker();
     }
 
     public String toString() {
-        return "Test ∃ principal with " + predicate.toString();
+        return "Test presence that matches " + predicate.toString();
     }
 }
