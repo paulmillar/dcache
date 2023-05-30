@@ -19,20 +19,15 @@ package org.dcache.auth.watches;
 
 import dmg.cells.nucleus.CellCommandListener;
 import dmg.util.CommandException;
-import static dmg.util.CommandException.checkCommand;
 import dmg.util.command.Argument;
 import dmg.util.command.Command;
 import dmg.util.command.Option;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.dcache.gplazma.LoginObserver;
@@ -43,6 +38,8 @@ import org.parboiled.Parboiled;
 import org.parboiled.parserunners.ReportingParseRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static dmg.util.CommandException.checkCommand;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Support for watching login results.
@@ -59,9 +56,8 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
 
     private int nextId = 1;
 
-    public WatchSupport(int maxQueue) {
-        BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue(maxQueue);
-        executor = new ThreadPoolExecutor(1,1,5, TimeUnit.MINUTES, workQueue);
+    public WatchSupport(Executor executor) {
+        this.executor = requireNonNull(executor);
     }
 
     @Command(name = "watch ls", hint = "list watches",

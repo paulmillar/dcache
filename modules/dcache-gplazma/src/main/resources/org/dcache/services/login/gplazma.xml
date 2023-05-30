@@ -66,10 +66,23 @@
     </constructor-arg>
     <property name="observers">
       <util:list>
-	<bean class="org.dcache.gplazma.RecordFailedLogins"/>
-	<bean class="org.dcache.auth.watches.WatchSupport">
-	  <constructor-arg type="int" value="512"/>
-	</bean>
+        <bean class="org.dcache.gplazma.RecordFailedLogins"/>
+        <bean class="org.dcache.auth.watches.WatchSupport">
+          <constructor-arg>
+            <bean class="java.util.concurrent.ThreadPoolExecutor"
+                  destroy-method="shutdown">
+              <constructor-arg type="int" value="1"/>
+              <constructor-arg type="int" value="1"/>
+              <constructor-arg type="long" value="5"/>
+              <constructor-arg type="java.util.concurrent.TimeUnit" value="MINUTES"/>
+              <constructor-arg>
+                <bean class="java.util.concurrent.ArrayBlockingQueue">
+                  <constructor-arg type="int" value="512"/>
+                </bean>
+              </constructor-arg>
+            </bean>
+          </constructor-arg>
+        </bean>
       </util:list>
     </property>
   </bean>
