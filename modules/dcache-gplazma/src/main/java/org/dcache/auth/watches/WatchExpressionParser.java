@@ -23,7 +23,6 @@ import java.security.Principal;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -35,8 +34,6 @@ import org.dcache.auth.OidcSubjectPrincipal;
 import org.dcache.auth.PasswordCredential;
 import org.dcache.auth.UidPrincipal;
 import org.dcache.auth.UserNamePrincipal;
-import org.dcache.auth.util.DescriptivePredicate;
-import static org.dcache.auth.util.DescriptivePredicate.decorate;
 import org.dcache.auth.util.HasMatching;
 import org.dcache.gplazma.util.CertPaths;
 import org.dcache.gplazma.util.JsonWebToken;
@@ -47,6 +44,8 @@ import org.parboiled.Rule;
 import org.parboiled.annotations.BuildParseTree;
 import org.parboiled.errors.ParserRuntimeException;
 import org.parboiled.support.StringVar;
+import static java.util.Objects.requireNonNull;
+import static org.dcache.auth.util.DescriptivePredicate.decorate;
 
 /**
  * A class responsible for parsing a watch expression.
@@ -62,15 +61,6 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         "username", UserNamePrincipal.class,
         "uid", UidPrincipal.class,
         "gid", GidPrincipal.class);
-
-    private static final Predicate<Object> IS_JWT_CREDENTIAL = c -> c instanceof BearerTokenCredential
-                && JsonWebToken.isCompatibleFormat(((BearerTokenCredential)c).getToken());
-
-    protected static final Map<String,Predicate<Object>> CREDENTIAL_TYPE_PREDICATE_BY_LABEL = Map.of(
-        "in.jwt", IS_JWT_CREDENTIAL,
-        "in.password", c -> c instanceof PasswordCredential,
-        "in.x509", CertPaths::isX509CertPath
-    );
 
     Rule input() {
         return sequence(orExpression(), EOI);
@@ -138,8 +128,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         return firstOf(
             principalTypeAndNamePredicate(),
             principalTypePredicate(),
-            credentialTypeAndIntrospection(),
-            credentialTypePredicate()
+            credentialExpression()
             /* TODO Add predicates for:
                 login-attributes,
                 overall login result (success/failure)
@@ -149,37 +138,63 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         );
     }
 
-    Rule credentialTypeAndIntrospection() {
+    Rule credentialExpression() {
         StringVar credentialType = new StringVar();
 
-        return sequence(
-                string("in.jwt WITH "),
-                parseJwtCredentialIntrospection()
-            );
-
-        /* For when supporting introspection on multiple credential types
         return firstOf(
-            sequence(
-                string("jwt."),
-                parseJwtCredentialIntrospection()
-            ),
-            sequence(
-                string("x509."),
-                parseX509CredentialIntrospection()
-            ),
-            sequence(
-                string("password."),
-                parsePasswordCredentialIntrospection()
-            ));*/
+                sequence(
+                    string("in.jwt"),
+                    push(hasJwtCredential()),
+                    optional(
+                        string(" WITH "),
+                        push(InnerComposeCredentialPredicate.composeOnInner(pop())),
+                        jwtClaimNegatable(),
+                        push(pop(1).and(pop())), // combine hasJwtCredential with jwtClaimNegatable
+                        push(InnerComposeCredentialPredicate.composeOnOuter(pop()))
+                    )
+                ),
+                sequence(
+                    string("in.x509"),
+                    push(hasX509Credential())
+                    // FIXME add X509-specific tests.
+                ),
+                sequence(
+                    string("in.password"),
+                    push(hasUsernamePasswordCredential())
+                    // FIXME add password-specific tests.
+                )
+            );
     }
 
-    Rule parseJwtCredentialIntrospection() {
+    Rule jwtClaimOrExpression() {
+        return sequence(jwtClaimAndExpression(), zeroOrMore(orLiteral(), jwtClaimAndExpression(), push(pop().or(pop()))));
+    }
+
+    Rule jwtClaimAndExpression() {
+        return sequence(jwtClaimNegatable(), zeroOrMore(andLiteral(), jwtClaimNegatable(), push(pop().and(pop()))));
+    }
+
+    Rule jwtClaimNegatable() {
+        return firstOf(
+            sequence(notLiteral(), jwtClaimTerm(), push(pop().negate())),
+            jwtClaimTerm()
+        );
+    }
+
+    Rule jwtClaimTerm() {
+        return firstOf(
+            sequence(ch('('), optionalWhiteSpace(), jwtClaimOrExpression(), ch(')'), optionalWhiteSpace()),
+            jwtClaimPredicate()
+        );
+    }
+
+    Rule jwtClaimPredicate() {
         StringVar claimNameCapture = new StringVar();
         StringVar claimValueCapture = new StringVar();
 
         return firstOf(
             sequence( // Match claim exists and has a matching string value
-                oneOrMore(noneOf("/~: &|")),
+                oneOrMore(noneOf("/~: &|()")),
                 claimNameCapture.set(match()),
 
                 firstOf(
@@ -205,23 +220,11 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 )
             ),
             sequence( // Check existence of claim, ignoring the value
-                oneOrMore(noneOf(" &|")),
+                oneOrMore(noneOf(" &|()")),
                 claimNameCapture.set(match()),
-                push(hasJwtClaim(claimNameCapture.get()))
+                push(hasJwtClaim(claimNameCapture.get())),
+                optionalWhiteSpace()
             ));
-    }
-
-    Rule credentialTypePredicate() {
-        StringVar credentialType = new StringVar();
-        return sequence(
-            credentialType(credentialType),
-            optionalWhiteSpace(),
-            push(hasCredentialOfType(credentialType.get()))
-        );
-    }
-
-    Rule credentialType(StringVar type) {
-        return sequence(trie(CREDENTIAL_TYPE_PREDICATE_BY_LABEL.keySet()), type.set(match()));
     }
 
     Rule principalTypePredicate() {
@@ -345,20 +348,32 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     @VisibleForTesting
-    static CredentialPredicate hasCredentialOfType(String typeLabel) {
-        Predicate<Object> check = CREDENTIAL_TYPE_PREDICATE_BY_LABEL.get(typeLabel);
-        if (check == null) {
-            throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
-        }
-        var predicate = decorate(check)
-                .withDescription("door supplied a " + typeLabel);
+    static CredentialPredicate hasJwtCredential() {
+        Predicate<Object> check = c -> c instanceof BearerTokenCredential
+                && JsonWebToken.isCompatibleFormat(((BearerTokenCredential)c).getToken());
+        var predicate = decorate(check).withDescription("door supplied a JWT");
+        var hasPrincipalOfType = new HasMatching(predicate);
+        return new CredentialPredicate(hasPrincipalOfType);
+    }
+
+    @VisibleForTesting
+    static CredentialPredicate hasX509Credential() {
+        Predicate<Object> check = CertPaths::isX509CertPath;
+        var predicate = decorate(check).withDescription("door supplied an X.509 certificate chain");
+        var hasPrincipalOfType = new HasMatching(predicate);
+        return new CredentialPredicate(hasPrincipalOfType);
+    }
+
+    static CredentialPredicate hasUsernamePasswordCredential() {
+        Predicate<Object> check = c -> c instanceof PasswordCredential;
+        var predicate = decorate(check).withDescription("door supplied a username+password");
         var hasPrincipalOfType = new HasMatching(predicate);
         return new CredentialPredicate(hasPrincipalOfType);
     }
 
     @VisibleForTesting
     static CredentialPredicate hasJwtClaim(String claimName) {
-        Predicate<Object> check = IS_JWT_CREDENTIAL.and(c -> {
+        Predicate<Object> check = c -> {
                 try {
                     var jwt = new JsonWebToken(((BearerTokenCredential)c).getToken());
                     return jwt.getPayloadValueAsString(claimName)
@@ -367,15 +382,14 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-            });
-        var predicate = decorate(check)
-                .withDescription("door supplied a jwt with claim" + claimName);
+            };
+        var predicate = decorate(check).withDescription(claimName + " exists");
         var hasCredentialOfType = new HasMatching(predicate);
-        return new CredentialPredicate(hasCredentialOfType);
+        return new InnerComposeCredentialPredicate(hasCredentialOfType);
     }
 
     static CredentialPredicate hasJwtClaimWithExactStringValue(String claimName, String claimValue) {
-        Predicate<Object> check = IS_JWT_CREDENTIAL.and(c -> {
+        Predicate<Object> check = c -> {
                 try {
                     var jwt = new JsonWebToken(((BearerTokenCredential)c).getToken());
                     return jwt.getPayloadString(claimName)
@@ -384,16 +398,15 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-            });
-        var predicate = decorate(check)
-                .withDescription("door supplied a jwt with claim" + claimName + " with value \"" + claimValue + "\"");
+            };
+        var predicate = decorate(check).withDescription(claimName + " is \"" + claimValue + "\"");
         var hasCredentialOfType = new HasMatching(predicate);
-        return new CredentialPredicate(hasCredentialOfType);
+        return new InnerComposeCredentialPredicate(hasCredentialOfType);
     }
 
-    static CredentialPredicate hasJwtClaimWithValueMatchingGlob(String claimName, String globPattern) {
-        Pattern pattern = new Glob(globPattern).toPattern();
-        Predicate<Object> check = IS_JWT_CREDENTIAL.and(c -> {
+    static CredentialPredicate hasJwtClaimWithValueMatchingGlob(String claimName, String glob) {
+        Pattern pattern = new Glob(glob).toPattern();
+        Predicate<Object> check = c -> {
                 try {
                     var jwt = new JsonWebToken(((BearerTokenCredential)c).getToken());
                     return jwt.getPayloadString(claimName)
@@ -402,17 +415,15 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-            });
-        var predicate = decorate(check)
-                .withDescription("door supplied a jwt with claim" + claimName + " with value matching glob \"" + globPattern + "\"");
+            };
+        var predicate = decorate(check).withDescription(claimName + " matches glob \"" + glob + "\"");
         var hasCredentialOfType = new HasMatching(predicate);
-        return new CredentialPredicate(hasCredentialOfType);
+        return new InnerComposeCredentialPredicate(hasCredentialOfType);
     }
 
-    static CredentialPredicate hasJwtClaimWithValueMatchingRegularExpression(String claimName, String rePattern) {
-        Pattern pattern = Pattern.compile(rePattern);
-        Predicate<Object> check = CREDENTIAL_TYPE_PREDICATE_BY_LABEL.get("in.jwt")
-            .and(c -> {
+    static CredentialPredicate hasJwtClaimWithValueMatchingRegularExpression(String claimName, String re) {
+        Pattern pattern = Pattern.compile(re);
+        Predicate<Object> check = c -> {
                 try {
                     var jwt = new JsonWebToken(((BearerTokenCredential)c).getToken());
                     return jwt.getPayloadString(claimName)
@@ -421,11 +432,10 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-            });
-        var predicate = decorate(check)
-                .withDescription("door supplied a jwt with claim" + claimName + " with value matching RE \"" + rePattern + "\"");
+            };
+        var predicate = decorate(check).withDescription(claimName + " matches RE \"" + re + "\"");
         var hasCredentialOfType = new HasMatching(predicate);
-        return new CredentialPredicate(hasCredentialOfType);
+        return new InnerComposeCredentialPredicate(hasCredentialOfType);
     }
 
     @VisibleForTesting

@@ -36,7 +36,7 @@ import org.dcache.gplazma.monitor.LoginResult;
  * another predicate.
  */
 public class CredentialPredicate implements Predicate<LoginResultObservation> {
-    private final StatefulPredicate<Object> predicate;
+    protected final StatefulPredicate<Object> predicate;
 
     public CredentialPredicate(StatefulPredicate<Object> predicate) {
         this.predicate = requireNonNull(predicate);

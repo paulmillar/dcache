@@ -22,7 +22,8 @@ import java.util.function.Predicate;
 
 /**
  * A simple StatefulPredicate that checks whether there is any of the items match the supplied
- * predicate.
+ * predicate.  Composition is supported through the {@link #and}, {@link #or} and {@link negate}
+ * methods.
  */
 public class HasMatching<T> implements StatefulPredicate<T> {
     private class HasMatchingChecker implements StatefulPredicate.Checker<T> {
@@ -58,5 +59,17 @@ public class HasMatching<T> implements StatefulPredicate<T> {
 
     public String toString() {
         return "Test presence that matches " + predicate.toString();
+    }
+
+    public HasMatching<T> and(HasMatching<T> other) {
+        return new HasMatching(this.predicate.and(other.predicate));
+    }
+
+    public HasMatching<T> or(HasMatching<T> other) {
+        return new HasMatching(this.predicate.or(other.predicate));
+    }
+
+    public HasMatching<T> negate() {
+        return new HasMatching(predicate.negate());
     }
 }
