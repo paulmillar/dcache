@@ -54,7 +54,7 @@ import org.parboiled.support.StringVar;
 @BuildParseTree
 public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObservation>> {
 
-    protected static final Map<String,Class<? extends Principal>> TYPES_BY_LABEL = Map.of(
+    protected static final Map<String,Class<? extends Principal>> PRINCIPAL_TYPES_BY_LABEL = Map.of(
         "dn", GlobusPrincipal.class,
         "sub", OidcSubjectPrincipal.class,
         "email", EmailAddressPrincipal.class,
@@ -264,7 +264,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     }
 
     Rule principalType(StringVar principalType) {
-        return sequence(trie(TYPES_BY_LABEL.keySet()), principalType.set(match()));
+        return sequence(trie(PRINCIPAL_TYPES_BY_LABEL.keySet()), principalType.set(match()));
     }
 
     Rule stringLiteral(StringVar principalName) {
@@ -430,7 +430,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     @VisibleForTesting
     static PrincipalPredicate hasType(String typeLabel) {
-        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        Class<? extends Principal> type = PRINCIPAL_TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
             throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
         }
@@ -442,7 +442,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     @VisibleForTesting
     static PrincipalPredicate hasTypeAndExactName(String typeLabel, String name) {
-        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        Class<? extends Principal> type = PRINCIPAL_TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
             throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
         }
@@ -455,7 +455,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     @VisibleForTesting
     static PrincipalPredicate hasTypeAndGlobMatchingName(String typeLabel, String globPattern) {
-        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        Class<? extends Principal> type = PRINCIPAL_TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
             throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
         }
@@ -466,7 +466,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
 
     @VisibleForTesting
     static PrincipalPredicate hasTypeAndRegExpMatchingName(String typeLabel, String pattern) {
-        Class<? extends Principal> type = TYPES_BY_LABEL.get(typeLabel);
+        Class<? extends Principal> type = PRINCIPAL_TYPES_BY_LABEL.get(typeLabel);
         if (type == null) {
             throw new ParserRuntimeException("Unknown principal type \"" + typeLabel + "\"");
         }
