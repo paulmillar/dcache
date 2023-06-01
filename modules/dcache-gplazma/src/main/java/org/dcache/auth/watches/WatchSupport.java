@@ -39,7 +39,11 @@ import org.parboiled.parserunners.ReportingParseRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static dmg.util.CommandException.checkCommand;
+import dmg.util.command.CommandLine;
+import java.time.Instant;
 import static java.util.Objects.requireNonNull;
+import org.dcache.gplazma.monitor.LoginResultPrinter;
+import org.dcache.util.Args;
 
 /**
  * Support for watching login results.
@@ -64,10 +68,10 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
           description = "Provide information about the currently configured login watches.")
     public class WatchLsCommand implements Callable<String> {
 
-        @Argument(usage="Watch ID", required=false)
-        private String id;
+        // REVISIT add command options to customise the output?
 
-        private String listWatches() {
+        @Override
+        public String call() {
             ColumnWriter writer = new ColumnWriter().headersInColumns()
                     .header("ID").left("id").space()
                     .header("Count").right("count").space()
@@ -88,19 +92,69 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             }
             return writer.toString();
         }
+    }
 
-        private String listWatch(String id) throws CommandException {
-            Watch watch = watches.get(id);
-            checkCommand(watch != null, "Unknown watch with ID %s", id);
+    @Command(name = "watch show", hint="Show matching login", description = "Provide information"
+        + " about a specific watch.  Without any arguments, a summary table is shown.  If an index"
+        + " is specified then more detailed information about that login is shown.")
+    public class WatchShowCommand implements Callable<String> {
 
-            return watch.list().stream()
-                .map(LoginResultObservation::print)
-                .collect(Collectors.joining("\n"));
+        @Argument(index=0, usage="Specify the ID of the watch to show", metaVar="watch-id")
+        private String id;
+
+        @Argument(index=1, usage="Login index", required=false)
+        private int index;
+
+        @CommandLine
+        private Args args;
+
+        private String printSummary(Watch watch) {
+            ColumnWriter writer = new ColumnWriter().headersInColumns()
+                    .header("Index").left("index").space()
+                    .header("When").left("when").space()
+                    .header("Result").left("result");
+            int index = 1;
+            for (LoginResultObservation login : watch.list()) {
+                Instant whenObserved = login.getWhenObserved();
+                LoginResult result = login.getResult();
+                // REVISIT: add description of door-supplied credentials?
+                // REVISIT: add door?
+                writer.row()
+                    .value("index", index)
+                    .value("when", TimeUtils.relativeTimestamp(whenObserved))
+                    .value("result", result.isSuccessful() ? "SUCCESS" : "FAIL");
+                index++;
+            }
+            return writer.toString();
+        }
+
+        private String printObservation(LoginResultObservation observation) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Observed: ");
+            TimeUtils.appendRelativeTimestamp(sb, observation.getWhenObserved().toEpochMilli(),
+                  System.currentTimeMillis(), TimeUtils.TimeUnitFormat.SHORT).append('\n');
+
+            LoginResult result = observation.getResult();
+            sb.append(new LoginResultPrinter(result).print()); // REVISIT: allow admin more control over the output?
+            return sb.toString();
         }
 
         @Override
         public String call() throws CommandException {
-            return id == null ? listWatches() : listWatch(id);
+            Watch watch = watches.get(id);
+            checkCommand(watch != null, "Unknown watch with ID %s", id);
+
+            if (args.argc() == 1) {
+                return printSummary(watch);
+            }
+
+            var observations = watch.list();
+            checkCommand(index >= 1, "Index must be a positive number.");
+            checkCommand(index <= observations.size(), "%d is too large; only %d logins recorded.",
+                    index, observations.size());
+
+            var login = observations.get(index-1);
+            return printObservation(login);
         }
     }
 
