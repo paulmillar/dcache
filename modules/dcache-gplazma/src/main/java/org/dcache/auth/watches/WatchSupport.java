@@ -44,6 +44,7 @@ import java.time.Instant;
 import static java.util.Objects.requireNonNull;
 import org.dcache.gplazma.monitor.LoginResultPrinter;
 import org.dcache.util.Args;
+import org.parboiled.errors.ErrorUtils;
 
 /**
  * Support for watching login results.
@@ -294,11 +295,8 @@ public class WatchSupport implements LoginObserver, CellCommandListener{
             var result = runner.run(expression);
 
             if (!result.isSuccess()) {
-                var errors = result.getParseErrors().stream()
-                    .map(Object::toString)
-                    .collect(Collectors.joining("\n\n"));
-                throw new CommandException("Parsing of \"" + expression + "\" failed with errors:\n"
-                    + errors);
+                throw new CommandException("Unable to parse expression:\n"
+                    + ErrorUtils.printParseErrors(result));
             }
 
             return result.getTopStackValue();
