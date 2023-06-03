@@ -20,8 +20,12 @@ package org.dcache.auth.watches;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.security.Principal;
+import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -154,9 +158,20 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                     )
                 ),
                 sequence(
-                    string("in.x509"),
-                    push(hasX509Credential())
-                    // FIXME add X509-specific tests.
+                    string("in.x509-chain"),
+                    push(hasX509Credential()),
+                    optional(
+                        /* TODO: add "WITH ANY" and "WITH ALL" that are composible; e.g.,
+
+                            in.x509-chain WITH ALL validity:OK && WITH ANY \
+                                (voms.issuer:/C=DE/... && voms.fqan:/ATLAS && voms.validity:OK)
+                        */
+                        string(" WITH "),
+                        push(InnerComposeCredentialPredicate.composeOnInner(pop())),
+                        x509NegatableTerm(),
+                        push(pop(1).and(pop())), // combine hasX509Credential with x509Negatable
+                        push(InnerComposeCredentialPredicate.composeOnOuter(pop()))
+                    )
                 ),
                 sequence(
                     string("in.password"),
@@ -165,6 +180,8 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 )
             );
     }
+
+    /* JWT credential */
 
     Rule jwtClaimOrExpression() {
         return sequence(jwtClaimAndExpression(), zeroOrMore(orLiteral(), jwtClaimAndExpression(), push(pop().or(pop()))));
@@ -226,6 +243,104 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 optionalWhiteSpace()
             ));
     }
+
+    /* X.509 credential */
+
+    Rule x509OrExpression() {
+        return sequence(x509AndExpression(), zeroOrMore(orLiteral(), x509AndExpression(), push(pop().or(pop()))));
+    }
+
+    Rule x509AndExpression() {
+        return sequence(x509NegatableTerm(), zeroOrMore(andLiteral(), x509NegatableTerm(), push(pop().and(pop()))));
+    }
+
+    Rule x509NegatableTerm() {
+        return firstOf(
+            sequence(notLiteral(), x509Term(), push(pop().negate())),
+            x509Term()
+        );
+    }
+
+    Rule x509Term() {
+        return firstOf(
+            sequence(ch('('), optionalWhiteSpace(), x509OrExpression(), ch(')'), optionalWhiteSpace()),
+            x509Predicate()
+        );
+    }
+
+    Rule x509Predicate() {
+        StringVar valueCapture = new StringVar();
+
+        return sequence(
+                string("validity:"),
+                trie(X509Validity.NAMES),
+                valueCapture.set(match()),
+                optionalWhiteSpace(),
+                push(hasX509WithValidity(valueCapture.get()))
+            );
+        /*
+        return firstOf(
+            sequence(
+                string("validity:"),
+                trie(X509Validity.NAMES),
+                valueCapture.set(match()),
+                optionalWhiteSpace(),
+                push(hasX509WithValidity(valueCapture.get()))
+            ),
+            sequence(
+                string("issuer"),
+                firstOf(
+                    sequence(
+                        ch(':'),
+                        stringLiteral(valueCapture),
+                        optionalWhiteSpace(),
+                        push(hasX509WithExactIssuer(valueCapture.get()))
+                    ),
+                    sequence(
+                        ch('~'),
+                        stringLiteral(valueCapture),
+                        optionalWhiteSpace(),
+                        push(hasX509WithIssuerMatchingGlob(valueCapture.get()))
+                    ),
+                    sequence(
+                        ch('/'),
+                        zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
+                        push(hasX509WithIssuerMatchingRegularExpression(valueCapture.get(), match())),
+                        ch('/'),
+                        optionalWhiteSpace()
+                    )
+                ),
+                optionalWhiteSpace()
+            ),
+            sequence(
+                string("subject:"),
+                firstOf(
+                    sequence(
+                        ch(':'),
+                        stringLiteral(valueCapture),
+                        optionalWhiteSpace(),
+                        push(hasX509WithExactSubject(valueCapture.get()))
+                    ),
+                    sequence(
+                        ch('~'),
+                        stringLiteral(valueCapture),
+                        optionalWhiteSpace(),
+                        push(hasX509WithSubjectMatchingGlob(valueCapture.get()))
+                    ),
+                    sequence(
+                        ch('/'),
+                        zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
+                        push(hasX509WithSubjectMatchingRegularExpression(valueCapture.get(), match())),
+                        ch('/'),
+                        optionalWhiteSpace()
+                    )
+                ),
+                optionalWhiteSpace()
+            ));
+        */
+    }
+
+    /* principal */
 
     Rule principalTypePredicate() {
         StringVar principalType = new StringVar();
@@ -436,6 +551,30 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
         var predicate = decorate(check).withDescription(claimName + " matches RE \"" + re + "\"");
         var hasCredentialOfType = new HasMatching(predicate);
         return new InnerComposeCredentialPredicate(hasCredentialOfType);
+    }
+
+    static CredentialPredicate hasX509WithValidity(String value) {
+        Predicate<Object> check = c -> {
+                X509Certificate[] certs = CertPaths.getX509Certificates((CertPath)c);
+                return Arrays.stream(certs)
+                    .map(WatchExpressionParser::getValidity)
+                    .map(X509Validity::name)
+                    .anyMatch(value::equals);
+            };
+        var predicate = decorate(check).withDescription(value + " validity");
+        var hasCredentialOfType = new HasMatching(predicate);
+        return new InnerComposeCredentialPredicate(hasCredentialOfType);
+    }
+
+    static X509Validity getValidity(X509Certificate cert) {
+        Date now = new Date();
+        if (now.before(cert.getNotBefore())) {
+            return X509Validity.EMBARGOED;
+        }
+        if (now.after(cert.getNotAfter())) {
+            return X509Validity.EXPIRED;
+        }
+        return X509Validity.OK;
     }
 
     @VisibleForTesting
