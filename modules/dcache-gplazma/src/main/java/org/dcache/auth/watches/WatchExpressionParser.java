@@ -150,12 +150,15 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                     string("in.jwt"),
                     push(hasJwtCredential()),
                     optional(
-                        string(" WITH "),
+                        whiteSpace(),
+                        string("WITH"),
+                        whiteSpace(),
                         push(InnerComposeCredentialPredicate.composeOnInner(pop())),
                         jwtClaimNegatable(),
                         push(pop(1).and(pop())), // combine hasJwtCredential with jwtClaimNegatable
                         push(InnerComposeCredentialPredicate.composeOnOuter(pop()))
-                    )
+                    ),
+                    optionalWhiteSpace()
                 ),
                 sequence(
                     string("in.x509-chain"),
@@ -175,8 +178,9 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 ),
                 sequence(
                     string("in.password"),
-                    push(hasUsernamePasswordCredential())
+                    push(hasUsernamePasswordCredential()),
                     // FIXME add password-specific tests.
+                    optionalWhiteSpace()
                 )
             );
     }
