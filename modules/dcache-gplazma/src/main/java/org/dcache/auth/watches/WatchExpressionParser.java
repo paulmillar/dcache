@@ -145,7 +145,8 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
     Rule credentialExpression() {
         StringVar credentialType = new StringVar();
 
-        return firstOf(
+        return sequence(
+            firstOf(
                 sequence(
                     string("in.jwt"),
                     push(hasJwtCredential()),
@@ -157,8 +158,7 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                         jwtClaimNegatable(),
                         push(pop(1).and(pop())), // combine hasJwtCredential with jwtClaimNegatable
                         push(InnerComposeCredentialPredicate.composeOnOuter(pop()))
-                    ),
-                    optionalWhiteSpace()
+                    )
                 ),
                 sequence(
                     string("in.x509-chain"),
@@ -178,11 +178,12 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 ),
                 sequence(
                     string("in.password"),
-                    push(hasUsernamePasswordCredential()),
+                    push(hasUsernamePasswordCredential())
                     // FIXME add password-specific tests.
-                    optionalWhiteSpace()
                 )
-            );
+            ),
+            optionalWhiteSpace()
+        );
     }
 
     /* JWT credential */
@@ -217,28 +218,25 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
             sequence( // Match claim exists and has a matching string value
                 oneOrMore(noneOf("/~: &|()")),
                 claimNameCapture.set(match()),
-
                 firstOf(
                     sequence(
                         ch(':'),
                         stringLiteral(claimValueCapture),
-                        optionalWhiteSpace(),
                         push(hasJwtClaimWithExactStringValue(claimNameCapture.get(), claimValueCapture.get()))
                     ),
                     sequence(
                         ch('~'),
                         stringLiteral(claimValueCapture),
-                        optionalWhiteSpace(),
                         push(hasJwtClaimWithValueMatchingGlob(claimNameCapture.get(), claimValueCapture.get()))
                     ),
                     sequence(
                         ch('/'),
                         zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
                         push(hasJwtClaimWithValueMatchingRegularExpression(claimNameCapture.get(), match())),
-                        ch('/'),
-                        optionalWhiteSpace()
+                        ch('/')
                     )
-                )
+                ),
+                optionalWhiteSpace()
             ),
             sequence( // Check existence of claim, ignoring the value
                 oneOrMore(noneOf(" &|()")),
@@ -365,23 +363,21 @@ public class WatchExpressionParser extends BaseParser<Predicate<LoginResultObser
                 sequence(
                     ch(':'),
                     stringLiteral(principalName),
-                    optionalWhiteSpace(),
                     push(hasTypeAndExactName(principalType.get(), principalName.get()))
                 ),
                 sequence(
                     ch('~'),
                     stringLiteral(principalName),
-                    optionalWhiteSpace(),
                     push(hasTypeAndGlobMatchingName(principalType.get(), principalName.get()))
                 ),
                 sequence(
                     ch('/'),
                     zeroOrMore(noneOf("/")), // REVISIT what if we want '/' in the RE?
                     push(hasTypeAndRegExpMatchingName(principalType.get(), match())),
-                    ch('/'),
-                    optionalWhiteSpace()
+                    ch('/')
                 )
-            )
+            ),
+            optionalWhiteSpace()
         );
     }
 
