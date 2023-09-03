@@ -13,7 +13,9 @@ import io.milton.http.HttpManager;
 import io.milton.http.Response;
 import io.milton.http.Response.Status;
 import io.milton.http.http11.DefaultHttp11ResponseHandler;
+import io.milton.http.webdav.DefaultPropFindRequestFieldParser;
 import io.milton.http.webdav.DefaultWebDavResponseHandler;
+import io.milton.http.webdav.MsPropFindRequestFieldParser;
 import io.milton.http.webdav.PropFindXmlGenerator;
 import java.util.Date;
 import org.dcache.http.PathMapper;
@@ -23,10 +25,16 @@ import org.springframework.beans.factory.annotation.Required;
 
 public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBean {
 
+    enum DefaultProperties {
+        PERFORMANCE,
+        MICROSOFT_COMPATIBLE
+    };
+
     private ReloadableTemplate _template;
     private ImmutableMap<String, String> _templateConfig;
     private String _staticContentPath;
     private PathMapper _pathMapper;
+    private DefaultProperties _defaultProperties = DefaultProperties.MICROSOFT_COMPATIBLE;
 
     @Override
     public Object getObject() throws Exception {
@@ -45,6 +53,12 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
         Rfc3230ResponseHandler rfc3230 = Rfc3230ResponseHandler.wrap(workarounds);
         AbstractWrappingResponseHandler handler = new FederationResponseHandler(rfc3230);
         setWebdavResponseHandler(handler);
+
+        var defaultFieldParser = new DefaultPropFindRequestFieldParser();
+        var fieldParser = _defaultProperties == DefaultProperties.PERFORMANCE
+            ? new DcachePropFindRequestFieldParser(defaultFieldParser)
+            : new MsPropFindRequestFieldParser(defaultFieldParser);
+        setPropFindRequestFieldParser(fieldParser);
 
         init();
 
@@ -154,6 +168,11 @@ public class HttpManagerFactory extends HttpManagerBuilder implements FactoryBea
     @Required
     public void setTemplateConfig(ImmutableMap<String, String> config) {
         _templateConfig = config;
+    }
+
+    @Required
+    public void setDefaultProperties(DefaultProperties properties) {
+        _defaultProperties = requireNonNull(properties);
     }
 
     /**
