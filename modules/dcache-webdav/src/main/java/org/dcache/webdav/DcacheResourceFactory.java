@@ -186,6 +186,14 @@ public class DcacheResourceFactory
 
     private static final Map<QName,Set<FileAttribute>> PROPERTY_TO_FILE_ATTRIBUTES;
 
+    private static final QName QUOTA_USED_BYTES = new QName("DAV:", "quota-used-bytes");
+    private static final QName QUOTA_AVAILABLE_BYTES = new QName("DAV:", "quota-available-bytes");
+
+    private static final Set<QName> GFAL2_SUPPRESSED_PROPERTIES = Set.of(QUOTA_USED_BYTES, QUOTA_AVAILABLE_BYTES);
+
+    private static final Set<FileAttribute> GFAL2_DEFAULT_PROPERTIES = Set.of(MODIFICATION_TIME,
+            CREATION_TIME, SIZE, TYPE, OWNER, OWNER_GROUP);
+
     static {
         ImmutableMap.Builder<QName,Set<FileAttribute>> builder = ImmutableMap.builder();
         builder.put(new QName(SRM_NAMESPACE_URI, PROPERTY_ACCESS_LATENCY), Set.of(ACCESS_LATENCY));
@@ -204,8 +212,8 @@ public class DcacheResourceFactory
         builder.put(new QName("DAV:", "getlastmodified"), Set.of(MODIFICATION_TIME));
         builder.put(new QName("DAV:", "getcreated"), Set.of(CREATION_TIME));
         builder.put(new QName("DAV:", "creationdate"), Set.of(CREATION_TIME));
-        builder.put(new QName("DAV:", "quota-used-bytes"), Set.of(STORAGEINFO));
-        builder.put(new QName("DAV:", "quota-available-bytes"), Set.of(STORAGEINFO));
+        builder.put(QUOTA_USED_BYTES, Set.of(STORAGEINFO));
+        builder.put(QUOTA_AVAILABLE_BYTES, Set.of(STORAGEINFO));
         PROPERTY_TO_FILE_ATTRIBUTES = builder.build();
     }
 
@@ -1465,7 +1473,9 @@ public class DcacheResourceFactory
                 .orElseGet(() -> {
                         LOGGER.debug("Missing PropertiesRequest object,"
                                 + " throwing the kitchen sink at it.");
-                        return ALL_PROPFIND_ATTRIBUTES;
+                        return isGfal2Request()
+                            ? GFAL2_DEFAULT_PROPERTIES
+                            : ALL_PROPFIND_ATTRIBUTES;
                     });
 
             attributes.addAll(extraAttr);
@@ -1486,6 +1496,10 @@ public class DcacheResourceFactory
     private Set<FileAttribute> attributesForProperty(QName name) {
         if (name.getNamespaceURI().equalsIgnoreCase(XATTR_NAMESPACE_URI)) {
             return Set.of(XATTR);
+        }
+
+        if (isGfal2Request() && GFAL2_SUPPRESSED_PROPERTIES.contains(name)) {
+            return Collections.emptySet();
         }
 
         var attributes = Optional.ofNullable(PROPERTY_TO_FILE_ATTRIBUTES.get(name));
@@ -1544,6 +1558,11 @@ public class DcacheResourceFactory
     private boolean isGetOrHeadRequest() {
         return HttpManager.request().getMethod() == Request.Method.HEAD ||
                 HttpManager.request().getMethod() == Request.Method.GET;
+    }
+
+    private boolean isGfal2Request() {
+        String useragent = HttpManager.request().getUserAgentHeader();
+        return useragent != null && useragent.contains("gfal2");
     }
 
     FileLocality calculateLocality(FileAttributes attributes, String clientIP) {
