@@ -1434,6 +1434,10 @@ public final class BulkServiceCommands implements CellCommandListener {
 
     private JdbcBulkArchiveDao archiveDao;
 
+    public void shutdown() {
+        executor.shutdown();
+    }
+
     @Required
     public void setActivityFactory(BulkActivityFactory activityFactory) {
         this.activityFactory = activityFactory;

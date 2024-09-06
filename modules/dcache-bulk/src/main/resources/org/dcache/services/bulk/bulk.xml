@@ -295,7 +295,7 @@
     <property name="endpointStub" ref="ha-leader-stub"/>
   </bean>
 
-  <bean id="admin-commands" class="org.dcache.services.bulk.BulkServiceCommands">
+  <bean id="admin-commands" class="org.dcache.services.bulk.BulkServiceCommands" destroy-method="shutdown">
     <description>Holds the various commands for administrative purposes.</description>
     <property name="service" ref="bulk-service"/>
     <property name="activityFactory" ref="activity-factory"/>

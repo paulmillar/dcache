@@ -408,6 +408,7 @@ public final class ConcurrentRequestManager implements BulkRequestManager {
         requestJobs = null;
         cancelledTargets = null;
         requestStore.clearCache();
+        processorExecutorService.shutdown();
     }
 
     @Override
