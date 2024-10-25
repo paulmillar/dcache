@@ -66,12 +66,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.dcache.namespace.FileAttribute;
 import org.dcache.pool.movers.NettyTransferService;
 import org.dcache.pool.movers.RepositoryFileRegion;
@@ -132,7 +135,7 @@ public class HttpPoolRequestHandler extends HttpRequestHandler {
      */
     private NettyTransferService<HttpProtocolInfo>.NettyMoverChannel _writeChannel;
 
-    private Optional<ChecksumType> _wantedDigest;
+    private Set<ChecksumType> _wantedDigests = EnumSet.noneOf(ChecksumType.class);
 
     /**
      * A simple data class to encapsulate the errors to return by the mover to the pool for file
@@ -522,8 +525,10 @@ public class HttpPoolRequestHandler extends HttpRequestHandler {
             }
 
             file.getProtocolInfo().getWantedChecksums().forEach(file::addChecksumType);
-            _wantedDigest = wantDigest(request).flatMap(Checksums::parseWantDigest);
-            _wantedDigest.ifPresent(file::addChecksumType);
+            _wantedDigests = wantDigest(request)
+                    .map(Checksums::parseWantDigest)
+                    .orElseGet(() -> EnumSet.noneOf(ChecksumType.class));
+            _wantedDigests.forEach(file::addChecksumType);
 
             if (is100ContinueExpected(request)) {
                 context.writeAndFlush(new DefaultFullHttpResponse(HTTP_1_1, CONTINUE))
@@ -589,10 +594,11 @@ public class HttpPoolRequestHandler extends HttpRequestHandler {
                         @Override
                         public void onSuccess(Void result) {
                             try {
-                                Optional<String> digest = _wantedDigest
-                                      .flatMap(t -> Checksums.digestHeader(t,
-                                            writeChannel.getFileAttributes()));
-                                context.writeAndFlush(new HttpPutResponse(size, location, digest),
+                                Optional<String> digestResponseHeader =
+                                      Checksums.digestHeader(_wantedDigests,
+                                      writeChannel.getFileAttributes());
+                                context.writeAndFlush(new HttpPutResponse(size,
+                                      location, digestResponseHeader),
                                       promise);
                             } catch (IOException e) {
                                 context.writeAndFlush(

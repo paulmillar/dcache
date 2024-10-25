@@ -115,6 +115,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.security.auth.Subject;
@@ -763,7 +764,7 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
         private final ImmutableMap<String, String> _transferHeaders;
         private final Direction _direction;
         private final boolean _overwriteAllowed;
-        private final Optional<String> _wantDigest;
+        private final Set<ChecksumType> _wantedDigests;
         private final PnfsHandler _pnfs;
         private final Instant _whenSubmitted = Instant.now();
         private final SettableFuture<Optional<String>> _transferResult = SettableFuture.create();
@@ -818,7 +819,9 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
             _transferHeaders = transferHeaders;
             _direction = direction;
             _overwriteAllowed = overwriteAllowed;
-            _wantDigest = wantDigest;
+            _wantedDigests = wantDigest
+                    .map(Checksums::parseWantDigest)
+                    .orElse(EnumSet.noneOf(ChecksumType.class));
         }
 
         private IoDoorEntry describe() {
@@ -850,9 +853,9 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
             try {
                 switch (_direction) {
                     case PUSH:
-                        EnumSet<FileAttribute> desired = _wantDigest.isPresent()
-                              ? EnumSet.of(PNFSID, SIZE, TYPE, CHECKSUM)
-                              : EnumSet.of(PNFSID, SIZE, TYPE);
+                        EnumSet<FileAttribute> desired = _wantedDigests.isEmpty()
+                              ? EnumSet.of(PNFSID, SIZE, TYPE)
+                              : EnumSet.of(PNFSID, SIZE, TYPE, CHECKSUM);
                         desired.addAll(TransferManagerHandler.ATTRIBUTES_FOR_PUSH);
                         try {
                             FileAttributes attributes = _pnfs.getFileAttributes(_path.toString(),
@@ -975,7 +978,7 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
             _async = servletRequest.startAsync();
             _async.setTimeout(0); // Disable timeout as we don't know how long we'll take.
 
-            if (_direction == Direction.PULL && _wantDigest.isPresent()) {
+            if (_direction == Direction.PULL && !_wantedDigests.isEmpty()) {
                 // Ensure this is called before any perf-marker data is sent.
                 addTrailerCallback();
             }
@@ -1029,14 +1032,25 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
                       "Unknown " + target + " hostname");
             }
 
-            Optional<ChecksumType> desiredChecksum = _wantDigest.flatMap(
-                  Checksums::parseWantDigest);
-            var desiredChecksums = desiredChecksum
-                    .map(List::of)
-                    .orElseGet(Collections::emptyList);
+            List<ChecksumType> desiredChecksums;
+            if (_wantedDigests.isEmpty()) {
+                desiredChecksums = Collections.emptyList();
+            } else {
+                ChecksumType preferred = _wantedDigests.stream()
+                        .sorted(Checksums.PREFERRED_CHECKSUM_TYPE_ORDERING)
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Failed to identified preferred checksum in " + _wantedDigests));
+                desiredChecksums = Stream.concat(
+                        Stream.of(preferred),
+                        _wantedDigests.stream().filter(c -> c != preferred))
+                        .collect(Collectors.toList());
+            }
 
             switch (_type) {
                 case GSIFTP:
+                    Optional<ChecksumType> desiredChecksum = desiredChecksums.isEmpty()
+                            ? Optional.empty()
+                            : Optional.of(desiredChecksums.get(0));
                     return new RemoteGsiftpTransferProtocolInfo("RemoteGsiftpTransfer",
                           1, 1, address, _destination.toASCIIString(), null,
                           null, buffer, MiB.toBytes(1), _privateKey, _certificateChain,
@@ -1080,19 +1094,18 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
         }
 
         private void fetchChecksums() {
-            if (_direction == Direction.PULL && _wantDigest.isPresent()) {
-                Optional<String> empty = Optional.empty();
-                _digestValue = _wantDigest.map(h -> {
-                    try {
-                        FileAttributes attributes = _pnfs.getFileAttributes(_path,
-                              EnumSet.of(CHECKSUM));
-                        return Checksums.digestHeader(h, attributes);
-                    } catch (CacheException e) {
-                        LOGGER.warn("Failed to acquire checksum of fetched file: {}",
-                              e.getMessage());
-                        return empty;
-                    }
-                }).orElse(empty);
+            if (_direction == Direction.PULL && !_wantedDigests.isEmpty()) {
+                try {
+                    FileAttributes attributes = _pnfs.getFileAttributes(_path,
+                          EnumSet.of(CHECKSUM));
+                    _digestValue = Checksums.digestHeader(_wantedDigests, attributes);
+                } catch (CacheException e) {
+                    LOGGER.warn("Failed to acquire checksum of fetched file: {}",
+                          e.getMessage());
+                    _digestValue = Optional.empty();
+                }
+            } else {
+                _digestValue = Optional.empty();
             }
         }
 
@@ -1127,13 +1140,13 @@ public class RemoteTransferHandler implements CellMessageReceiver, CellCommandLi
 
             switch (_direction) {
                 case PULL:
-                    if (_wantDigest.isPresent()) {
+                    if (!_wantedDigests.isEmpty()) {
                         response.setHeader("Trailer", "Digest");
                     }
                     break;
 
                 case PUSH:
-                    _wantDigest.flatMap(h -> Checksums.digestHeader(h, attributes))
+                    Checksums.digestHeader(_wantedDigests, attributes)
                           .ifPresent(v -> response.setHeader("Digest", v));
                     break;
             }

@@ -110,6 +110,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.PostConstruct;
 import javax.security.auth.Subject;
 import javax.servlet.http.HttpServletRequest;
@@ -1595,8 +1597,9 @@ public class DcacheResourceFactory
             case HEAD:
             case GET:
                 return wantDigest()
-                      .flatMap(Checksums::parseWantDigest)
-                      .isPresent();
+                      .map(Checksums::parseWantDigest)
+                      .map(c -> !c.isEmpty())
+                      .orElse(false);
             default:
                 return false;
         }
@@ -1674,7 +1677,7 @@ public class DcacheResourceFactory
     private class HttpTransfer extends RedirectedTransfer<String> {
 
         private URI _location;
-        private ChecksumType _wantedChecksum;
+        private Set<ChecksumType> _wantedChecksums = EnumSet.noneOf(ChecksumType.class);
         private InetSocketAddress _clientAddressForPool;
         protected HttpProtocolInfo.Disposition _disposition;
         private boolean _isSSL;
@@ -1696,9 +1699,19 @@ public class DcacheResourceFactory
         }
 
         protected ProtocolInfo createProtocolInfo(InetSocketAddress address) {
-            List<ChecksumType> wantedChecksums = _wantedChecksum == null
-                    ? Collections.emptyList()
-                    : List.of(_wantedChecksum);
+            List<ChecksumType> wantedChecksums;
+            if (_wantedChecksums.isEmpty()) {
+                wantedChecksums = Collections.emptyList();
+            } else {
+                ChecksumType preferred = _wantedChecksums.stream()
+                        .sorted(Checksums.PREFERRED_CHECKSUM_TYPE_ORDERING)
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Failed to identified preferred checksum in " + _wantedChecksums));
+                wantedChecksums = Stream.concat(
+                        Stream.of(preferred),
+                        _wantedChecksums.stream().filter(c -> c != preferred))
+                        .collect(Collectors.toList());
+            }
             HttpProtocolInfo protocolInfo =
                   new HttpProtocolInfo(
                         _isSSL ? PROTOCOL_INFO_SSL_NAME : PROTOCOL_INFO_NAME,
@@ -1728,8 +1741,8 @@ public class DcacheResourceFactory
             _location = location;
         }
 
-        public void setWantedChecksum(ChecksumType type) {
-            _wantedChecksum = type;
+        public void setWantedChecksums(Set<ChecksumType> checksums) {
+            _wantedChecksums = requireNonNull(checksums);
         }
 
         public void setProxyTransfer(boolean isProxyTransfer) {
@@ -1841,8 +1854,9 @@ public class DcacheResourceFactory
             _mtime = OwncloudClients.parseMTime(request);
 
             wantDigest()
-                  .flatMap(Checksums::parseWantDigest)
-                  .ifPresent(this::setWantedChecksum);
+                  .map(Checksums::parseWantDigest)
+                  .filter(v -> !v.isEmpty())
+                  .ifPresent(this::setWantedChecksums);
 
             try {
                 _contentMd5 = Optional.ofNullable(

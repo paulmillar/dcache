@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.Set;
 import org.dcache.vehicles.FileAttributes;
 import org.hamcrest.Description;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Test;
 
@@ -409,85 +411,116 @@ public class ChecksumsTests {
 
     @Test
     public void shouldFindAdler32AsSingleEntry() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.ADLER32)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32");
+        assertThat(type, contains(ChecksumType.ADLER32));
+    }
+
+    @Test
+    public void shouldFindUppercaseAdler32AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("ADLER32");
+        assertThat(type, contains(ChecksumType.ADLER32));
+    }
+
+    @Test
+    public void shouldFindMixedcaseAdler32AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("Adler32");
+        assertThat(type, contains(ChecksumType.ADLER32));
     }
 
     @Test
     public void shouldFindMd5AsSingleEntry() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("md5");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.MD5_TYPE)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("md5");
+        assertThat(type, contains(ChecksumType.MD5_TYPE));
+    }
+
+    @Test
+    public void shouldFindUppercaseMd5AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("MD5");
+        assertThat(type, contains(ChecksumType.MD5_TYPE));
     }
 
     @Test
     public void shouldFindSha1AsSingleEntry() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("sha");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(SHA1)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("sha");
+        assertThat(type, contains(SHA1));
+    }
+
+    @Test
+    public void shouldFindUppercaseSha1AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("SHA");
+        assertThat(type, contains(SHA1));
     }
 
     @Test
     public void shouldNotFindSha1Explicitly() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("sha-1");
-        assertFalse(type.isPresent());
+        Set<ChecksumType> type = Checksums.parseWantDigest("sha-1");
+        assertTrue(type.isEmpty());
+    }
+
+    @Test
+    public void shouldNotFindUppercaseSha1Explicitly() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("SHA-1");
+        assertTrue(type.isEmpty());
     }
 
     @Test
     public void shouldFindSha256AsSingleEntry() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("sha-256");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(SHA256)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("sha-256");
+        assertThat(type, contains(SHA256));
+    }
+
+    @Test
+    public void shouldFindUppercaseSha256AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("SHA-256");
+        assertThat(type, contains(SHA256));
     }
 
     @Test
     public void shouldFindSha512AsSingleEntry() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("sha-512");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(SHA512)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("sha-512");
+        assertThat(type, contains(SHA512));
+    }
+
+    @Test
+    public void shouldFindUppercaseSha512AsSingleEntry() {
+        Set<ChecksumType> type = Checksums.parseWantDigest("SHA-512");
+        assertThat(type, contains(SHA512));
     }
 
     @Test
     public void shouldFindSingleGoodEntryWithQ() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.ADLER32)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5");
+        assertThat(type, contains(ChecksumType.ADLER32));
     }
 
     @Test
     public void shouldSelectSecondAsBestByInternalPreference() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32,md5");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.MD5_TYPE)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32,md5");
+        assertThat(type, containsInAnyOrder(ChecksumType.ADLER32, ChecksumType.MD5_TYPE));
     }
 
     @Test
     public void shouldSelectFirstAsBestByInternalPreference() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("md5,adler32");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.MD5_TYPE)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("md5,adler32");
+        assertThat(type, containsInAnyOrder(ChecksumType.ADLER32, ChecksumType.MD5_TYPE));
     }
 
     @Test
     public void shouldSelectBestByExplicitQ() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,md5;q=1");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.MD5_TYPE)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,md5;q=1");
+        assertThat(type, contains(ChecksumType.MD5_TYPE));
     }
 
     @Test
     public void shouldSelectBestByImplicitQ() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,md5");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.MD5_TYPE)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,md5");
+        assertThat(type, contains(ChecksumType.MD5_TYPE));
     }
 
     @Test
     public void shouldIgnoreUnknownAlgorithm() {
-        Optional<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,UNKNOWN;q=1");
-        assertThat(type.isPresent(), is(equalTo(true)));
-        assertThat(type.get(), is(equalTo(ChecksumType.ADLER32)));
+        Set<ChecksumType> type = Checksums.parseWantDigest("adler32;q=0.5,UNKNOWN;q=1");
+        assertThat(type, contains(ChecksumType.ADLER32));
     }
 
     @Test

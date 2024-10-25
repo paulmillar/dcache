@@ -17,6 +17,7 @@
  */
 package org.dcache.util;
 
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,6 +81,11 @@ public class QualityValue<T> implements Comparable<QualityValue> {
      */
     public <U> QualityValue<U> mapWith(Function<String, U> conversion) {
         return new QualityValue(rawValue, conversion.apply(rawValue), quality);
+    }
+
+    public <U> Optional<QualityValue<U>> flatMap(Function<String,Optional<U>> conversion) {
+        var maybeValue = conversion.apply(rawValue);
+        return maybeValue.map(v -> new QualityValue(rawValue, v, quality));
     }
 
     /**

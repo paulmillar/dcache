@@ -17,6 +17,8 @@
  */
 package org.dcache.util;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -24,6 +26,7 @@ import static org.hamcrest.Matchers.is;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Test;
 
 public class QualityValueTest {
@@ -96,5 +99,34 @@ public class QualityValueTest {
         List<QualityValue> actual = Arrays.asList(qvalue1, qvalue2);
         actual.sort(Comparator.naturalOrder());
         assertThat(actual, is(equalTo(expected)));
+    }
+
+    @Test
+    public void shouldFlatMapOptionalToOptional() {
+        QualityValue qvalue = QualityValue.of("value");
+
+        Optional<QualityValue<Integer>> result = qvalue.flatMap(v -> Optional.empty());
+
+        assertThat(result, isEmpty());
+    }
+
+    @Test
+    public void shouldFlatMapValueToValue() {
+        QualityValue qvalue = QualityValue.of("value");
+
+        Optional<QualityValue<Integer>> result = qvalue.flatMap(v -> Optional.of(42));
+
+        assertThat(result, isPresent());
+        assertThat(result.get().value(), equalTo(42));
+    }
+
+    @Test
+    public void shouldFlatMapToSameQvalue() {
+        QualityValue qvalue = QualityValue.of("value;q=0.5");
+
+        Optional<QualityValue<Integer>> result = qvalue.flatMap(v -> Optional.of(42));
+
+        assertThat(result, isPresent());
+        assertThat(result.get().quality(), equalTo(0.5));
     }
 }
